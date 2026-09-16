@@ -2,6 +2,10 @@
 
 Date: 16 September 2026.
 
+## Studio 05.1 browser paper workflow
+
+The 18 web logic checks pass. A focused browser regression verifies Orbit → Add paper → Draw, drawing on a second sheet with focus, active target restoration through undo/redo, monitor/panorama presets preserving stroke data, fixed-position preview, export invariance, resizing to a phone viewport and drawing after returning. No browser errors were reported; screenshots were inspected. The static build versions app assets by content. The deployed version is checked with the same browser workflow. Native Android and the v4 contract remain unchanged. [Reproduction and review](PAPER_WORKFLOW_FIX.md).
+
 ## Studio 05 surfaces and Android 0.5.0
 
 Eighteen web tests and nineteen Android JVM tests pass. Android assembly and lint pass (0 errors, 16 warnings). A focused browser flow passes flat drawing followed by bend/tilt/roll, drawing directly on curved sheets, flatten/undo, duplication with attached ink, sparse curved-line erasure/undo, independent sheets, export and reopen, with zero browser errors. The actual browser samples/surfaces-v4.json survives Android decode/copy/export and browser re-import with every persisted field unchanged; old v3 paper and curve fixtures also still round-trip. artifacts/studio05-surfaces.png was inspected. No device/emulator performance campaign was run; native surface runtime and S9+/S22 Ultra performance/battery remain pending. [Surface controls, data model and logic review](CURVED_SURFACES.md).

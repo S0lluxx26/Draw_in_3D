@@ -4,6 +4,10 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 05.1: draw after orbiting and preview panoramas
+
+**Add a paper sheet** now faces your current view and activates Draw. **Focus sheet** prevents other sheets from covering your paint; **Show all objects** restores the full scene. Use **Curved monitor** or **Panorama** directly in Paper & surface to wrap an existing drawing. **Panorama view** lets you drag to look around from a fixed viewpoint, then return to drawing. Undo/redo also restores the active paint target. Export your work before refreshing the browser. [Reproduction, fixes and checked workflow](docs/PAPER_WORKFLOW_FIX.md).
+
 ## Studio 05: bendable drawing surfaces
 
 Draw on a flat sheet, then use **Edit active surface → Surface bend** to curve it with its paint. XYZ, Yaw, Tilt, Roll and Scale position each sheet independently. **Face sheet** adjusts the view; **Paint** resumes drawing. Add several sheets and switch using **Paint on**. Flattening, transforming, duplicating and deleting a sheet are undoable.

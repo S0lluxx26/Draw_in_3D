@@ -2,6 +2,8 @@
 
 16 September 2026. Implemented prototype, with physical phone review still pending.
 
+Studio 05.1 adds direct Flat / Curved monitor / Panorama presets, a fixed-position panorama preview, and corrects the new-sheet workflow after orbiting. **Position, tilt & size** is the new label for **Edit active surface**. See the [updated workflow and regression review](PAPER_WORKFLOW_FIX.md).
+
 ## Workflow
 
 1. Add a paper sheet. Draw normally while it is flat, or bend it before drawing.

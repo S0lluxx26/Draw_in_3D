@@ -7,7 +7,7 @@ const root=fileURLToPath(new URL('../',import.meta.url)),out=path.join(root,'tes
 const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
   const page=await browser.newPage({viewport:{width:1440,height:1040},acceptDownloads:true}),errors=[];
-  page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});page.on('console',m=>{if(m.type()==='error'){errors.push(m.text());console.error(m.text());}});page.on('dialog',d=>d.accept());await page.goto('http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();
+  page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});page.on('console',m=>{if(m.type()==='error'){errors.push(m.text());console.error(m.text());}});page.on('dialog',d=>d.accept());await page.goto('http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();await page.locator('.stroke-finish').evaluate(e=>e.open=true);
   const box=await page.locator('#canvas').boundingBox(),xy=(x,y)=>[box.x+box.width*x,box.y+box.height*y];
   const draw=async points=>{await page.mouse.move(...xy(...points[0]));await page.mouse.down();for(const p of points.slice(1))await page.mouse.move(...xy(...p));await page.mouse.up();};
   const count=async n=>page.waitForFunction(n=>document.querySelector('#object-count').textContent===`${n} / 80`,n);
