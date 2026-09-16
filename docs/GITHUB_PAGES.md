@@ -1,16 +1,16 @@
 # GitHub repository and HTTPS web app
 
-**Status:** repository and Pages creation were blocked by automatic approval review pending explicit confirmation of the public destinations and source release. Nothing has been pushed; these URLs are proposed, not live. The local SSH setup and Pages workflow are prepared.
+The public repository and GitHub Pages site use the same account as the reference project. Publishing was authorized on 16 September 2026. The workflow deploys each successful main-branch build automatically.
 
 Repository: [S0lluxx26/Draw_in_3D](https://github.com/S0lluxx26/Draw_in_3D)
 
 Web app: [Draw in 3D](https://s0lluxx26.github.io/Draw_in_3D/)
 
-The planned deployment is a project site on the same GitHub account as `Project_web_student_support`. The source includes the native Android project and browser editor. The website serves only the generated `web/dist` directory, including the synthetic starter scene and local Three.js files. Local SDK configuration, build caches, installed dependencies, generated APKs, test output and SSH credentials are excluded from Git.
+This is a project site on the same GitHub account as `Project_web_student_support`. The source includes the native Android project and browser editor. The website serves only the generated `web/dist` directory, including the synthetic starter scene and local Three.js files. Local SDK configuration, build caches, installed dependencies, generated APKs, test output and SSH credentials are excluded from Git.
 
 ## Publishing updates
 
-After public release approval, configure this SSH origin (no remote is currently configured):
+The local repository uses this SSH origin:
 
 ```text
 git@github.com:S0lluxx26/Draw_in_3D.git

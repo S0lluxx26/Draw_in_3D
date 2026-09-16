@@ -13,11 +13,16 @@ try{
   page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
   const response=await page.goto(url);assert.equal(response.status(),200);await page.locator('#undo:disabled').waitFor();
   assert.ok(await page.evaluate(()=>isSecureContext));
+  assert.equal(await page.locator('.edition').textContent(),'STUDIO 05');
   await page.locator('#example').click();await page.waitForFunction(()=>document.querySelector('#project-name').textContent==='Starter scene');
   assert.ok(await page.locator('#outliner .object-row').count()>0);await page.locator('#toast').evaluate(e=>e.hidden=true);
+  await page.locator('#add-paper').click();await page.locator('#edit-surface').click();
+  await page.locator('#surface-bend').fill('160');await page.locator('#surface-bend').dispatchEvent('change');
+  assert.equal(await page.locator('#surface-bend-value').textContent(),'160°');
+  await page.locator('#toast').evaluate(e=>e.hidden=true);
   await page.screenshot({path:fileURLToPath(new URL('../test-output/github-pages-desktop.png',import.meta.url))});
   await page.setViewportSize({width:412,height:915});await page.locator('[data-tool="curve"]').click();await page.locator('#curve-options').waitFor({state:'visible'});
   assert.ok(await page.locator('#canvas').isVisible());assert.ok(await page.locator('#export').isVisible());
   await page.screenshot({path:fileURLToPath(new URL('../test-output/github-pages-mobile.png',import.meta.url))});
-  assert.deepEqual(errors,[]);console.log('PASS: HTTPS editor, project subpath assets, starter scene, desktop/mobile layouts and curve control; zero browser errors.');
+  assert.deepEqual(errors,[]);console.log('PASS: Studio 05 HTTPS editor, project subpath assets, starter scene, bendable surface, desktop/mobile layouts and curve control; zero browser errors.');
 }finally{await browser.close();}

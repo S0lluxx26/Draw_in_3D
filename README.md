@@ -1,6 +1,6 @@
 # Draw in 3D
 
-Public GitHub / Pages publication is pending approval. Use the local browser editor below. [Prepared publishing setup](docs/GITHUB_PAGES.md).
+**[Open the web app](https://s0lluxx26.github.io/Draw_in_3D/)** · [GitHub repository](https://github.com/S0lluxx26/Draw_in_3D) · [Publishing and phone access](docs/GITHUB_PAGES.md)
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
