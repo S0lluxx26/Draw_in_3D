@@ -1,0 +1,106 @@
+# Draw in 3D
+
+**[Open the web app](https://s0lluxx26.github.io/Draw_in_3D/)** · [GitHub repository](https://github.com/S0lluxx26/Draw_in_3D) · [Publishing and phone access](docs/GITHUB_PAGES.md)
+
+Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
+
+## Studio 04: curves and stroke finishing
+
+**Curve (Q)** draws arcs and S-curves with adjustable bend. **Smooth on release** optionally softens new freehand strokes after lifting; strength is adjustable, and **Smooth selected strokes** applies it later as an undoable edit. Open endpoints and paper attachments are preserved. Native Android has Curve in its first toolbar row and finishing/bend controls in Pen / settings.
+
+Install `artifacts/Draw-in-3D-v0.4.0-debug.apk` for the new Android controls. Saved curves use the existing v1/v2/v3 stroke format. Read [the controls and reviewed implementation](docs/CURVES_AND_SMOOTHING.md). Export unsaved browser work before refreshing to load Studio 04.
+
+## Studio 03: paper and paint surfaces
+
+Add watercolor, rough watercolor, sketch, canvas or water-resistant coated sheets. Paint stays attached when a sheet moves, rotates, scales, duplicates or is deleted; undo restores the edit. Water/Wet paint uses surface grain and spread, with short runoff on coated paper. These are lightweight visual effects. Read [the paper workflow, research and logic review](docs/PAPER_SURFACES.md).
+
+Use **Paper & surface → Add a paper sheet** on web, or **Paper / surface** in the Android toolbar. Install `artifacts/Draw-in-3D-v0.3.0-debug.apk` for paper files. Both editors import/export v1, v2 and v3. `samples/paper-v3.json` is a portable watercolor example. Export existing browser work before refreshing to load this update.
+
+## Studio 02 tools
+
+The browser now includes line/rectangle/ellipse tools, solid 3D blocks, dashed/dotted styles, stabilization/taper, segment/object erasers, box selection, group move/rotate/scale, duplicate, snapping, and 30-step undo/redo. Read [the tool guide and logic review](docs/EDITOR_TOOLS.md).
+
+Android 0.2 introduced `artifacts/Draw-in-3D-v0.2.0-debug.apk` for solid blocks and patterned strokes; use the latest APK for all current features. Older projects remain supported; ordinary scenes still export v1. Advanced selection/shape/segment-erase controls are currently in the web editor. Native 0.2 adds block placement, whole-object erase and pattern presets, and can import/adjust/export the web results.
+
+## PC browser → phone / tablet
+
+The browser prototype is in [`web/`](web/README.md). Run `.\web\start-web.ps1` (Node.js 22+), then open **http://127.0.0.1:5173** in Chrome or Edge. The prepared `artifacts/Draw-in-3D-Web-Prototype.zip` includes the built editor and local server. No camera or account is needed.
+
+Draw in the browser, choose **Export for phone**, transfer the `.json` file, and use **Files / more → Import project JSON** in the Android app. Strokes, pressure, brush settings, curved images and marker order stay editable. Android exports reopen with **Open project** on PC. The transfer is manual; images are embedded in the one file. Use Studio on the phone to keep the camera off, or place a new origin for optional Camera AR.
+
+See [the shared-format design and reviewed web plan](docs/WEB_INTEROP.md). Browser authoring is implemented; browser gyro/AR and an iOS native app are not. Physical phone/tablet round-trip review is still pending.
+
+## Android camera and power modes
+
+**Camera-free by default (v0.1.1):** Studio uses touch without the camera or orientation sensors. Look / gyro turns the view using phone orientation, with the camera off. Camera AR is optional for real-room placement and walking around objects. Switching back to Studio/Look stops the camera; returning to AR requires origin placement again.
+
+Stationary camera-free scenes stop redrawing after input and effects settle. The app honors the normal screen timeout, requests gyro samples at about 30 Hz, and caps the experimental 60 fps renderer to 30 under Android Battery Saver or thermal pressure. Camera-free viewing does not track phone translation. Battery savings still need measurement on the S9+.
+
+Read [the researched and reviewed product plan](docs/PLAN.md) for the engine comparison, related apps, architecture, brush roadmap, performance targets and corrections from the logic review. The production recommendation is Unity + AR Foundation; this first executable feasibility prototype is **native Java + ARCore + OpenGL ES**, not a Unity project.
+
+## Install the prototype
+
+The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. Copy it to your phone and open it, or use Android platform tools with USB debugging enabled:
+
+```powershell
+adb devices
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+
+Package ID: `com.drawin3d.prototype`. Android 8.0+; arm64 phones and x86_64 emulator included. AR needs an ARCore-supported device, a compatible Google Play Services for AR installation, and camera permission. Studio and Look do not require camera permission. No developer API key, account, cloud project or Blender install is needed.
+
+This is a development-signed APK for direct review, not a Play Store release. Phone tracking, thermal stability and S9+ frame rate have not yet been measured.
+
+## First session
+
+1. Start in **Studio**. Drag across the view to draw. Choose **Look** in the bottom toolbar to rotate the virtual view by dragging; switch back to **Draw** to paint.
+2. Optionally tap **Camera AR**, grant camera permission, and scan a textured floor/wall slowly. Tap **Origin**, then tap a detected surface. Point the camera in the desired map-forward direction during placement. Skip this step to keep the camera off.
+3. Choose **Air** for drawing at a fixed distance from the screen ray, or **Surface** to capture a detected plane at stroke start. In Studio, Surface uses the floor grid.
+4. Drag on the canvas, or hold **HOLD DRAW** while moving the phone. Open **Pen / settings** for Pen, Marker, Neon, Spray, Water, colours, width, opacity, distance and optional wet drips.
+5. Tap **+ Image**, select a picture, then use **Select → Adjust** to move, rotate or scale it. The image appears ahead of the camera. In settings, change its curve and tap **Apply curve to selected image**. Curve ranges from flat to 300°.
+6. **Look / gyro** uses the phone's orientation to look around from a fixed point. It does not know where the phone moves. **Origin** recentres it.
+7. Place **Start**, optional **Checkpoint** markers, and **Goal**. Tap **Play / edit**, then tap Start, checkpoints in creation order, and Goal. Tap **Play / edit** again to return to the editor.
+8. **Save** writes one private local project. **Files / more** loads it or imports/exports portable JSON with embedded images. Loading into AR requires setting the origin again. Backgrounding the app writes a separate recovery project; a force kill before that point may lose unsaved edits.
+
+Toolbar rows scroll horizontally on narrow screens. Tap close to the centre of an image/marker or a visible stroke to select it. Movement adjustments use map axes in 10 cm steps. Undo/redo keeps the last 20 authoring operations. Delete erases an entire selected object. The native Erase tool taps away whole objects; + Block places a 0.5 m cube. Pen/settings includes solid/dash/dot styles.
+
+## Build
+
+Requirements: JDK 17 or 21, Android SDK platform 36 and Android build tools. Gradle wrapper and dependencies are pinned. First build needs internet to download dependencies.
+
+```powershell
+.\scripts\build.ps1
+```
+
+Or write `local.properties` with your SDK path, then:
+
+```powershell
+.\gradlew.bat --no-daemon :app:assembleDebug
+```
+
+The initial review uses a small check set:
+
+```powershell
+.\gradlew.bat --no-daemon :app:testDebugUnitTest :app:lintDebug
+```
+
+No elaborate test harness or benchmark farm is required for this stage. See [verification and known limitations](docs/VERIFICATION.md) for what is actually checked versus waiting for a phone.
+
+## Project layout
+
+- `docs/PLAN.md`: research, engine decision, architecture, budgets, staged delivery and review fixes.
+- `web/`: Three.js browser authoring, local server and compatible JSON import/export.
+- `docs/WEB_INTEROP.md`: browser ↔ Android contract, review fixes and transfer limits.
+- `app/src/main/java/com/drawin3d/MainActivity.java`: native UI, AR lifecycle, sensors, file picker and render pacing.
+- `SceneRenderer.java`: tracking gate, origin placement, scene editing, GPU resources and marker gameplay.
+- `SceneData.java`: bounded versioned scene document and validation.
+- `Geometry.java` / `Math3.java`: brush meshes, curved panels and gravity geometry.
+- `ProjectIO.java`: image orientation/size handling and atomic local storage.
+- `FrameDemand.java`: bounds input/effect redraw windows so unchanged camera-free scenes can idle.
+- `app/src/test`: six geometry/data-integrity tests, two small render-demand checks and three real browser-file interop checks (v1/v2/v3), plus paper geometry/coordinate checks.
+
+The prototype has no networked multiplayer, cloud anchors, depth occlusion, room-mesh reconstruction, physical fluid solver, spherical 360° photo viewer, advanced brush mixing, layers or GLB model import. Those are planned explicitly; they are not hidden behind nonworking controls.
+
+## Dependency notices
+
+ARCore is Google's SDK and is used under its applicable terms. AndroidX ExifInterface and the Gradle tooling retain their own licenses; JUnit and JSON-java are test dependencies only. Product examples in the research are references, not copied assets. The prototype's geometry and app icon are created in code, and user pictures are stored locally/re-encoded into their chosen project export. Review all final distribution terms before a public release.

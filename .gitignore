@@ -1,0 +1,15 @@
+.gradle/
+**/build/
+local.properties
+.idea/
+*.iml
+*.jks
+*.keystore
+artifacts/
+.tools/
+web/node_modules/
+web/dist/
+web/test-output/
+.env
+.env.*
+!.env.example
