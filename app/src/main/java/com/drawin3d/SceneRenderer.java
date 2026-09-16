@@ -46,6 +46,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private final ArrayList<SceneData.Entity> scene=new ArrayList<>(), ordered=new ArrayList<>();
     private final ArrayDeque<ArrayList<SceneData.Entity>> undo=new ArrayDeque<>(),redo=new ArrayDeque<>();
     private final IdentityHashMap<SceneData.Entity,Resource> resources=new IdentityHashMap<>();
+    private final IdentityHashMap<SceneData.Entity,float[]> surfaceTransforms=new IdentityHashMap<>();
     private final HashMap<String,Bitmap> bitmaps=new HashMap<>();
     private final HashMap<String,Integer> textures=new HashMap<>();
     private final HashMap<String,Long> born=new HashMap<>();
@@ -62,7 +63,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private Frame frame;
     private boolean tracking;
     private int screenWidth=1,screenHeight=1,program,cameraProgram,cameraTexture;
-    private int pPosition,pColor,pUv,pFall,uMatrix,uTexture,uTextured,uWet,uHighlight,uPaperClip;
+    private int pPosition,pColor,pUv,pFall,uMatrix,uTexture,uTextured,uWet,uHighlight,uPaperClip,uSurface;
     private FloatBuffer quad,uv;
     private Resource grid,originIndicator,activeResource;
     private SceneData.Entity active;
@@ -94,11 +95,11 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     @Override public void onSurfaceCreated(GL10 gl,EGLConfig config){
         requestSceneFrame();
         try {
-            resources.clear();textures.clear();activeResource=null;renderFailed=false;
-            program=program("uniform mat4 uM;uniform float uWet;attribute vec3 aP;attribute vec4 aC;attribute vec2 aU;attribute vec3 aF;varying vec4 vC;varying vec2 vU;void main(){gl_Position=uM*vec4(aP+aF*uWet,1.0);vC=aC;vU=aU;}",
+            resources.clear();surfaceTransforms.clear();textures.clear();activeResource=null;renderFailed=false;
+            program=program("uniform mat4 uM;uniform vec4 uSurface;uniform float uWet;attribute vec3 aP;attribute vec4 aC;attribute vec2 aU;attribute vec3 aF;varying vec4 vC;varying vec2 vU;void main(){vec3 pos=aP+aF*uWet;if(abs(uSurface.x)>0.000001&&dot(aF,aF)>0.0){vec2 xy=vec2((aU.x-0.5)*uSurface.y,(0.5-aU.y)*uSurface.z)-aF.xy*(1.0-uWet);float t=xy.x*uSurface.x;pos=vec3(sin(t)/uSurface.x-sin(t)*uSurface.w,xy.y,2.0*sin(t*0.5)*sin(t*0.5)/uSurface.x+cos(t)*uSurface.w);}gl_Position=uM*vec4(pos,1.0);vC=aC;vU=aU;if(uSurface.y>0.0)vU-=vec2(aF.x/uSurface.y,-aF.y/uSurface.z)*(1.0-uWet);}",
                     "precision mediump float;uniform sampler2D uT;uniform float uTextured;uniform float uHighlight;uniform float uPaperClip;varying vec4 vC;varying vec2 vU;void main(){if(uPaperClip>0.5&&(vU.x<0.0||vU.x>1.0||vU.y<0.0||vU.y>1.0))discard;vec4 c=vC;if(uTextured>0.5)c*=texture2D(uT,vU);c.rgb=mix(c.rgb,vec3(1.0,.85,.4),uHighlight);if(c.a<.01)discard;gl_FragColor=c;}");
             pPosition=GLES20.glGetAttribLocation(program,"aP");pColor=GLES20.glGetAttribLocation(program,"aC");pUv=GLES20.glGetAttribLocation(program,"aU");pFall=GLES20.glGetAttribLocation(program,"aF");
-            uMatrix=GLES20.glGetUniformLocation(program,"uM");uTexture=GLES20.glGetUniformLocation(program,"uT");uTextured=GLES20.glGetUniformLocation(program,"uTextured");uWet=GLES20.glGetUniformLocation(program,"uWet");uHighlight=GLES20.glGetUniformLocation(program,"uHighlight");uPaperClip=GLES20.glGetUniformLocation(program,"uPaperClip");
+            uMatrix=GLES20.glGetUniformLocation(program,"uM");uTexture=GLES20.glGetUniformLocation(program,"uT");uTextured=GLES20.glGetUniformLocation(program,"uTextured");uWet=GLES20.glGetUniformLocation(program,"uWet");uHighlight=GLES20.glGetUniformLocation(program,"uHighlight");uPaperClip=GLES20.glGetUniformLocation(program,"uPaperClip");uSurface=GLES20.glGetUniformLocation(program,"uSurface");
             cameraProgram=program("attribute vec2 aP;attribute vec2 aU;varying vec2 vU;void main(){gl_Position=vec4(aP,0.0,1.0);vU=aU;}","#extension GL_OES_EGL_image_external : require\nprecision mediump float;uniform samplerExternalOES uT;varying vec2 vU;void main(){gl_FragColor=texture2D(uT,vU);}");
             int[] id=new int[1];GLES20.glGenTextures(1,id,0);cameraTexture=id[0];GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,cameraTexture);
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR);
@@ -136,6 +137,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
             if(mode!=AR){Matrix.setIdentityM(model,0);draw(grid,model,0,1,false);}
             if(mode!=AR||(anchor!=null&&tracking)){
                 Matrix.setIdentityM(model,0);draw(originIndicator,model,0,1,false);
+                surfaceTransforms.keySet().removeIf(p->!scene.contains(p));
                 resources.entrySet().removeIf(entry->{if(entry.getKey()!=active&&!scene.contains(entry.getKey())){entry.getValue().dispose();return true;}return false;});
                 ordered.clear();ordered.addAll(scene);ordered.sort((a,b)->a.type.equals("paper")!=b.type.equals("paper")?(a.type.equals("paper")?-1:1):Float.compare(distanceToCamera(b),distanceToCamera(a)));
                 for(SceneData.Entity e:ordered){
@@ -161,9 +163,11 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     }
     private SceneData.Entity paper(String id){for(SceneData.Entity e:scene)if(e.id.equals(id)&&e.type.equals("paper"))return e;return null;}
     private Geometry mesh(SceneData.Entity e){SceneData.Entity p=paper(e.paperId);return e.type.equals("paper")?Paper.sheet(e):e.type.equals("stroke")?(p==null?Geometry.stroke(e):Paper.ink(e,p)):e.type.equals("image")?Geometry.image(e):e.type.equals("block")?Geometry.block(e):Geometry.marker(e);}
-    private float distanceToCamera(SceneData.Entity e){float x=e.position[0]-cameraLocal[12],y=e.position[1]-cameraLocal[13],z=e.position[2]-cameraLocal[14];return x*x+y*y+z*z;}
+    private float distanceToCamera(SceneData.Entity e){SceneData.Entity parent=paper(e.paperId);if(parent!=null)e=parent;float x=e.position[0]-cameraLocal[12],y=e.position[1]-cameraLocal[13],z=e.position[2]-cameraLocal[14];return x*x+y*y+z*z;}
     private void drawEntity(SceneData.Entity e,Resource res,long now){
-        Matrix.setIdentityM(model,0);Matrix.translateM(model,0,e.position[0],e.position[1],e.position[2]);Matrix.rotateM(model,0,e.yaw,0,1,0);Matrix.scaleM(model,0,e.scale,e.scale,e.scale);
+        SceneData.Entity parent=e.type.equals("paper")?e:paper(e.paperId),pose=parent==null?e:parent;
+        Matrix.setIdentityM(model,0);Matrix.translateM(model,0,pose.position[0],pose.position[1],pose.position[2]);Matrix.rotateM(model,0,pose.yaw,0,1,0);Matrix.scaleM(model,0,pose.scale,pose.scale,pose.scale);
+        if(parent!=null){float[] cached=surfaceTransforms.get(parent);if(cached==null){float[][] axes=Surface.axes(parent);float[] orientation=new float[16];Matrix.setIdentityM(orientation,0);for(int c=0;c<3;c++)for(int i=0;i<3;i++)orientation[c*4+i]=axes[c][i];cached=new float[16];Matrix.multiplyMM(cached,0,model,0,orientation,0);surfaceTransforms.put(parent,cached);}System.arraycopy(cached,0,model,0,16);}
         int texture=0;
         if(e.type.equals("image")){
             Integer cached=textures.get(e.id);if(cached==null){Bitmap bitmap=bitmaps.get(e.id);if(bitmap==null)return;int[] id=new int[1];GLES20.glGenTextures(1,id,0);texture=id[0];GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture);
@@ -175,7 +179,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         float growth=Math3.clamp((now-born.getOrDefault(e.id,now-5000L))/4000f,0,1);growth=1-(1-growth)*(1-growth);
         // All content is sorted back-to-front; opaque strokes still write depth.
         GLES20.glDepthMask(!paperInk&&e.alpha>=.999f&&!e.type.equals("image")&&!e.brush.equals("Water")&&!e.brush.equals("Marker")&&!e.brush.equals("Neon"));
-        draw(res,model,texture,growth,playing?(gameStep<gameOrder.size()&&e.id.equals(gameOrder.get(gameStep))):e.id.equals(selected),paperInk);
+        draw(res,model,texture,growth,playing?(gameStep<gameOrder.size()&&e.id.equals(gameOrder.get(gameStep))):e.id.equals(selected),paperInk,parent);
     }
     private int paperTexture(String kind,boolean ink){
         String key="paper:"+kind+":"+ink;Integer cached=textures.get(key);if(cached!=null)return cached;
@@ -184,10 +188,10 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR);
         GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D,0,GLES20.GL_RGBA,256,256,0,GLES20.GL_RGBA,GLES20.GL_UNSIGNED_BYTE,pixels);textures.put(key,id[0]);return id[0];
     }
-    private void draw(Resource res,float[] transform,int texture,float growth,boolean selected){draw(res,transform,texture,growth,selected,false);}
-    private void draw(Resource res,float[] transform,int texture,float growth,boolean selected,boolean paperClip){
+    private void draw(Resource res,float[] transform,int texture,float growth,boolean selected){draw(res,transform,texture,growth,selected,false,null);}
+    private void draw(Resource res,float[] transform,int texture,float growth,boolean selected,boolean paperClip,SceneData.Entity surface){
         GLES20.glUseProgram(program);Matrix.multiplyMM(mvp,0,vp,0,transform,0);GLES20.glUniformMatrix4fv(uMatrix,1,false,mvp,0);
-        GLES20.glUniform1f(uPaperClip,paperClip?1:0);GLES20.glUniform1f(uWet,growth);GLES20.glUniform1f(uHighlight,selected?.22f:0);GLES20.glUniform1f(uTextured,texture==0?0:1);GLES20.glUniform1i(uTexture,0);
+        GLES20.glUniform4f(uSurface,surface==null?0:(float)Surface.curvature(surface),surface==null?0:surface.panelWidth,surface==null?0:surface.panelWidth/surface.aspect,paperClip?.003f/surface.scale:0);GLES20.glUniform1f(uPaperClip,paperClip?1:0);GLES20.glUniform1f(uWet,growth);GLES20.glUniform1f(uHighlight,selected?.22f:0);GLES20.glUniform1f(uTextured,texture==0?0:1);GLES20.glUniform1i(uTexture,0);
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0);GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture);
         GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,res.buffer);int stride=Geometry.STRIDE*4;
         GLES20.glEnableVertexAttribArray(pPosition);GLES20.glVertexAttribPointer(pPosition,3,GLES20.GL_FLOAT,false,stride,0);
@@ -206,7 +210,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         if(action==2&&tool.equals("Look")&&mode==STUDIO&&!playing){yaw+=(x-lastX)*140;pitch=Math3.clamp(pitch+(y-lastY)*100,-80,80);}
         lastX=x;lastY=y;touchX=x;touchY=y;this.pressure=Math3.clamp(pressure,.2f,1.5f);
         if(action==0&&(tool.equals("Draw")||tool.equals("Curve"))&&!playing&&!originTool&&tracking&&(mode!=AR||anchor!=null)){startStroke=false;beginStroke(x,y);}
-        if(action==1){if(active!=null){float[][] ray=ray(x,y);float[] p=active.surface?Math3.planeHit(ray[0],ray[1],planePoint,planeNormal):Math3.add(ray[0],Math3.mul(ray[1],depth));if(p!=null)addPoint(p);}down=false;finishStroke();startStroke=false;}
+        if(action==1){if(active!=null){float[][] ray=ray(x,y);float[] p=strokeHit(ray);if(p!=null)addPoint(p);}down=false;finishStroke();startStroke=false;}
         if(action==3){down=false;hold=false;startStroke=false;cancelStroke();}
     }
     void hold(boolean held){hold=held;touchX=.5f;touchY=.5f;pressure=1;if(held){startStroke=true;down=true;}else{down=false;finishStroke();}}
@@ -239,7 +243,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         float x=hold?.5f:touchX,y=hold?.5f:touchY;
         if(startStroke){startStroke=false;beginStroke(x,y);}
         if(active==null)return;
-        float[][] r=ray(x,y);float[] p=active.surface?Math3.planeHit(r[0],r[1],planePoint,planeNormal):Math3.add(r[0],Math3.mul(r[1],depth));
+        float[][] r=ray(x,y);float[] p=strokeHit(r);
         if(p!=null)addPoint(p);
     }
     private void placeOrigin(){
@@ -251,21 +255,22 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     }
     void requestOrigin(){finishStroke();originTool=true;listener.notice("Tap a detected floor or wall to place the map origin. Aim in the map's forward direction.");}
     private int pointCount(){int n=0;for(SceneData.Entity e:scene)n+=e.points.size();if(active!=null)n+=active.points.size();return n;}
+    private float[] strokeHit(float[][] r){SceneData.Entity p=paper(active.paperId);return p!=null?Surface.hit(p,r[0],r[1]):active.surface?Math3.planeHit(r[0],r[1],planePoint,planeNormal):Math3.add(r[0],Math3.mul(r[1],depth));}
     private void beginStroke(float x,float y){
         if(scene.size()>=SceneData.MAX_OBJECTS||pointCount()>=SceneData.MAX_POINTS||(tool.equals("Curve")&&SceneData.MAX_POINTS-pointCount()<3)){listener.notice("Scene budget reached. Erase objects or save and start a new map.");down=false;return;}
-        SceneData.Entity paper=paper(activePaperId);float[][] ray=ray(x,y);float[] p=paper==null?placement(x,y,surface):Math3.planeHit(ray[0],ray[1],paper.position,Math3.rotateY(paper.normal,paper.yaw));if(p!=null&&paper!=null&&!Paper.inside(paper,p))p=null;if(p==null){listener.notice("Aim inside the active paper. In free space, Studio Surface mode uses the floor grid.");down=false;return;}
-        if(Math3.length(p)>SceneData.RADIUS-.4f){listener.notice("Keep drawing within four metres of the map origin.");down=false;return;}
+        SceneData.Entity paper=paper(activePaperId);float[][] ray=ray(x,y);float[] p=paper==null?placement(x,y,surface):Surface.hit(paper,ray[0],ray[1]);if(p==null){listener.notice("Face the front of the active paper and aim inside it. In free space, Studio Surface mode uses the floor grid.");down=false;return;}
+        if(paper==null&&Math3.length(p)>SceneData.RADIUS-.4f){listener.notice("Keep drawing within four metres of the map origin.");down=false;return;}
         activeCurve=tool.equals("Curve");activeSCurve=sCurve;activeBend=curveBend;activeCurveBudget=Math.min(65,SceneData.MAX_POINTS-pointCount());activeSmooth=smoothOnRelease;activeStrength=smoothStrength;
         active=new SceneData.Entity();active.position=p.clone();active.brush=brush;active.pattern=pattern;active.color=ink;active.width=width;active.alpha=alpha;active.wet=wet;active.surface=paper!=null||surface;active.paperId=paper==null?"":paper.id;
-        if(paper!=null){planePoint=paper.position.clone();planeNormal=Math3.rotateY(paper.normal,paper.yaw);active.normal=planeNormal.clone();}
+        if(paper!=null){active.pointSpace="surface";active.position=Surface.coordinates(paper,p);active.position[2]=0;active.normal=new float[]{0,0,1};}
         else if(surface){planePoint=p.clone();HitResult h=mode==AR?surfaceHit(x,y):null;planeNormal=h==null?new float[]{0,1,0}:directionLocal(h.getHitPose().getTransformedAxis(1,1));active.normal=planeNormal.clone();}
         else active.normal=directionLocal(new float[]{cameraWorld[8],cameraWorld[9],cameraWorld[10]});
         if(activeCurve){active.surface=true;planePoint=p.clone();planeNormal=active.normal.clone();}
         long now=SystemClock.elapsedRealtime();born.put(active.id,now);if(active.wet&&(paper==null||paper.paperKind.equals("coated")))frameDemand.wakeUntil(now+4100);selected=null;addPoint(p);
     }
     private void addPoint(float[] p){
-        if(active==null)return;SceneData.Entity paper=paper(active.paperId);if(paper!=null&&!Paper.inside(paper,p))return;if(Math3.length(p)>SceneData.RADIUS-.4f){finishStroke();down=false;return;}
-        float[] local=Math3.sub(p,active.position);int count=active.points.size();
+        if(active==null)return;SceneData.Entity paper=paper(active.paperId);if(paper!=null&&!Paper.inside(paper,p))return;if(paper==null&&Math3.length(p)>SceneData.RADIUS-.4f){finishStroke();down=false;return;}
+        float[] local=Math3.sub(paper==null?p:Surface.coordinates(paper,p),active.position);if(paper!=null)local[2]=0;int count=active.points.size();
         if(activeCurve){if(count>0&&Math3.distance(local,active.points.get(count-1))<.001f)return;ArrayList<float[]> points=StrokeProcessing.curve(local,active.normal,activeBend,activeSCurve,activeCurveBudget,count>0?active.points.get(0)[3]:pressure,pressure);SceneData.Entity candidate=active.copy();candidate.points.clear();candidate.points.addAll(points);if(!SceneData.withinBounds(candidate))return;active.points.clear();active.points.addAll(points);Geometry mesh=mesh(active);if(activeResource==null)activeResource=new Resource(mesh);else activeResource.update(mesh);return;}
         if(count>0){float[] prev=active.points.get(count-1);float gap=Math3.distance(prev,local);if(gap<Math.max(.006f,active.width*.25f))return;
             if(gap>.45f){finishStroke();down=false;listener.notice("Stroke ended after a tracking/motion jump.");return;}
@@ -324,7 +329,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
             int samples=Math.max(1,candidates.size());
             for(int i=0;i<samples;i+=Math.max(1,samples/40)){
                 float[] local=candidates.isEmpty()?new float[]{0,0,0}:candidates.get(i);
-                float[] p=Math3.add(e.position,Math3.rotateY(Math3.mul(local,e.scale),e.yaw));
+                SceneData.Entity sheet=paper(e.paperId);float[] p=sheet==null?Paper.world(e,local):Surface.world(sheet,Surface.uv(e,local,sheet),.003f/sheet.scale);
                 float[] clip=new float[4];Matrix.multiplyMV(clip,0,vp,0,new float[]{p[0],p[1],p[2],1},0);if(clip[3]<=0)continue;
                 float dx=(clip[0]/clip[3]+1)*.5f-x,dy=(1-clip[1]/clip[3])*.5f-y;
                 float d=dx*dx+dy*dy;if(d<.0064f&&clip[3]<nearest){found=e.id;nearest=clip[3];}
@@ -335,11 +340,17 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     void deleteSelected(){if(playing)return;finishStroke();if(selected==null){listener.notice("Select an object first.");return;}checkpoint();scene.removeIf(e->e.id.equals(selected)||e.paperId.equals(selected));selected=null;}
     void adjust(float dx,float dy,float dz,float degrees,float scaleDelta,Float newArc){
         if(playing)return;finishStroke();for(int i=0;i<scene.size();i++){SceneData.Entity old=scene.get(i);if(!old.id.equals(selected))continue;
-            SceneData.Entity e=old.copy();e.position[0]+=dx;e.position[1]+=dy;e.position[2]+=dz;e.yaw+=degrees;e.scale=Math3.clamp(e.scale+scaleDelta,.1f,4);if(newArc!=null&&e.type.equals("image"))e.arc=newArc;
-            if(!SceneData.withinBounds(e)){listener.notice("Adjustment would exceed the four-metre map radius.");return;}ArrayList<SceneData.Entity> next=new ArrayList<>(scene);next.set(i,e);
-            if(old.type.equals("paper"))for(int j=0;j<next.size();j++){SceneData.Entity child=next.get(j);if(!child.paperId.equals(old.id))continue;SceneData.Entity copy=child.copy();float ratio=e.scale/old.scale;copy.position=Math3.add(e.position,Math3.rotateY(Math3.mul(Math3.sub(child.position,old.position),ratio),degrees));copy.yaw+=degrees;copy.scale*=ratio;if(copy.scale<.1f||copy.scale>4||!SceneData.withinBounds(copy)){listener.notice("Paper paint would exceed scene limits.");return;}next.set(j,copy);}
+            SceneData.Entity sheet=paper(old.paperId);SceneData.Entity e=(sheet==null?old:Surface.localize(old,sheet)).copy();e.position[0]+=dx;e.position[1]+=dy;if(!e.pointSpace.equals("surface"))e.position[2]+=dz;e.yaw+=degrees;e.scale=Math3.clamp(e.scale+scaleDelta,.1f,4);if(newArc!=null&&e.type.equals("image"))e.arc=newArc;
+            if(!SceneData.withinBounds(e)||Math.abs(e.position[0])>4||Math.abs(e.position[1])>4||Math.abs(e.position[2])>4||Math.abs(e.yaw)>36000){listener.notice("Adjustment would exceed the four-metre map radius.");return;}ArrayList<SceneData.Entity> next=new ArrayList<>(scene);next.set(i,e);
+            if(old.type.equals("paper"))for(int j=0;j<next.size();j++){SceneData.Entity child=next.get(j);if(child.paperId.equals(old.id))next.set(j,Surface.localize(child,old).copy());}
             checkpoint();scene.clear();scene.addAll(next);return;
         }listener.notice("Select an object to adjust it.");
+    }
+    void surfaceAdjust(float bend,float pitch,float roll,boolean flatten){
+        if(playing)return;finishStroke();SceneData.Entity p=paper(selected);if(p==null)p=paper(activePaperId);if(p==null){listener.notice("Choose a paper in Paper / surface first.");return;}
+        SceneData.Entity changed=p.copy();changed.bend=flatten?0:Math3.clamp(p.bend+bend,-300,300);changed.pitch=Math3.clamp(p.pitch+pitch,-36000,36000);changed.roll=Math3.clamp(p.roll+roll,-36000,36000);checkpoint();
+        for(int i=0;i<scene.size();i++){SceneData.Entity e=scene.get(i);if(e.id.equals(p.id))scene.set(i,changed);else if(e.paperId.equals(p.id))scene.set(i,Surface.localize(e,p).copy());}
+        selected=p.id;listener.notice("Surface: bend "+Math.round(changed.bend)+"°, tilt "+Math.round(changed.pitch)+"°, roll "+Math.round(changed.roll)+"°. Paint follows the sheet.");
     }
     void togglePlay(){
         finishStroke();if(playing){playing=false;gameStep=-1;listener.notice("Editor restored.");return;}

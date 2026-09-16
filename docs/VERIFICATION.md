@@ -2,6 +2,10 @@
 
 Date: 16 September 2026.
 
+## Studio 05 surfaces and Android 0.5.0
+
+Eighteen web tests and nineteen Android JVM tests pass. Android assembly and lint pass (0 errors, 16 warnings). A focused browser flow passes flat drawing followed by bend/tilt/roll, drawing directly on curved sheets, flatten/undo, duplication with attached ink, sparse curved-line erasure/undo, independent sheets, export and reopen, with zero browser errors. The actual browser samples/surfaces-v4.json survives Android decode/copy/export and browser re-import with every persisted field unchanged; old v3 paper and curve fixtures also still round-trip. artifacts/studio05-surfaces.png was inspected. No device/emulator performance campaign was run; native surface runtime and S9+/S22 Ultra performance/battery remain pending. [Surface controls, data model and logic review](CURVED_SURFACES.md).
+
 ## Studio 04 curves and Android 0.4.0
 
 Fifteen web tests and sixteen Android JVM tests pass. APK build and lint pass. The focused browser flow covers arcs/S-curves, smoothing selected strokes with exact undo, equivalent automatic finishing, gesture cancellation, paper attachment and reopening, with zero browser errors. The actual `samples/curves.json` export survives Android re-encoding and web reading with all persisted fields unchanged. `artifacts/studio04-curves.png` was inspected. No new emulator campaign or physical performance measurement was run. [Controls and logic review](CURVES_AND_SMOOTHING.md).

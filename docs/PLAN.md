@@ -200,3 +200,8 @@ Implemented five drawable paper/surface presets on web and native Android, attac
 ## 13. Studio 04 curves and stroke finishing
 
 Web and native Android now author bounded arc/S-curves and optionally finish freehand strokes after release. The strength control and explicit smooth-selected action share the same corner-cut/resampling behavior. Finished geometry uses the existing file schema. See [the implementation review](CURVES_AND_SMOOTHING.md) for endpoint, pressure, plane, history and budget invariants. Curve control handles and non-destructive smoothing modifiers remain later work.
+
+
+## 14. Studio 05 bendable drawing surfaces
+
+Implemented independent cylindrical drawing sheets with position, yaw, local tilt/roll, width/height, scale and signed curvature. Strokes store ordered surface-local coordinates and pressure. Analytic ray intersection enables drawing on bent sheets; bounded display subdivision makes sparse strokes conform without expanding saved samples. The v4 interchange contract is shared with Android 0.5. See [the storage decisions, fixes and verification scope](CURVED_SURFACES.md). Arbitrary mesh painting, compound curvature, binary point chunks and measured phone performance remain later work.

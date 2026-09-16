@@ -1,4 +1,6 @@
-# Draw in 3D — browser studio 0.4.0
+# Draw in 3D — browser studio 0.5.0
+
+**Bendable surfaces:** Add a paper sheet → Edit active surface → Surface bend. XYZ, Yaw, Tilt and Roll position each sheet. Face sheet adjusts the view; Paint resumes drawing. Paint follows the sheet even when it is curved after drawing. Several independent sheets share one portable v4 file. Install **Android 0.5+** for these files. [Surface guide and reviewed design](../docs/CURVED_SURFACES.md).
 
 **Curves & finishing:** Q draws arcs or S-curves; set Bend before dragging endpoints. Smooth on release optionally finishes freehand strokes after lifting, with adjustable strength. Smooth selected strokes applies it later with undo. See [the curve guide](../docs/CURVES_AND_SMOOTHING.md). Geometry remains compatible with the existing file versions.
 
@@ -48,6 +50,6 @@ Limits match Android v0.1.1: 80 objects, 4,000 total stroke points, 384 points p
 
 Brush geometry uses the same cylindrical curve, tube/spray construction, Java-compatible random seed and gravity projection as Android. Pixel-perfect rendering is not promised: the web engine's colour/transparency pipeline differs from GLES, and transparent intersections can still show artifacts. Gyro/AR, surface detection and room localization are **not implemented in the web editor**.
 
-Fifteen fast model/editing/paper/curve tests run with `npm test`. The paper walkthrough is `scripts/paper-smoke.mjs`; the original walkthrough is in `scripts/smoke.mjs`; it requires the local server and `DRAW3D_CHROME` pointing to a Chromium executable. It uses software graphics, so it is not a performance benchmark. Android's focused JVM interop test reads the real browser export in `samples/web-authored.json` and writes `app/build/interop/android-reencoded.json`.
+Eighteen fast model/editing/paper/curve/surface tests run with `npm test`. The paper walkthrough is `scripts/paper-smoke.mjs`; the original walkthrough is in `scripts/smoke.mjs`; it requires the local server and `DRAW3D_CHROME` pointing to a Chromium executable. It uses software graphics, so it is not a performance benchmark. Android's focused JVM interop test reads the real browser export in `samples/web-authored.json` and writes `app/build/interop/android-reencoded.json`.
 
 See [`../docs/WEB_INTEROP.md`](../docs/WEB_INTEROP.md) for contract details and [`../docs/VERIFICATION.md`](../docs/VERIFICATION.md) for the exact checks performed. Three.js is MIT licensed; its license accompanies the local renderer in `dist/vendor/THREE-LICENSE.txt`. Playwright Core is a development-only Apache-2.0 dependency and is not shipped in the prepared static editor.

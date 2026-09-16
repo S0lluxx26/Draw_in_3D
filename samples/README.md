@@ -16,3 +16,6 @@ Regenerate both files with `powershell -File scripts/make-sample.ps1` on Windows
 
 
 `curves.json` is the Studio 04 browser export: arc and S-curves, manual/automatic smoothing examples, and a curve painted on watercolor paper. Its paper requires Android 0.3+ to view; new curve/finishing controls require Android 0.4+.
+
+
+`surfaces-v4.json` is the Studio 05 browser export: two independent curved sheets, a flat-authored line carried through bending, and curves/freehand strokes drawn directly on a tilted, rolled surface. Requires **Android 0.5+**. It is the v4 round-trip fixture.

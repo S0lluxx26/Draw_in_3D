@@ -1,5 +1,7 @@
 # Paper and paint surfaces — Studio 03
 
+**Superseded surface transforms:** Studio 05 adds bend, tilt, roll and explicit sheet-local points. See [the current curved-surface workflow and v4 format](CURVED_SURFACES.md). The finish descriptions below still apply.
+
 16 September 2026. Web and Android prototype 0.3.0; paper projects use format v3.
 
 “Water shed” has two plausible meanings here: watercolor paper and a water-resistant painting surface. This prototype includes both. They are drawable sheets in the 3D scene, rather than a background filter over the whole view.

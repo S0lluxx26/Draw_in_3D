@@ -13,9 +13,9 @@ final class SceneData {
     static final float RADIUS=4;
     static final int MAX_JSON_BYTES=16*1024*1024;
     static class Entity {
-        String id=UUID.randomUUID().toString(), type="stroke", brush="Pen", image="", pattern="solid", paperKind="watercolor", paperId="";
+        String id=UUID.randomUUID().toString(), type="stroke", brush="Pen", image="", pattern="solid", paperKind="watercolor", paperId="", pointSpace="object";
         float[] position={0,0,0}, normal={0,0,1}, size={.5f,.5f,.5f};
-        float yaw=0, scale=1, width=.018f, alpha=1, arc=100, panelWidth=2, aspect=2;
+        float bend=0,pitch=0,roll=0,yaw=0, scale=1, width=.018f, alpha=1, arc=100, panelWidth=2, aspect=2;
         int color=0xff61e8c6;
         boolean wet=false, surface=false;
         final ArrayList<float[]> points=new ArrayList<>();
@@ -24,7 +24,7 @@ final class SceneData {
             e.position=position.clone();e.normal=normal.clone();e.yaw=yaw;e.scale=scale;
             e.width=width;e.alpha=alpha;e.arc=arc;e.panelWidth=panelWidth;e.aspect=aspect;
             e.color=color;e.wet=wet;e.surface=surface;
-            e.pattern=pattern;e.size=size.clone();e.paperKind=paperKind;e.paperId=paperId;
+            e.pattern=pattern;e.size=size.clone();e.paperKind=paperKind;e.paperId=paperId;e.pointSpace=pointSpace;e.bend=bend;e.pitch=pitch;e.roll=roll;
             for(float[] p:points)e.points.add(p.clone()); return e;
         }
         JSONObject json() throws JSONException {
@@ -35,13 +35,14 @@ final class SceneData {
             o.put("wet",wet);o.put("surface",surface);o.put("image",image);
             if(!pattern.equals("solid"))o.put("pattern",pattern);
             if(type.equals("paper"))o.put("paperKind",paperKind);if(!paperId.isEmpty())o.put("paperId",paperId);
+            if(pointSpace.equals("surface"))o.put("pointSpace",pointSpace);if(bend!=0)o.put("bend",bend);if(pitch!=0)o.put("pitch",pitch);if(roll!=0)o.put("roll",roll);
             if(type.equals("block"))o.put("size",array(size));
             JSONArray p=new JSONArray();for(float[] point:points)p.put(array(point));o.put("points",p);return o;
         }
     }
     static JSONArray array(float[] a) throws JSONException { JSONArray j=new JSONArray();for(float v:a)j.put(v);return j; }
     static String encode(List<Entity> scene) throws JSONException {
-        int version=1;for(Entity e:scene){if(e.type.equals("block")||!e.pattern.equals("solid"))version=Math.max(2,version);if(e.type.equals("paper")||!e.paperId.isEmpty())version=3;}
+        int version=1;for(Entity e:scene){if(e.type.equals("block")||!e.pattern.equals("solid"))version=Math.max(2,version);if(e.type.equals("paper")||!e.paperId.isEmpty())version=Math.max(3,version);if(e.pointSpace.equals("surface")||e.bend!=0||e.pitch!=0||e.roll!=0)version=4;}
         JSONObject o=new JSONObject();o.put("version",version);o.put("units","metres");o.put("coordinates","right-handed-y-up");
         o.put("alignment","manual-origin-required");JSONArray es=new JSONArray();
         for(Entity e:scene)es.put(e.json());o.put("entities",es);return o.toString();
@@ -58,7 +59,7 @@ final class SceneData {
         if(text.length()>MAX_JSON_BYTES)throw new JSONException("Project too large");
         JSONObject doc=new JSONObject(text);
         int version=doc.getInt("version");
-        if((version!=1&&version!=2&&version!=3)||!"metres".equals(doc.getString("units"))||!"right-handed-y-up".equals(doc.getString("coordinates")))
+        if((version!=1&&version!=2&&version!=3&&version!=4)||!"metres".equals(doc.getString("units"))||!"right-handed-y-up".equals(doc.getString("coordinates")))
             throw new JSONException("Unsupported project format");
         JSONArray es=doc.getJSONArray("entities");if(es.length()>MAX_OBJECTS)throw new JSONException("Object limit exceeded");
         ArrayList<Entity> result=new ArrayList<>();java.util.HashSet<String> ids=new java.util.HashSet<>();int points=0,images=0;
@@ -66,8 +67,13 @@ final class SceneData {
             JSONObject o=es.getJSONObject(i);Entity e=new Entity();e.id=o.getString("id");
             if(e.id.length()>100||!ids.add(e.id))throw new JSONException("Invalid or duplicate object ID");
             e.type=o.getString("type");if(!java.util.Arrays.asList("stroke","image","start","checkpoint","goal","block","paper").contains(e.type))throw new JSONException("Unknown object type");
+            e.pointSpace=o.optString("pointSpace","object");if(!java.util.Arrays.asList("object","surface").contains(e.pointSpace))throw new JSONException("Unknown point space");
+            e.bend=o.has("bend")?number(o,"bend",-300,300):0;e.pitch=o.has("pitch")?number(o,"pitch",-36000,36000):0;e.roll=o.has("roll")?number(o,"roll",-36000,36000):0;
+            if(version<4&&(e.pointSpace.equals("surface")||e.bend!=0||e.pitch!=0||e.roll!=0))throw new JSONException("Surface coordinates require version 4");
+            if(!e.type.equals("paper")&&(e.bend!=0||e.pitch!=0||e.roll!=0))throw new JSONException("Only paper has surface transforms");
             e.paperKind=o.optString("paperKind","watercolor");e.paperId=o.optString("paperId","");
             if(e.type.equals("paper")&&Paper.kind(e.paperKind)<0)throw new JSONException("Unknown paper finish");
+            if(e.pointSpace.equals("surface")&&(e.paperId.isEmpty()||!e.type.equals("stroke")))throw new JSONException("Surface points need a paper reference");
             if(e.paperId.length()>100||(!e.paperId.isEmpty()&&!e.type.equals("stroke")))throw new JSONException("Invalid paper reference");
             if(version<3&&(e.type.equals("paper")||!e.paperId.isEmpty()))throw new JSONException("Paper requires version 3");
             e.pattern=o.optString("pattern","solid");if(!java.util.Arrays.asList("solid","dash","dot").contains(e.pattern))throw new JSONException("Unknown stroke pattern");
@@ -77,11 +83,12 @@ final class SceneData {
             e.position=vector(o.getJSONArray("position"),3,RADIUS);e.normal=vector(o.getJSONArray("normal"),3,1.01f);
             if(Math3.length(e.normal)<.9f||Math3.length(e.normal)>1.1f)throw new JSONException("Invalid surface normal");
             e.normal=Math3.norm(e.normal);e.yaw=number(o,"yaw",-36000,36000);e.scale=number(o,"scale",.1f,4);
-            e.width=number(o,"width",.002f,.15f);e.alpha=number(o,"alpha",.05f,1);e.arc=number(o,"arc",0,300);
+            e.width=number(o,"width",e.pointSpace.equals("surface")?.0005f:.002f,e.pointSpace.equals("surface")?1.5f:.15f);e.alpha=number(o,"alpha",.05f,1);e.arc=number(o,"arc",0,300);
             e.panelWidth=number(o,"panelWidth",.1f,4);e.aspect=number(o,"aspect",.1f,10);
             e.color=o.getInt("color");e.wet=o.getBoolean("wet");e.surface=o.getBoolean("surface");
             JSONArray ps=o.getJSONArray("points");if(ps.length()>MAX_STROKE)throw new JSONException("Stroke too long");
-            for(int p=0;p<ps.length();p++){float[] v=vector(ps.getJSONArray(p),4,8);if(v[3]<.1f||v[3]>2)throw new JSONException("Invalid pressure");e.points.add(v);}
+            for(int p=0;p<ps.length();p++){float[] v=vector(ps.getJSONArray(p),4,e.pointSpace.equals("surface")?1024:8);if(v[3]<.1f||v[3]>2)throw new JSONException("Invalid pressure");e.points.add(v);}
+            if(e.pointSpace.equals("surface")&&(Math.abs(e.position[2])>1e-7||e.points.stream().anyMatch(p->Math.abs(p[2])>1e-7)))throw new JSONException("Surface points must have zero depth");
             points+=ps.length();e.image=o.optString("image","");
             if("stroke".equals(e.type)&&e.points.isEmpty())throw new JSONException("Empty stroke");
             if("image".equals(e.type)){images++;if(e.image.length()==0||e.image.length()>2*1024*1024)throw new JSONException("Image payload too large or missing");}
@@ -92,6 +99,7 @@ final class SceneData {
         if(points>MAX_POINTS||images>MAX_IMAGES)throw new JSONException("Scene budget exceeded");return result;
     }
     static boolean withinBounds(Entity e) {
+        if(e.pointSpace.equals("surface"))return true;
         float radius="block".equals(e.type)?Math3.length(e.size)*.5f:("image".equals(e.type)||"paper".equals(e.type))?e.panelWidth*(float)Math.sqrt(1+1/(e.aspect*e.aspect))*.5f:.2f;
         if("stroke".equals(e.type)){
             for(float[] p:e.points){float[] world=Math3.add(e.position,Math3.rotateY(Math3.mul(p,e.scale),e.yaw));if(Math3.length(world)>RADIUS-.35f)return false;}

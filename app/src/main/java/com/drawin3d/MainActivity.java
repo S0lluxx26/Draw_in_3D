@@ -217,6 +217,10 @@ public final class MainActivity extends Activity implements SensorEventListener,
         LinearLayout a=row();a.addView(button("X −",()->adjust(-.1f,0,0,0,0)));a.addView(button("X +",()->adjust(.1f,0,0,0,0)));a.addView(button("Y −",()->adjust(0,-.1f,0,0,0)));a.addView(button("Y +",()->adjust(0,.1f,0,0,0)));box.addView(a);
         LinearLayout b=row();b.addView(button("Z −",()->adjust(0,0,-.1f,0,0)));b.addView(button("Z +",()->adjust(0,0,.1f,0,0)));b.addView(button("↶ 15°",()->adjust(0,0,0,-15,0)));b.addView(button("↷ 15°",()->adjust(0,0,0,15,0)));box.addView(b);
         LinearLayout c=row();c.addView(button("Smaller",()->adjust(0,0,0,0,-.1f)));c.addView(button("Larger",()->adjust(0,0,0,0,.1f)));box.addView(c);
+        TextView surface=new TextView(this);surface.setText("Active paper surface (paint moves with it)");box.addView(surface);
+        LinearLayout bend=row();bend.addView(button("Bend −30°",()->queueScene(()->renderer.surfaceAdjust(-30,0,0,false))));bend.addView(button("Bend +30°",()->queueScene(()->renderer.surfaceAdjust(30,0,0,false))));bend.addView(button("Flatten",()->queueScene(()->renderer.surfaceAdjust(0,0,0,true))));box.addView(bend);
+        LinearLayout tilt=row();tilt.addView(button("Tilt −15°",()->queueScene(()->renderer.surfaceAdjust(0,-15,0,false))));tilt.addView(button("Tilt +15°",()->queueScene(()->renderer.surfaceAdjust(0,15,0,false))));box.addView(tilt);
+        LinearLayout roll=row();roll.addView(button("Roll −15°",()->queueScene(()->renderer.surfaceAdjust(0,0,-15,false))));roll.addView(button("Roll +15°",()->queueScene(()->renderer.surfaceAdjust(0,0,15,false))));box.addView(roll);
         new AlertDialog.Builder(this).setTitle("Adjust selected object").setView(box).setPositiveButton("Done",null).show();
     }
     private void adjust(float x,float y,float z,float yaw,float scale){queueScene(()->renderer.adjust(x,y,z,yaw,scale,null));}

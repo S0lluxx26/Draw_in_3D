@@ -1,10 +1,12 @@
 # Browser ↔ Android project contract
 
-16 September 2026. Browser editor v0.4.0; companion Android v0.4.0. Plain v1 scenes remain compatible with Android v0.1.1.
+16 September 2026. Browser editor v0.5.0; companion Android v0.5.0. Plain v1 scenes remain compatible with Android v0.1.1.
 
 **Studio 02 extension:** blocks and non-solid stroke patterns use v2. V2 adds block `size: [x,y,z]` and optional `pattern: "solid" | "dash" | "dot"`. Both readers accept v1 and v2; exporters choose the lowest necessary version. Older Android versions intentionally reject v2 instead of silently dropping shapes. See [tools and logic review](EDITOR_TOOLS.md).
 
-**Studio 03 extension:** paper uses v3. Add `type: "paper"`, `paperKind: "watercolor" | "rough" | "sketch" | "canvas" | "coated"`, and optional stroke `paperId`. Paper reuses `panelWidth`, `aspect`, `normal` and the common transform. Linked strokes retain their own transforms and points; renderers project them onto the paper. Parent edits propagate to attached strokes. Both readers accept v1/v2/v3; exporters choose the lowest required version. Paper requires Android 0.3+. See [paper semantics and review](PAPER_SURFACES.md).
+**Studio 05 extension:** version 4 introduces paper `bend`, `pitch`, `roll` and stroke `pointSpace: "surface"`. Points are unrolled `[u,v,0,pressure]`; stroke position/yaw/scale act within that sheet, while the parent positions and bends it in 3D. New local strokes need Android 0.5+, including flat ones. Old paper attachments migrate when their sheet is transformed. Both readers accept v1/v2/v3/v4 and preserve older file semantics. See [the v4 contract, workflow and review](CURVED_SURFACES.md).
+
+**Historical Studio 03 extension:** paper uses v3. Add `type: "paper"`, `paperKind: "watercolor" | "rough" | "sketch" | "canvas" | "coated"`, and optional stroke `paperId`. Paper reuses `panelWidth`, `aspect`, `normal` and the common transform. Linked strokes retain their own transforms and points; renderers project them onto the paper. Parent edits propagate to attached strokes. Both readers accept v1/v2/v3; exporters choose the lowest required version. Paper requires Android 0.3+. See [paper semantics and review](PAPER_SURFACES.md).
 
 **Studio 04:** curve and smoothed geometry are baked to ordinary stroke points. No new fields or version are needed. The `curves.json` browser sample round-trips through Android unchanged. New native authoring controls require app 0.4, while older compatible versions can load the resulting strokes.
 

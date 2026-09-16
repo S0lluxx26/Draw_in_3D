@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {entity,encode,decode,documentOf,validate} from '../src/model.js';
 import {transformSelection,duplicateSelection} from '../src/editing.js';
-import {PAPER_TYPES,basis,worldPoint,paperCoordinates,paperPixels,insidePaper,attachedIds} from '../src/paper.js';
+import {PAPER_TYPES,basis,worldPoint,paperCoordinates,paperPixels,insidePaper,attachedIds,strokeUV} from '../src/paper.js';
 import {geometry} from '../src/geometry.js';
 const scene=()=>{const p=entity('paper');p.position=[0,1,0];p.panelWidth=2;const e=entity();e.paperId=p.id;e.position=[.2,1,0];e.points=[[0,0,0,1],[.6,.2,0,1]];e.wet=true;e.brush='Water';return [p,e];};
 test('v3 attaches strokes to a valid paper and rejects dangling or non-stroke links',()=>{
@@ -14,7 +14,7 @@ test('v3 attaches strokes to a valid paper and rejects dangling or non-stroke li
 test('parent transforms and duplicates preserve painted coordinates without double-moving children',()=>{
   const [p,e]=scene(),before=paperCoordinates(p,worldPoint(e,e.points[1]));
   const moved=transformSelection([p,e],new Set([p.id,e.id]),{move:[.1,.2,.1],yaw:47,scale:.8});
-  const after=paperCoordinates(moved[0],worldPoint(moved[1],moved[1].points[1]));after.forEach((v,i)=>assert.ok(Math.abs(v-before[i])<1e-8));
+  const after=strokeUV(moved[1],moved[1].points[1],moved[0]);after.forEach((v,i)=>assert.ok(Math.abs(v-before[i])<1e-8));
   const copies=duplicateSelection([p,e],new Set([p.id])).entities;assert.equal(copies.length,4);assert.equal(copies[3].paperId,copies[2].id);assert.notEqual(copies[3].paperId,p.id);
   assert.equal(attachedIds([p,e],new Set([p.id])).size,2);
 });

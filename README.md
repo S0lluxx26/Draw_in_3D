@@ -1,8 +1,16 @@
 # Draw in 3D
 
-**[Open the web app](https://s0lluxx26.github.io/Draw_in_3D/)** · [GitHub repository](https://github.com/S0lluxx26/Draw_in_3D) · [Publishing and phone access](docs/GITHUB_PAGES.md)
+Public GitHub / Pages publication is pending approval. Use the local browser editor below. [Prepared publishing setup](docs/GITHUB_PAGES.md).
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
+
+## Studio 05: bendable drawing surfaces
+
+Draw on a flat sheet, then use **Edit active surface → Surface bend** to curve it with its paint. XYZ, Yaw, Tilt, Roll and Scale position each sheet independently. **Face sheet** adjusts the view; **Paint** resumes drawing. Add several sheets and switch using **Paint on**. Flattening, transforming, duplicating and deleting a sheet are undoable.
+
+New strokes store sheet-local coordinates, so surface edits do not rewrite their points. Curved drawing uses actual cylinder intersections; sparse lines receive display-only segments. Export/import uses format **v4**, requiring **Android 0.5+**. Older files remain readable. Native **Adjust** adds bend, tilt and roll controls. [Workflow, storage design and logic review](docs/CURVED_SURFACES.md).
+
+Install artifacts/Draw-in-3D-v0.5.0-debug.apk for the latest native prototype. Try samples/surfaces-v4.json in either editor. **Export unsaved browser work before refreshing** to load Studio 05. Phone rendering, sustained performance and battery measurements remain pending.
 
 ## Studio 04: curves and stroke finishing
 
