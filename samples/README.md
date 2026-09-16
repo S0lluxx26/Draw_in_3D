@@ -21,3 +21,5 @@ Regenerate both files with `powershell -File scripts/make-sample.ps1` on Windows
 `surfaces-v4.json` is the Studio 05 browser export: two independent curved sheets, a flat-authored line carried through bending, and curves/freehand strokes drawn directly on a tilted, rolled surface. Requires **Android 0.5+**. It is the v4 round-trip fixture.
 
 - `ink-guides-v5.json`: browser-exported curved hidden guides with attached ink. Requires Studio 06 / Android 0.6+. Show all sheets restores their backgrounds; Paint on selects each hidden guide.
+
+- drawing-assists.json: browser-authored mirrored/snapped strokes on two parallel hidden guides. Studio 07 helper controls; resulting v5 file opens in native Android 0.6.

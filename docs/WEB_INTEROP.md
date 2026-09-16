@@ -1,6 +1,8 @@
 # Browser ↔ Android project contract
 
-16 September 2026. Browser editor v0.6.0; companion Android v0.6.0. Plain v1 scenes remain compatible with Android v0.1.1.
+16 September 2026. Browser editor v0.7.0; companion Android v0.6.0. Plain v1 scenes remain compatible with Android v0.1.1.
+
+**Studio 07 authoring helpers:** mirror and snap are baked into ordinary stroke points; depth and parallel-layer operations use existing parent transforms. See-through guide opacity and helper settings are local editor state, not saved materials or new schema fields. The native 0.6 reader renders and re-exports the resulting files unchanged. [Applied research and semantics](DRAWING_ASSISTS.md).
 
 **Studio 06 extension:** v5 adds optional paper **paperVisible**. Omitted or true shows the background; false hides it while retaining the editable parent and all attached ink. Only a hidden paper requires v5; non-boolean values and non-paper false values are invalid. Both readers accept v1–v5; visibility survives undo, copy and export. Android 0.6+ is required for hidden-guide files. [Workflow and contract review](FLOATING_INK.md).
 

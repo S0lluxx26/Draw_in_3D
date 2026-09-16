@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 07: research applied to drawing helpers
+
+**See-through guides** reveal other ink while drawing. **Mirror new strokes** draws a live partner across the sheet centre; both sides undo together. **Snap stroke ends** joins Draw/Line/Curve endpoints on the active sheet. **Nearer/Farther** move a sheet with its ink in small depth steps, and **Add parallel sheet** creates a blank layer without copying the drawing. These controls are in **Paper & surface → Drawing helpers** on web; the resulting files work in the existing **Android 0.6** app.
+
+This increment applies ideas from Feather, Gravity Sketch and Open Brush. [Primary-source research, controls, design review and checks](docs/DRAWING_ASSISTS.md). Try samples/drawing-assists.json. Export unsaved work before refreshing to Studio 07.
+
 ## Studio 06: hide the paper, keep the 3D ink
 
 Draw on a sheet, then **Hide sheet · keep ink** to remove its background. The invisible guide stays editable: bend or position it with its paint, draw inside its dotted outline, or Show sheet again. **View 3D ink** hides all sheets and the grid and switches to Orbit. Orbit to a new angle, add another sheet, and keep drawing with your existing pen settings and previous ink as a reference. Visibility is undoable and saved. **Delete sheet + ink** still removes both.

@@ -1,5 +1,10 @@
 # Prototype verification and review handoff
 
+## Studio 07 drawing helpers, existing Android 0.6 compatibility
+
+24 web tests and 22 Android JVM tests pass. The focused browser flow covers live mirror/cancel/paired undo, both axes and curved sheets, snapping through smoothing, translucent editing with identical saved data, sheet depth/undo, blank parallel sheets, narrow layout, export/reopen, and free-space/grid tools. The hidden-sheet flow also passes; browser errors are zero. The actual browser drawing-assists.json fixture survives Android decode/finite render geometry/copy/export and web re-import with every saved field unchanged. Screenshots were inspected. Native code/APK is unchanged; no additional device performance campaign was run. [Research and review](DRAWING_ASSISTS.md).
+
+
 ## Studio 06 floating ink and Android 0.6.0
 
 20 web tests and 21 Android JVM tests pass. Android build and lint pass (0 errors, 16 warnings). The focused browser check confirms rendered ink remains after curved-paper removal, hidden-guide drawing, multiple sheets, pen/context preservation, undo/redo, export/reopen, mobile layout, explicit deletion and show-all. The previous orbit/add-sheet/panorama check also passes. Browser errors: zero. The actual browser v5 fixture survives Android copy/export and web re-import with every saved field unchanged. Desktop and narrow screenshots were visually reviewed. No new phone runtime or performance campaign was run. See [research, workflow and logic review](FLOATING_INK.md).

@@ -1,4 +1,6 @@
-# Draw in 3D — browser studio 0.6.0
+# Draw in 3D — browser studio 0.7.0
+
+**Drawing helpers:** See-through guides, live left/right or top/bottom mirroring, same-sheet endpoint snapping, Nearer/Farther depth steps and blank parallel sheets are available in Paper & surface. Mirrors are ordinary independent strokes after release; one undo handles the pair. Generated files remain compatible with Android 0.6. [Research, usage and verification](../docs/DRAWING_ASSISTS.md).
 
 **Floating ink:** Hide sheet · keep ink removes the background while preserving the guide and every stroke. View 3D ink hides all papers and the workspace grid, shows all objects and activates Orbit. Orbit → add a sheet → draw to build in another direction; your pen settings are preserved. Paint on selects hidden guides; Face & draw, Show sheet and Show all sheets let you return. Hidden visibility is undoable and saved in **v5 / Android 0.6+**. [Research and workflow](../docs/FLOATING_INK.md).
 
