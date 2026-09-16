@@ -165,6 +165,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private Geometry mesh(SceneData.Entity e){SceneData.Entity p=paper(e.paperId);return e.type.equals("paper")?Paper.sheet(e):e.type.equals("stroke")?(p==null?Geometry.stroke(e):Paper.ink(e,p)):e.type.equals("image")?Geometry.image(e):e.type.equals("block")?Geometry.block(e):Geometry.marker(e);}
     private float distanceToCamera(SceneData.Entity e){SceneData.Entity parent=paper(e.paperId);if(parent!=null)e=parent;float x=e.position[0]-cameraLocal[12],y=e.position[1]-cameraLocal[13],z=e.position[2]-cameraLocal[14];return x*x+y*y+z*z;}
     private void drawEntity(SceneData.Entity e,Resource res,long now){
+        if(e.type.equals("paper")&&!e.paperVisible)return;
         SceneData.Entity parent=e.type.equals("paper")?e:paper(e.paperId),pose=parent==null?e:parent;
         Matrix.setIdentityM(model,0);Matrix.translateM(model,0,pose.position[0],pose.position[1],pose.position[2]);Matrix.rotateM(model,0,pose.yaw,0,1,0);Matrix.scaleM(model,0,pose.scale,pose.scale,pose.scale);
         if(parent!=null){float[] cached=surfaceTransforms.get(parent);if(cached==null){float[][] axes=Surface.axes(parent);float[] orientation=new float[16];Matrix.setIdentityM(orientation,0);for(int c=0;c<3;c++)for(int i=0;i<3;i++)orientation[c*4+i]=axes[c][i];cached=new float[16];Matrix.multiplyMM(cached,0,model,0,orientation,0);surfaceTransforms.put(parent,cached);}System.arraycopy(cached,0,model,0,16);}
@@ -299,6 +300,15 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         if(e.position==null||!SceneData.withinBounds(e)){listener.notice("Move closer to the origin or lower placement distance.");return;}checkpoint();scene.add(e);usePaper(e.id);brush="Water";width=.06f;alpha=.85f;wet=true;ink=0xff3974b8;
     }
     void usePaper(String id){finishStroke();activePaperId=paper(id)==null?"":id;tool="Draw";selected=activePaperId.isEmpty()?null:activePaperId;listener.notice(activePaperId.isEmpty()?"Drawing in free 3D space.":"Painting on paper. Select and Adjust moves the sheet with its paint.");}
+    // Keep the surface and its children intact; only the paper background changes.
+    void paperVisibility(Boolean visible,boolean all){
+        if(playing)return;finishStroke();SceneData.Entity target=paper(selected);if(target==null)target=paper(activePaperId);
+        if(!all&&target==null){listener.notice("Choose a sheet in Paper / surface first.");return;}
+        boolean show=visible!=null?visible:target!=null&&!target.paperVisible;String id=target==null?"":target.id;boolean changed=false;
+        for(SceneData.Entity e:scene)if(e.type.equals("paper")&&(all||e.id.equals(id))&&e.paperVisible!=show){changed=true;break;}
+        if(!changed)return;checkpoint();for(int i=0;i<scene.size();i++){SceneData.Entity e=scene.get(i);if(e.type.equals("paper")&&(all||e.id.equals(id))&&e.paperVisible!=show){SceneData.Entity copy=e.copy();copy.paperVisible=show;scene.set(i,copy);}}
+        listener.notice(show?"Paper shown. Ink is unchanged.":"Paper hidden; ink remains. Use Paper / surface to show or keep drawing on its guide.");
+    }
     void paperKind(String kind){
         if(playing)return;finishStroke();SceneData.Entity p=paper(selected);if(p==null)p=paper(activePaperId);if(p==null){listener.notice("Choose a paper in Paper / surface first.");return;}String id=p.id;checkpoint();for(int i=0;i<scene.size();i++){SceneData.Entity e=scene.get(i);if(e.id.equals(id)||e.paperId.equals(id)){SceneData.Entity copy=e.copy();if(copy.id.equals(id))copy.paperKind=kind;scene.set(i,copy);}}
     }
@@ -325,6 +335,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private String pick(float x,float y){
         String found=null;float nearest=Float.MAX_VALUE;
         for(SceneData.Entity e:scene){
+            if(e.type.equals("paper")&&!e.paperVisible)continue;
             ArrayList<float[]> candidates=e.points;
             int samples=Math.max(1,candidates.size());
             for(int i=0;i<samples;i+=Math.max(1,samples/40)){

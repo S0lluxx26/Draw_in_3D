@@ -1,5 +1,10 @@
 # Prototype verification and review handoff
 
+## Studio 06 floating ink and Android 0.6.0
+
+20 web tests and 21 Android JVM tests pass. Android build and lint pass (0 errors, 16 warnings). The focused browser check confirms rendered ink remains after curved-paper removal, hidden-guide drawing, multiple sheets, pen/context preservation, undo/redo, export/reopen, mobile layout, explicit deletion and show-all. The previous orbit/add-sheet/panorama check also passes. Browser errors: zero. The actual browser v5 fixture survives Android copy/export and web re-import with every saved field unchanged. Desktop and narrow screenshots were visually reviewed. No new phone runtime or performance campaign was run. See [research, workflow and logic review](FLOATING_INK.md).
+
+
 Date: 16 September 2026.
 
 ## Studio 05.1 browser paper workflow

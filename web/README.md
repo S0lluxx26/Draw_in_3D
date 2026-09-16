@@ -1,6 +1,8 @@
-# Draw in 3D — browser studio 0.5.1
+# Draw in 3D — browser studio 0.6.0
 
-**New-sheet drawing:** Orbit, then Add a paper sheet; the new sheet faces you and switches to Draw. Focus sheet hides other objects until you choose Show all objects. Flat / Curved monitor / Panorama presets curve the active sheet with its paint. Panorama view lets you look around from a fixed viewpoint; Back to drawing restores the editor. [Workflow fixes and checks](../docs/PAPER_WORKFLOW_FIX.md). Exports still work in Android 0.5+.
+**Floating ink:** Hide sheet · keep ink removes the background while preserving the guide and every stroke. View 3D ink hides all papers and the workspace grid, shows all objects and activates Orbit. Orbit → add a sheet → draw to build in another direction; your pen settings are preserved. Paint on selects hidden guides; Face & draw, Show sheet and Show all sheets let you return. Hidden visibility is undoable and saved in **v5 / Android 0.6+**. [Research and workflow](../docs/FLOATING_INK.md).
+
+**New-sheet drawing:** Orbit, then Add a paper sheet; the new sheet faces you and switches to Draw. Focus sheet hides other objects until you choose Show all objects. Flat / Curved monitor / Panorama presets curve the active sheet with its paint. Panorama view lets you look around from a fixed viewpoint; Back to drawing restores the editor. [Workflow fixes and checks](../docs/PAPER_WORKFLOW_FIX.md). Surface files without hidden sheets still work in Android 0.5+.
 
 **Bendable surfaces:** Add a paper sheet → Edit active surface → Surface bend. XYZ, Yaw, Tilt and Roll position each sheet. Face sheet adjusts the view; Paint resumes drawing. Paint follows the sheet even when it is curved after drawing. Several independent sheets share one portable v4 file. Install **Android 0.5+** for these files. [Surface guide and reviewed design](../docs/CURVED_SURFACES.md).
 

@@ -1,6 +1,8 @@
 # Browser ↔ Android project contract
 
-16 September 2026. Browser editor v0.5.0; companion Android v0.5.0. Plain v1 scenes remain compatible with Android v0.1.1.
+16 September 2026. Browser editor v0.6.0; companion Android v0.6.0. Plain v1 scenes remain compatible with Android v0.1.1.
+
+**Studio 06 extension:** v5 adds optional paper **paperVisible**. Omitted or true shows the background; false hides it while retaining the editable parent and all attached ink. Only a hidden paper requires v5; non-boolean values and non-paper false values are invalid. Both readers accept v1–v5; visibility survives undo, copy and export. Android 0.6+ is required for hidden-guide files. [Workflow and contract review](FLOATING_INK.md).
 
 **Studio 02 extension:** blocks and non-solid stroke patterns use v2. V2 adds block `size: [x,y,z]` and optional `pattern: "solid" | "dash" | "dot"`. Both readers accept v1 and v2; exporters choose the lowest necessary version. Older Android versions intentionally reject v2 instead of silently dropping shapes. See [tools and logic review](EDITOR_TOOLS.md).
 

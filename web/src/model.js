@@ -4,9 +4,9 @@ export const LIMITS = Object.freeze({ objects: 80, points: 4000, stroke: 384, im
 export const BRUSHES = ['Pen', 'Marker', 'Neon', 'Spray', 'Water'];
 export const TYPES = ['stroke', 'image', 'start', 'checkpoint', 'goal', 'block', 'paper'];
 export function entity(type = 'stroke') {
-  return { id: crypto.randomUUID(), type, brush: 'Pen', pattern:'solid', size:[.5,.5,.5], paperKind:'watercolor',paperId:'',pointSpace:'object',bend:0,pitch:0,roll:0,position: [0,0,0], normal: [0,0,1], yaw: 0, scale: 1, width: .018, alpha: 1, arc: 100, panelWidth: 2, aspect: 2, color: 0xff61e8c6 | 0, wet: false, surface: false, image: '', points: [] };
+  return { id: crypto.randomUUID(), type, brush: 'Pen', pattern:'solid', size:[.5,.5,.5], paperKind:'watercolor',paperVisible:true,paperId:'',pointSpace:'object',bend:0,pitch:0,roll:0,position: [0,0,0], normal: [0,0,1], yaw: 0, scale: 1, width: .018, alpha: 1, arc: 100, panelWidth: 2, aspect: 2, color: 0xff61e8c6 | 0, wet: false, surface: false, image: '', points: [] };
 }
-export const versionOf = entities => entities.some(e=>e.pointSpace==='surface'||e.bend||e.pitch||e.roll)?4:entities.some(e=>e.type==='paper'||e.paperId)?3:entities.some(e=>e.type==='block'||(e.pattern&&e.pattern!=='solid'))?2:1;
+export const versionOf = entities => entities.some(e=>e.type==='paper'&&e.paperVisible===false)?5:entities.some(e=>e.pointSpace==='surface'||e.bend||e.pitch||e.roll)?4:entities.some(e=>e.type==='paper'||e.paperId)?3:entities.some(e=>e.type==='block'||(e.pattern&&e.pattern!=='solid'))?2:1;
 export function documentOf(entities) {
   return { version: versionOf(entities), units: 'metres', coordinates: 'right-handed-y-up', alignment: 'manual-origin-required', entities };
 }
@@ -27,7 +27,7 @@ function need(ok, message) { if (!ok) throw new Error(message); }
 function number(v, lo, hi, label) { need(typeof v === 'number' && Number.isFinite(v) && v >= lo-1e-7 && v <= hi+1e-7, `Invalid ${label}.`); }
 function vector(v, length, max) { need(Array.isArray(v) && v.length === length, 'Invalid coordinate vector.'); v.forEach(n => number(n,-max,max,'coordinate')); }
 export function validate(doc) {
-  need(doc && [1,2,3,4].includes(doc.version) && doc.units === 'metres' && doc.coordinates === 'right-handed-y-up', 'This file is not a supported Draw in 3D project.');
+  need(doc && [1,2,3,4,5].includes(doc.version) && doc.units === 'metres' && doc.coordinates === 'right-handed-y-up', 'This file is not a supported Draw in 3D project.');
   need(Array.isArray(doc.entities) && doc.entities.length <= LIMITS.objects, 'A project can contain at most 80 objects.');
   const ids = new Set();
   for (const e of doc.entities) {
@@ -41,6 +41,9 @@ export function validate(doc) {
     need(doc.version>=4||e.pointSpace!=='surface'&&!e.bend&&!e.pitch&&!e.roll,'Bent surfaces need project version 4.');
     for(const key of ['bend','pitch','roll'])number(e[key]??0,key==='bend'?-300:-36000,key==='bend'?300:36000,key);
     need(e.type==='paper'||!e.bend&&!e.pitch&&!e.roll,'Only paper has surface transforms.');
+    need(e.paperVisible===undefined||typeof e.paperVisible==='boolean','Invalid paper visibility.');
+    need(e.paperVisible!==false||e.type==='paper','Only paper has sheet visibility.');
+    need(e.paperVisible!==false||doc.version>=5,'Hidden paper needs project version 5.');
     if(e.type==='paper')need(Object.hasOwn(PAPER_TYPES,e.paperKind),'Unknown paper type.');
     if(e.paperId!==undefined)need(typeof e.paperId==='string'&&e.paperId.length<=100,'Invalid paper attachment.');
     if(e.type==='block'){vector(e.size,3,4);e.size.forEach(v=>number(v,.02,4,'block dimension'));}
@@ -85,6 +88,7 @@ export function encode(entities) {
     if(e.type==='block')copy.size=e.size.map(Math.fround);else delete copy.size;
     if(!e.pattern||e.pattern==='solid')delete copy.pattern;
     if(e.type!=='paper')delete copy.paperKind;
+    if(e.paperVisible!==false)delete copy.paperVisible;
     if(!e.paperId)delete copy.paperId;
     if(e.pointSpace!=='surface')delete copy.pointSpace;
     for(const key of ['bend','pitch','roll'])if(!e[key])delete copy[key];

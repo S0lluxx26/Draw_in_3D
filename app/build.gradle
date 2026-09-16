@@ -7,8 +7,8 @@ android {
         applicationId 'com.drawin3d.prototype'
         minSdk 26
         targetSdk 36
-        versionCode 6
-        versionName '0.5.0-prototype'
+        versionCode 7
+        versionName '0.6.0-prototype'
         ndk { abiFilters 'arm64-v8a', 'x86_64' }
     }
     compileOptions {

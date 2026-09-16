@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 06: hide the paper, keep the 3D ink
+
+Draw on a sheet, then **Hide sheet · keep ink** to remove its background. The invisible guide stays editable: bend or position it with its paint, draw inside its dotted outline, or Show sheet again. **View 3D ink** hides all sheets and the grid and switches to Orbit. Orbit to a new angle, add another sheet, and keep drawing with your existing pen settings and previous ink as a reference. Visibility is undoable and saved. **Delete sheet + ink** still removes both.
+
+Hidden-guide exports use **v5**, requiring **Android 0.6+**. The new native prototype is artifacts/Draw-in-3D-v0.6.0-debug.apk; its Paper / surface menu adds hide/show controls. Try samples/ink-guides-v5.json. [Workflow, internet research, design review and verification](docs/FLOATING_INK.md). **Export unsaved browser work before refreshing** to load Studio 06.
+
 ## Studio 05.1: draw after orbiting and preview panoramas
 
 **Add a paper sheet** now faces your current view and activates Draw. **Focus sheet** prevents other sheets from covering your paint; **Show all objects** restores the full scene. Use **Curved monitor** or **Panorama** directly in Paper & surface to wrap an existing drawing. **Panorama view** lets you drag to look around from a fixed viewpoint, then return to drawing. Undo/redo also restores the active paint target. Export your work before refreshing the browser. [Reproduction, fixes and checked workflow](docs/PAPER_WORKFLOW_FIX.md).
@@ -14,7 +20,7 @@ Draw on a flat sheet, then use **Edit active surface → Surface bend** to curve
 
 New strokes store sheet-local coordinates, so surface edits do not rewrite their points. Curved drawing uses actual cylinder intersections; sparse lines receive display-only segments. Export/import uses format **v4**, requiring **Android 0.5+**. Older files remain readable. Native **Adjust** adds bend, tilt and roll controls. [Workflow, storage design and logic review](docs/CURVED_SURFACES.md).
 
-Install artifacts/Draw-in-3D-v0.5.0-debug.apk for the latest native prototype. Try samples/surfaces-v4.json in either editor. **Export unsaved browser work before refreshing** to load Studio 05. Phone rendering, sustained performance and battery measurements remain pending.
+Install artifacts/Draw-in-3D-v0.5.0-debug.apk for the earlier native 0.5 prototype; use 0.6 above for current files. Try samples/surfaces-v4.json in either editor. **Export unsaved browser work before refreshing** to load Studio 05. Phone rendering, sustained performance and battery measurements remain pending.
 
 ## Studio 04: curves and stroke finishing
 

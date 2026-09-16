@@ -17,13 +17,13 @@ final class SceneData {
         float[] position={0,0,0}, normal={0,0,1}, size={.5f,.5f,.5f};
         float bend=0,pitch=0,roll=0,yaw=0, scale=1, width=.018f, alpha=1, arc=100, panelWidth=2, aspect=2;
         int color=0xff61e8c6;
-        boolean wet=false, surface=false;
+        boolean wet=false, surface=false, paperVisible=true;
         final ArrayList<float[]> points=new ArrayList<>();
         Entity copy() {
             Entity e=new Entity(); e.id=id;e.type=type;e.brush=brush;e.image=image;
             e.position=position.clone();e.normal=normal.clone();e.yaw=yaw;e.scale=scale;
             e.width=width;e.alpha=alpha;e.arc=arc;e.panelWidth=panelWidth;e.aspect=aspect;
-            e.color=color;e.wet=wet;e.surface=surface;
+            e.color=color;e.wet=wet;e.surface=surface;e.paperVisible=paperVisible;
             e.pattern=pattern;e.size=size.clone();e.paperKind=paperKind;e.paperId=paperId;e.pointSpace=pointSpace;e.bend=bend;e.pitch=pitch;e.roll=roll;
             for(float[] p:points)e.points.add(p.clone()); return e;
         }
@@ -34,7 +34,7 @@ final class SceneData {
             o.put("panelWidth",panelWidth);o.put("aspect",aspect);o.put("color",color);
             o.put("wet",wet);o.put("surface",surface);o.put("image",image);
             if(!pattern.equals("solid"))o.put("pattern",pattern);
-            if(type.equals("paper"))o.put("paperKind",paperKind);if(!paperId.isEmpty())o.put("paperId",paperId);
+            if(type.equals("paper"))o.put("paperKind",paperKind);if(!paperVisible)o.put("paperVisible",false);if(!paperId.isEmpty())o.put("paperId",paperId);
             if(pointSpace.equals("surface"))o.put("pointSpace",pointSpace);if(bend!=0)o.put("bend",bend);if(pitch!=0)o.put("pitch",pitch);if(roll!=0)o.put("roll",roll);
             if(type.equals("block"))o.put("size",array(size));
             JSONArray p=new JSONArray();for(float[] point:points)p.put(array(point));o.put("points",p);return o;
@@ -42,7 +42,7 @@ final class SceneData {
     }
     static JSONArray array(float[] a) throws JSONException { JSONArray j=new JSONArray();for(float v:a)j.put(v);return j; }
     static String encode(List<Entity> scene) throws JSONException {
-        int version=1;for(Entity e:scene){if(e.type.equals("block")||!e.pattern.equals("solid"))version=Math.max(2,version);if(e.type.equals("paper")||!e.paperId.isEmpty())version=Math.max(3,version);if(e.pointSpace.equals("surface")||e.bend!=0||e.pitch!=0||e.roll!=0)version=4;}
+        int version=1;for(Entity e:scene){if(e.type.equals("block")||!e.pattern.equals("solid"))version=Math.max(2,version);if(e.type.equals("paper")||!e.paperId.isEmpty())version=Math.max(3,version);if(e.pointSpace.equals("surface")||e.bend!=0||e.pitch!=0||e.roll!=0)version=Math.max(4,version);if(e.type.equals("paper")&&!e.paperVisible)version=5;}
         JSONObject o=new JSONObject();o.put("version",version);o.put("units","metres");o.put("coordinates","right-handed-y-up");
         o.put("alignment","manual-origin-required");JSONArray es=new JSONArray();
         for(Entity e:scene)es.put(e.json());o.put("entities",es);return o.toString();
@@ -59,7 +59,7 @@ final class SceneData {
         if(text.length()>MAX_JSON_BYTES)throw new JSONException("Project too large");
         JSONObject doc=new JSONObject(text);
         int version=doc.getInt("version");
-        if((version!=1&&version!=2&&version!=3&&version!=4)||!"metres".equals(doc.getString("units"))||!"right-handed-y-up".equals(doc.getString("coordinates")))
+        if((version!=1&&version!=2&&version!=3&&version!=4&&version!=5)||!"metres".equals(doc.getString("units"))||!"right-handed-y-up".equals(doc.getString("coordinates")))
             throw new JSONException("Unsupported project format");
         JSONArray es=doc.getJSONArray("entities");if(es.length()>MAX_OBJECTS)throw new JSONException("Object limit exceeded");
         ArrayList<Entity> result=new ArrayList<>();java.util.HashSet<String> ids=new java.util.HashSet<>();int points=0,images=0;
@@ -71,6 +71,8 @@ final class SceneData {
             e.bend=o.has("bend")?number(o,"bend",-300,300):0;e.pitch=o.has("pitch")?number(o,"pitch",-36000,36000):0;e.roll=o.has("roll")?number(o,"roll",-36000,36000):0;
             if(version<4&&(e.pointSpace.equals("surface")||e.bend!=0||e.pitch!=0||e.roll!=0))throw new JSONException("Surface coordinates require version 4");
             if(!e.type.equals("paper")&&(e.bend!=0||e.pitch!=0||e.roll!=0))throw new JSONException("Only paper has surface transforms");
+            if(o.has("paperVisible")&&!(o.get("paperVisible") instanceof Boolean))throw new JSONException("Invalid paper visibility");
+            e.paperVisible=o.optBoolean("paperVisible",true);if(!e.paperVisible&&(version<5||!e.type.equals("paper")))throw new JSONException("Hidden paper needs a paper entity and version 5");
             e.paperKind=o.optString("paperKind","watercolor");e.paperId=o.optString("paperId","");
             if(e.type.equals("paper")&&Paper.kind(e.paperKind)<0)throw new JSONException("Unknown paper finish");
             if(e.pointSpace.equals("surface")&&(e.paperId.isEmpty()||!e.type.equals("stroke")))throw new JSONException("Surface points need a paper reference");

@@ -2,6 +2,10 @@
 
 Research date: 16 September 2026. Primary target: Samsung Galaxy S9+; second target: Galaxy S22 Ultra. This is a prototype-first plan with a premium production quality bar, not a claim that the first build has AAA quality or measured device performance.
 
+## Current 3D drawing workflow update
+
+Studio 06 implements reversible hidden paper guides: draw on a controlled surface, hide its background, Orbit to inspect ink, then add a guide facing the new view. Research from Feather, Blender and Open Brush supports prioritizing explicit guides and constraints for touch/mouse input. The next usability priorities are depth handles, cross-sheet endpoint snapping and named guides. Arbitrary mesh projection and permanently detached geometry remain later work. [Research, implemented behavior, storage/performance review and bounded checks](FLOATING_INK.md).
+
 ## 1. Product decision
 
 Build a phone-based 3D drawing and small game-map editor that works **with the camera off by default**. A creator draws in a virtual scene, places pictures on flat or curved panels, adds game markers, saves the scene, and tries a simple game within it. Gyro viewing lets the user turn the phone to look around without running the camera. Camera AR is an optional extension: scan a room, establish a map origin and place art on real surfaces. Camera-free authoring/viewing works offline without AR services; AR requires those services to be installed first.
