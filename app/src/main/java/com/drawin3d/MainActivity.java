@@ -204,7 +204,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
     private void paperMenu(){
         queueScene(()->{List<SceneData.Entity> snapshot=renderer.snapshot();runOnUiThread(()->{
             java.util.ArrayList<String> names=new java.util.ArrayList<>(),ids=new java.util.ArrayList<>();names.add("＋ Add a paper sheet");names.add("Draw in free 3D space");names.add("Change active paper finish");names.add("Hide / show active sheet (keep ink)");names.add("Hide all sheets (keep ink)");names.add("Show all sheets");
-            for(SceneData.Entity e:snapshot)if(e.type.equals("paper")){names.add("Paint: "+Paper.NAMES[Paper.kind(e.paperKind)]+" ("+(ids.size()+1)+")"+(e.paperVisible?"":" · hidden guide"));ids.add(e.id);}
+            for(SceneData.Entity e:snapshot)if(e.type.equals("paper")){names.add("Paint: "+(e.paperName.isEmpty()?Paper.NAMES[Paper.kind(e.paperKind)]:e.paperName)+" ("+(ids.size()+1)+")"+(e.paperVisible?"":" · hidden guide"));ids.add(e.id);}
             new AlertDialog.Builder(this).setTitle("Paper & surface").setItems(names.toArray(new String[0]),(d,w)->{
                 if(w==0||w==2)new AlertDialog.Builder(this).setTitle(w==0?"Add paper":"Paper finish").setItems(Paper.NAMES,(dialog,index)->{queueScene(()->{if(w==0)renderer.addPaper(Paper.KINDS[index]);else renderer.paperKind(Paper.KINDS[index]);});toolLabel.setText("PAPER · draw inside the sheet; choose free space to leave");}).show();
                 else if(w>=3&&w<=5)queueScene(()->renderer.paperVisibility(w==3?null:w==5,w!=3));

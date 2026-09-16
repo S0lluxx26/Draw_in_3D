@@ -2,7 +2,11 @@
 
 Research date: 16 September 2026. Primary target: Samsung Galaxy S9+; second target: Galaxy S22 Ultra. This is a prototype-first plan with a premium production quality bar, not a claim that the first build has AAA quality or measured device performance.
 
-## Current drawing helpers update
+## Current recovery and guide-placement update
+
+Studio 08 implements the next prioritized suggestions: local browser draft recovery, named guides and an undoable drag-depth control. Android 0.8 preserves names in project v6; older unnamed files keep their format. [Executed implementation plan, code review, logic review and verification](IMPLEMENTATION_PLAN_08.md). Physical phone evaluation remains the next product gate.
+
+## Previous drawing helpers update
 
 Studio 07 applies primary-source research from Feather, Gravity Sketch and Open Brush: translucent editing guides, sheet-local live mirror, endpoint snapping and deliberate depth/parallel-sheet controls. Generated geometry stays in the existing file contract. Native Android 0.6 can load it; helper authoring controls are currently web-only. [Applied research, implementation review, remaining decisions and focused checks](DRAWING_ASSISTS.md).
 

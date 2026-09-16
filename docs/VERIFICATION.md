@@ -1,5 +1,9 @@
 # Prototype verification and review handoff
 
+## Studio 08 recovery, naming and depth
+
+27 web unit tests and 25 Android JVM tests pass. Browser flows cover recovery after reload, two-tab separation, draft download/deletion, quota failure/retry, corrupt recovery, named-guide undo/redo, live parent-depth movement, cancellation, bounds, keyboard and narrow layout. The drawing-helper regression passes. No browser errors were reported. Actual browser v6 data survives Android rendering/copy/export and web return unchanged. Android 0.8 build and lint pass (0 errors, 16 warnings). [Implementation plan and code/logic review](IMPLEMENTATION_PLAN_08.md). Physical device performance remains unmeasured.
+
 ## Studio 07 drawing helpers, existing Android 0.6 compatibility
 
 24 web tests and 22 Android JVM tests pass. The focused browser flow covers live mirror/cancel/paired undo, both axes and curved sheets, snapping through smoothing, translucent editing with identical saved data, sheet depth/undo, blank parallel sheets, narrow layout, export/reopen, and free-space/grid tools. The hidden-sheet flow also passes; browser errors are zero. The actual browser drawing-assists.json fixture survives Android decode/finite render geometry/copy/export and web re-import with every saved field unchanged. Screenshots were inspected. Native code/APK is unchanged; no additional device performance campaign was run. [Research and review](DRAWING_ASSISTS.md).

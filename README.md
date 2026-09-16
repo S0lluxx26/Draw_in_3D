@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 08: recovery, named sheets and drag depth
+
+**Drafts** saves committed edits in this browser and offers Restore, Download and Delete. **Sheet name** organizes your guides. **Drawing helpers → Drag depth from this view** previews moving a sheet with its ink; release applies one undo step, Esc cancels. Existing stepped depth and parallel-sheet tools remain available.
+
+Named sheets use **v6**, requiring **Android 0.8+**. The local APK is artifacts/Draw-in-3D-v0.8.0-debug.apk. Unnamed files keep their previous format. Drafts do not sync devices or replace a JSON backup. Export before updating from an older editor. [Implementation plan, completed work, code/logic review and focused checks](docs/IMPLEMENTATION_PLAN_08.md). Try samples/named-guides-v6.json.
+
 ## Studio 07: research applied to drawing helpers
 
 **See-through guides** reveal other ink while drawing. **Mirror new strokes** draws a live partner across the sheet centre; both sides undo together. **Snap stroke ends** joins Draw/Line/Curve endpoints on the active sheet. **Nearer/Farther** move a sheet with its ink in small depth steps, and **Add parallel sheet** creates a blank layer without copying the drawing. These controls are in **Paper & surface → Drawing helpers** on web; the resulting files work in the existing **Android 0.6** app.

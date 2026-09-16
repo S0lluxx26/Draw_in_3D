@@ -23,3 +23,5 @@ Regenerate both files with `powershell -File scripts/make-sample.ps1` on Windows
 - `ink-guides-v5.json`: browser-exported curved hidden guides with attached ink. Requires Studio 06 / Android 0.6+. Show all sheets restores their backgrounds; Paint on selects each hidden guide.
 
 - drawing-assists.json: browser-authored mirrored/snapped strokes on two parallel hidden guides. Studio 07 helper controls; resulting v5 file opens in native Android 0.6.
+
+- `named-guides-v6.json`: browser-authored named, curved hidden guide with attached ink. Requires Android 0.8+. Used for the web → native → web naming and geometry round-trip.

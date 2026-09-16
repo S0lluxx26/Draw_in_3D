@@ -24,7 +24,7 @@ The app uses relative asset and import paths, so it works beneath `/Draw_in_3D/`
 
 ## Open on a phone
 
-Open the HTTPS web app URL in the phone's browser. Touch drawing and project import/export use the same client-side editor. Export before closing or refreshing; the web prototype does not autosave or sync between devices. Project files and pictures selected by the user are processed in the browser and are not uploaded by the app. Browser/WebGL/device compatibility still needs physical S9+ and S22 Ultra review.
+Open the HTTPS web app URL in the phone's browser. Touch drawing and project import/export use the same client-side editor. Studio 08 saves committed edits to IndexedDB drafts; open Drafts for recovery. These belong to this browser and site origin: localhost drafts do not appear on GitHub Pages, and another device has separate storage. Export JSON for transfer and durable backup because browser storage can be cleared or evicted. Project files and pictures are processed locally and are not uploaded by the app. Browser/WebGL/device compatibility still needs physical S9+ and S22 Ultra review.
 
 HTTPS supplies the secure context needed by browser sensor APIs, but publishing does not itself add sensor handling. This version's web editor has no Gyro Look or Camera AR mode yet. Gyro and AR remain available in the native Android prototype. See the [web contract](WEB_INTEROP.md) for the current scope.
 
