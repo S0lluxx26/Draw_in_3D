@@ -1,9 +1,9 @@
 // Scene payloads and list metadata are separate so opening the shelf is cheap.
-export function createDraftStore(indexedDB = globalThis.indexedDB) {
+export function createDraftStore(indexedDB = globalThis.indexedDB, databaseName = 'draw-in-3d-drafts') {
   let connection;
   const open = () => connection ||= new Promise((resolve, reject) => {
     if (!indexedDB) { reject(new Error('Local storage is unavailable.')); return; }
-    const request = indexedDB.open('draw-in-3d-drafts', 1);
+    const request = indexedDB.open(databaseName, 1);
     let settled = false;
     const fail = message => { if (!settled) { settled = true; clearTimeout(timer); reject(new Error(message)); } };
     const timer = setTimeout(() => fail('Local storage did not respond. Close older editor tabs and retry.'), 8000);

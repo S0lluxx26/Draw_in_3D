@@ -13,7 +13,7 @@ try{
   page.on('response',r=>{if(r.status()>=400)errors.push(`${r.status()} ${r.url()}`);});
   const response=await page.goto(url);assert.equal(response.status(),200);await page.locator('#undo:disabled').waitFor();
   assert.ok(await page.evaluate(()=>isSecureContext));
-  assert.equal(await page.locator('.edition').textContent(),'STUDIO 09');
+  assert.equal(await page.locator('.edition').textContent(),'STUDIO 10');
   await page.locator('#example').click();await page.waitForFunction(()=>document.querySelector('#project-name').textContent==='Starter scene');
   assert.ok(await page.locator('#outliner .object-row').count()>0);await page.locator('#toast').evaluate(e=>e.hidden=true);
   await page.locator('#add-paper').click();await page.locator('#edit-surface').click();

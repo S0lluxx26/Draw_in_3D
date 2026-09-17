@@ -1,4 +1,6 @@
-# Draw in 3D — browser studio 0.7.0
+# Draw in 3D — browser studio 0.10.0
+
+**Current: Show editor → Edit demo** lets you author formations, arrange a show, save/recover it and record a 720p video. [Start here](../docs/SHOW_EDITOR_GUIDE.md).
 
 **Drawing helpers:** See-through guides, live left/right or top/bottom mirroring, same-sheet endpoint snapping, Nearer/Farther depth steps and blank parallel sheets are available in Paper & surface. Mirrors are ordinary independent strokes after release; one undo handles the pair. Generated files remain compatible with Android 0.6. [Research, usage and verification](../docs/DRAWING_ASSISTS.md).
 
@@ -59,3 +61,7 @@ Brush geometry uses the same cylindrical curve, tube/spray construction, Java-co
 Eighteen fast model/editing/paper/curve/surface tests run with `npm test`. The paper walkthrough is `scripts/paper-smoke.mjs`; the original walkthrough is in `scripts/smoke.mjs`; it requires the local server and `DRAW3D_CHROME` pointing to a Chromium executable. It uses software graphics, so it is not a performance benchmark. Android's focused JVM interop test reads the real browser export in `samples/web-authored.json` and writes `app/build/interop/android-reencoded.json`.
 
 See [`../docs/WEB_INTEROP.md`](../docs/WEB_INTEROP.md) for contract details and [`../docs/VERIFICATION.md`](../docs/VERIFICATION.md) for the exact checks performed. Three.js is MIT licensed; its license accompanies the local renderer in `dist/vendor/THREE-LICENSE.txt`. Playwright Core is a development-only Apache-2.0 dependency and is not shipped in the prepared static editor.
+
+## Studio 10 show authoring
+
+Use **Show editor → Edit demo** to edit source artwork, arrange formation cards, set timing/lights/placement, and save or open `.show.json` files. **Play my show → Record video** exports a silent real-time 720p recording. Show drafts are separate from drawing drafts. [Walkthrough](../docs/SHOW_EDITOR_GUIDE.md), [architecture and review](../docs/SHOW_AUTHORING_PLAN.md). Native Android does not import show documents; the Android browser can use this web workflow.

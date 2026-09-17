@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
 import {createFrame,sampleShow,ShowClock} from './drone-show.js';
+import {ShowRecorder} from './show-recorder.js';
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
 
 export class DronePlayer{
   active=false;
   constructor(renderer,canvas,requestFrame,onExit){
     Object.assign(this,{renderer,canvas,requestFrame,onExit});
+    this.recorder=new ShowRecorder(this);
     $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{this.clock.seek(0,performance.now());this.clock.play(performance.now());this.refresh();};
     $('show-exit').onclick=()=>this.stop();$('show-speed').onchange=()=>{this.clock.speed(Number($('show-speed').value),performance.now());this.refresh();};
     $('show-scrub').oninput=()=>this.seek(Number($('show-scrub').value));
@@ -21,16 +23,16 @@ export class DronePlayer{
     this.orbit.addEventListener('change',()=>this.refresh());
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);this.front();this.createStage();this.createDrones();
-    $('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.custom?'YOUR INK, IN THE SKY':'SKY STORIES';
+    $('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
     $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.clock.play(performance.now());this.refresh();
   }
   front(){if(!this.active)return;this.camera.position.set(0,16,62*Math.max(1,.65/this.camera.aspect));this.orbit.target.set(0,15,0);this.orbit.update();}
   resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();this.force=true;}
   refresh(){this.force=true;this.requestFrame();}
-  seek(time){this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
-  toggle(){if(!this.active)return;const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}
-  suspend(){if(this.active){this.clock.pause(performance.now());this.refresh();}}
+  seek(time){if(this.recorder.active)return;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
+  toggle(){if(!this.active||this.recorder.active)return;const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}
+  suspend(){if(this.active){this.recorder.finish(true);this.clock.pause(performance.now());this.refresh();}}
   createStage(){
     const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),new THREE.MeshBasicMaterial({color:0x071019}));ground.rotation.x=-Math.PI/2;ground.position.y=-.05;this.scene.add(ground);
     const grid=new THREE.GridHelper(48,24,0x234153,0x112230);grid.material.transparent=true;grid.material.opacity=.5;this.scene.add(grid);
@@ -68,6 +70,7 @@ export class DronePlayer{
       this.trails.geometry.attributes.position.needsUpdate=true;this.trails.geometry.attributes.color.needsUpdate=true;
     }
     this.renderer.render(this.scene,this.camera);
+    this.recorder.frame();
     if(now-this.lastUI>100||!this.clock.playing||$('show-phase').textContent!==frame.phase){
       this.lastUI=now;$('show-phase').textContent=frame.phase;$('show-time').textContent=stamp(time)+' / '+stamp(this.show.duration);$('show-scrub').value=time;
       $('show-pause').textContent=this.clock.playing?'Ⅱ Pause':time>=this.show.duration?'↻ Replay':'▶ Play';$('show-pause').setAttribute('aria-label',this.clock.playing?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
@@ -79,7 +82,7 @@ export class DronePlayer{
     return this.clock.playing;
   }
   stop(){
-    if(!this.active)return;this.active=false;this.orbit.dispose();const geometries=new Set(),materials=new Set();this.scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});for(const g of geometries)g.dispose();for(const m of materials)m.dispose();
+    if(!this.active)return;this.recorder.finish(true);this.active=false;this.orbit.dispose();const geometries=new Set(),materials=new Set();this.scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});for(const g of geometries)g.dispose();for(const m of materials)m.dispose();
     $('drone-show').hidden=true;this.scene=null;this.lights=null;this.trails=null;this.show=null;this.frame=null;this.trailFrames=null;this.trailPositions=null;this.trailColors=null;this.onExit();
   }
 }

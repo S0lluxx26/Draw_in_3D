@@ -1,6 +1,8 @@
 # Browser ↔ Android project contract
 
-17 September 2026. Browser editor v0.9.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+17 September 2026. Browser editor v0.10.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+
+**Studio 10 authoring:** shows use a separate `format: "draw-in-3d-show", version: 1` document with source drawings, cue placement/timing/lights, fleet size and fireworks settings. Show drafts use a separate IndexedDB database. Open show accepts this format; Open project and native Android continue to accept drawing-only v1–v6 files. Video downloads are rendered output, not editable documents. [Show guide](SHOW_EDITOR_GUIDE.md).
 
 **Studio 09 preview:** drone-show replay is transient browser state and does not add a drawing format version. The demo is generated from source-controlled vector formations; Replay my drawing derives a normalized preview from stroke centre lines. Export for phone still exports the unchanged artwork, not the show or an aircraft mission. Native Android has no drone-show player yet. [Show plan and boundaries](DRONE_SHOW_PLAN.md).
 

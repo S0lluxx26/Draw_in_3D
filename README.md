@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 10: create the demo yourself
+
+**Show editor → Edit demo** opens the robot, fish and Eiffel Tower as editable drawings. Edit their ink with the existing drawing tools, add your own formations, reorder cards, adjust timing, placement and light reveals, and play the resulting show. Your original drawing and its undo history are preserved. Save/Open show uses a separate editable `.show.json` file, with browser-local show recovery.
+
+**Record video** in the player creates a silent 720p real-time recording, with supported WebM/MP4 detection. Keep the tab visible through landing. Native Android remains 0.8; use the web app on Android for show editing. [Step-by-step help](docs/SHOW_EDITOR_GUIDE.md) · [Implementation plan and logic/code review](docs/SHOW_AUTHORING_PLAN.md).
+
 ## Studio 09: drone-show simulator
 
 Click **✦ Demo** above the canvas to play an 87-second show: takeoff → robot → fish → Eiffel Tower → light fireworks → landing. It uses 256 persistent virtual drones, timed light reveals and continuous trajectories. Pause/replay, seek a formation, change speed, orbit and toggle trails. **Replay my drawing** in the inspector turns your stroke lines and colours into a sky formation, including curved-sheet depth. Back to drawing restores your editor session.

@@ -4,7 +4,7 @@ Research date: 16 September 2026. Primary target: Samsung Galaxy S9+; second tar
 
 ## Current drone-show update
 
-Studio 09 adds a camera-free browser drone-show preview, a one-click Demo and replay of drawing stroke formations. The show has its own coordinates, camera and timeline; it leaves the artwork and native file contract intact. [Drone-show implementation and production roadmap](DRONE_SHOW_PLAN.md). Continuous flight separation/kinematic validation, editable choreography and vehicle integration are separate future gates.
+Studio 09 adds a camera-free browser drone-show preview, a one-click Demo and replay of drawing stroke formations. The show has its own coordinates, camera and timeline; it leaves the artwork and native file contract intact. [Drone-show implementation and production roadmap](DRONE_SHOW_PLAN.md). Continuous flight separation/kinematic validation, vehicle integration and advanced motion animation are separate future gates. Studio 10 adds editable formations, a storyboard, light cues, show files/recovery and real-time video recording. [Reviewed authoring plan](SHOW_AUTHORING_PLAN.md) and [help](SHOW_EDITOR_GUIDE.md).
 
 ## Previous recovery and guide-placement update
 

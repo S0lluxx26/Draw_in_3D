@@ -33,27 +33,28 @@ export function samplePaths(paths,count=DRONE_COUNT){
   return {positions,colors};
 }
 
-function robot(){return samplePaths([
+function robot(){return [
   box(-3.8,2.8,7.6,5.8),line([[0,8.6],[0,10]],gold),ellipse(0,10.3,.4,.4,gold),
   box(-2.8,5,.95,1.2,white),box(1.85,5,.95,1.2,white),line([[-1.7,3.8],[1.7,3.8]],gold),
   box(-3,-3.5,6,5.6),line([[-3,1.3],[-5,1.3],[-5,-2.5],[-4,-2.5]],blue),line([[3,1.3],[5,1.3],[5,-2.5],[4,-2.5]],blue),
   box(-2.5,-7,1.7,3.5),box(.8,-7,1.7,3.5),line([[-3.1,-7],[-.5,-7]],gold),line([[.5,-7],[3.1,-7]],gold),
   line([[0,-1.6],[-1.25,-.4],[-1.25,.35],[-.6,.8],[0,.2],[.6,.8],[1.25,.35],[1.25,-.4],[0,-1.6]],pink)
-]);}
-function fish(){return samplePaths([
+];}
+function fish(){return [
   ellipse(0,0,7.5,3.8,cyan),line([[-6.5,1.8],[-11,5.3],[-10,-5.3],[-6.5,-1.8]],gold),
   line([[-2,3.7],[.7,7],[3,3.5]],blue),line([[-2,-3.7],[1,-6],[3,-3.5]],blue),
   ellipse(4.8,1,.55,.6,white),line([[2.8,2.7],[2,1.5],[1.9,0],[2.3,-1.4],[3,-2.5]],gold),
   line([[7.2,.2],[6.1,-.4],[7.1,-1.1]],pink),line([[-2,1],[.7,0],[-2,-1]],blue),
   ellipse(9.4,4,.65,.65,white),ellipse(10.5,6.6,.4,.4,blue)
-]);}
-function tower(){return samplePaths([
+];}
+function tower(){return [
   line([[-7,-8],[-4.7,-3],[-2.2,3],[-.55,9],[.55,9],[2.2,3],[4.7,-3],[7,-8]],gold),
   line([[-7,-8],[-4.5,-8],[-3.4,-5.8],[-1.9,-4.4],[0,-4],[1.9,-4.4],[3.4,-5.8],[4.5,-8],[7,-8]],gold),
   line([[-5,-3],[5,-3]],white),line([[-2.5,3],[2.5,3]],white),line([[-1,7],[1,7]],gold),line([[0,9],[0,11]],white),
   line([[-4.5,-3],[2.2,3],[-2.2,3],[1,7],[-1,7]],gold),line([[4.5,-3],[-2.2,3],[2.2,3],[-1,7],[1,7]],gold),
   line([[-6,-6],[-3,-3]],blue),line([[6,-6],[3,-3]],blue)
-]);}
+];}
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:8},{name:'Fish',paths:fish(),hold:8},{name:'Eiffel Tower',paths:tower(),hold:9}];
 
 // Deterministic O(n³) minimum squared-distance assignment (Hungarian algorithm).
 // Matching shortens paths; it DOES NOT establish minimum flight separation.
@@ -71,12 +72,12 @@ export function matchFormation(previous,target){
     }while(p[j0]!==0);
     do{const j1=way[j0];p[j0]=p[j1];j0=j1;}while(j0);
   }
-  const positions=new Array(n),colors=new Array(n);
-  for(let j=1;j<=n;j++){positions[p[j]-1]=target.positions[j-1];colors[p[j]-1]=target.colors[j-1];}
-  return {positions,colors};
+  const positions=new Array(n),colors=new Array(n),order=new Array(n);
+  for(let j=1;j<=n;j++){positions[p[j]-1]=target.positions[j-1];colors[p[j]-1]=target.colors[j-1];order[p[j]-1]=(target.order?.[j-1]??(j-1)/Math.max(1,n-1));}
+  return {positions,colors,order};
 }
 
-export function drawingFormation(entities){
+export function drawingPaths(entities){
   const papers=new Map(entities.filter(e=>e.type==='paper').map(p=>[p.id,p]));
   const paths=entities.filter(e=>e.type==='stroke').flatMap(e=>{
     const paper=papers.get(e.paperId);
@@ -90,12 +91,19 @@ export function drawingFormation(entities){
     }
     return subdivideSurface(segments,paper).map(path=>({points:path.map(p=>surfaceWorld(paper,p)),color:rgb(e.color&0xffffff)}));
   });
+  return paths;
+}
+export function fitPaths(paths){
   const points=paths.flatMap(p=>p.points);if(!points.length)throw new Error('Draw a line or shape first. Replay uses stroke lines and their colours.');
   const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(const p of points)for(let k=0;k<3;k++){min[k]=Math.min(min[k],p[k]);max[k]=Math.max(max[k],p[k]);}
   const scale=Math.min(22/Math.max(.001,max[0]-min[0]),18/Math.max(.001,max[1]-min[1]),12/Math.max(.001,max[2]-min[2]));
-  for(const path of paths)path.points=path.points.map(p=>p.map((v,k)=>(v-(min[k]+max[k])/2)*scale+(k===1?18:0)));
-  return samplePaths(paths);
+  return {origin:min.map((v,k)=>(v+max[k])/2),scale,position:[0,18,0],yaw:0};
 }
+export function placePaths(paths,placement){
+  const {origin,scale,position,yaw}=placement,a=yaw*Math.PI/180,c=Math.cos(a),s=Math.sin(a);
+  return paths.map(path=>({...path,points:path.points.map(p=>{const [x,y,z]=p.map((v,k)=>(v-origin[k])*scale);return [x*c+z*s+position[0],y+position[1],-x*s+z*c+position[2]];})}));
+}
+export function drawingFormation(entities){const paths=drawingPaths(entities);return samplePaths(placePaths(paths,fitPaths(paths)));}
 
 function fireworksSeeds(){
   const positions=[],colors=[];
@@ -106,21 +114,26 @@ function fireworksSeeds(){
   }
   return {positions,colors};
 }
-export function buildShow(custom){
+export function buildShow(custom,options={}){
   const home=Array.from({length:DRONE_COUNT},(_,i)=>[(i%16-7.5)*.95,.12,(Math.floor(i/16)-7.5)*.8]);
   const dark=()=>Array.from({length:DRONE_COUNT},()=>[0,0,0]);
   const ground={positions:home,colors:dark()},hover={positions:home.map(p=>[p[0],6,p[2]]),colors:dark()};
   const stages=[],cues=[];let cursor=0,previous=ground;
   const add=(name,kind,duration,target,details={})=>{const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
-  for(const [name,formation,duration] of custom?[['Your drawing',custom,12]]:[['Robot',robot(),8],['Fish',fish(),8],['Eiffel Tower',tower(),9]]){
-    const target=matchFormation(previous.positions,formation);add('Forming '+name,'move',7,target);cues.push({label:name,time:cursor+1});add(name,'hold',duration,target,{reveal:true});
+  const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths)})));
+  for(const {name,formation,hold,transfer=7,light='fade'} of sequence){
+    const target=matchFormation(previous.positions,formation);add('Forming '+name,'move',transfer,target);cues.push({label:name,time:cursor+Math.min(hold/2,2)});add(name,'hold',hold,target,{reveal:true,light});
   }
+  if(options.fireworks?.enabled!==false){
   const seeds=matchFormation(previous.positions,fireworksSeeds());add('Firework launch','move',7,seeds);cues.push({label:'Fireworks',time:cursor+5});
   const centres=seeds.positions.map(p=>p[0]<0?[-7,22,0]:[7,18,-1]);
-  const burst={positions:seeds.positions.map((p,i)=>p.map((v,k)=>centres[i][k]+(v-centres[i][k])*4.5-(k===1?2.5:0))),colors:seeds.colors};
-  add('Fireworks','burst',9,burst,{centres});add('Returning home','move',7,hover);cues.push({label:'Landing',time:cursor+2});add('Landing','landing',8,ground);add('Landed','hold',2,ground);
-  return {count:DRONE_COUNT,home,stages,cues,duration:cursor,custom:!!custom};
+  const burst={positions:seeds.positions.map((p,i)=>p.map((v,k)=>centres[i][k]+(v-centres[i][k])*(options.fireworks?.radius??6.3)/1.4-(k===1?2.5:0))),colors:seeds.colors};
+  const duration=options.fireworks?.duration??9;cues[cues.length-1].time=cursor+duration*.55;
+  add('Fireworks','burst',duration,burst,{centres});
+  }
+  add('Returning home','move',7,hover);cues.push({label:'Landing',time:cursor+2});add('Landing','landing',8,ground);add('Landed','hold',2,ground);
+  return {count:DRONE_COUNT,home,stages,cues,duration:cursor,custom:!!custom,title:options.title};
 }
 
 export function stageAt(show,time){const t=clamp(Number.isFinite(time)?time:0,0,show.duration);return show.stages.find(s=>t<s.end)||show.stages.at(-1);}
@@ -130,7 +143,7 @@ export function sampleShow(show,time,out=createFrame(show)){
   out.time=t;out.phase=s.name;
   for(let i=0;i<show.count;i++){
     let q=0,light=0,color=s.to.colors[i];
-    if(s.kind==='hold'){q=1;light=s.reveal?ease(elapsed/1.1):1;}
+    if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
     else if(s.kind==='move'){q=ease((elapsed-.65)/(duration-1.3));light=1-ease(elapsed/.6);color=s.from.colors[i];}
     else if(s.kind==='takeoff'||s.kind==='landing'){const row=Math.floor(i/16)/15;q=ease((elapsed-row*.65)/(duration-.65));}
     else if(s.kind==='burst'){q=ease(elapsed/duration);light=ease(elapsed/.65);}

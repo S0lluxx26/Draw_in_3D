@@ -1,5 +1,17 @@
 # Prototype verification and review handoff
 
+## Studio 10 show authoring
+
+36 web unit tests pass, including editable-demo sampling equivalence, hidden/curved parent capture, placement stability, schema rejection, undo history, minimum timing/light continuity and exact landing. The production build and diff whitespace check pass.
+
+The focused Show Editor browser flow covers source-stroke editing and colour changes, Cancel, new formation drawing, card order/timing/light controls, duplicate/undo/redo, source drawing/history preservation, Save/Open show, malformed-file rejection, cancellation of obsolete worker work, show playback, 412px mobile layout, and recovery in a fresh page from IndexedDB. Desktop and mobile screenshots were inspected. The existing drone-demo browser flow also passes, covering original figures, player controls, mobile stage, custom curved ink and repeated entry/exit.
+
+A complete 29-second performance was recorded with the real browser MediaRecorder and downloaded as WebM; decoding its metadata confirmed 1280 × 720. The recorder was also checked for cancellation on a visibility-change event and restoration of player controls. A test harness issue using a second page from Playwright's single-page convenience context was corrected; the recovery flow then passed with an explicit browser context. This was not an application failure.
+
+Code/logic review fixed card selection after history travel, explicit formation placement, stale worker/status/file-load races, tiny-stroke fit bounds, stale dot geometry after removing all ink, view alignment for oriented guides, video resize interference and recorder error/size/early-stop handling. [Reviewed implementation](SHOW_AUTHORING_PLAN.md) · [Help](SHOW_EDITOR_GUIDE.md).
+
+Native Android code and its v1–v6 drawing contract did not change. Animated rigs/paths, frame-exact offline export, flight validation and real vehicle control remain future work. Physical S9+/S22 Ultra frame rate, battery use and recording codec support have not been measured; browser smoke tests used desktop Chromium with software rendering.
+
 ## Studio 09 drone-show preview
 
 31 web unit tests and the production build pass. Focused browser verification covers Demo launch, all requested figures, fireworks and landing, clock/playback controls, orbiting, visibility-change pause, mobile layout, curved drawing conversion and editor/history preservation across repeated replay. Screenshots were reviewed and no browser errors reported. Native Android stays at 0.8; drawing schema remains v1–v6. This is visual choreography, with physical-flight validation and device performance still pending. [Plan, implementation, review and production gates](DRONE_SHOW_PLAN.md).

@@ -8,8 +8,9 @@ import {PAPER_TYPES,paperPixels,basis,rotate,insidePaper,attachedIds,paperCoordi
 import {smoothPoints} from './stroke-processing.js';
 import {strokeCapacity,assistedStrokeScene,sheetEndpoints,closestEndpoint} from './drawing-assists.js';
 import {createDraftStore,DraftWriter} from './drafts.js';
-import {buildShow,drawingFormation} from './drone-show.js';
+import {buildShow,drawingFormation,drawingPaths,samplePaths} from './drone-show.js';
 import {DronePlayer} from './drone-player.js';
+import {ShowEditor} from './show-editor.js';
 const $=id=>document.getElementById(id),$$=q=>[...document.querySelectorAll(q)];
 const names={draw:'Freehand drawing',line:'Straight line',curve:'Curve drawing',rectangle:'Rectangle',ellipse:'Ellipse',block:'Solid block',select:'Object selection',marquee:'Box selection',move:'Move selection',erase:'Eraser',orbit:'Orbit view',panorama:'Panorama preview',start:'Place Start',checkpoint:'Place Checkpoint',goal:'Place Goal'};
 const keys={d:'draw',v:'select',b:'marquee',m:'move',e:'erase',l:'line',q:'curve',r:'rectangle',c:'ellipse',g:'block',o:'orbit'};
@@ -19,14 +20,15 @@ let entities=[],selected=new Set(),tool='draw',dirty=false,projectName='Untitled
 let depthGesture=null,draftId=crypto.randomUUID(),draftState='ready',draftError,draftListRequest=0;
 const draftStore=createDraftStore(),draftWriter=new DraftWriter(draftStore,draftStatus);
 const history=new History(),brush={brush:'Pen',pattern:'solid',color:argb('#7ee8c5'),width:.018,alpha:1,wet:false};
-let dronePlayer=null,demoShow=null;
+let dronePlayer=null,demoShow=null,showEditor=null,formationSession=null,showReturn=null;
+let dotSource=null;const formationDots=new THREE.Points(new THREE.BufferGeometry(),new THREE.PointsMaterial({size:.026,vertexColors:true,depthTest:false}));formationDots.visible=false;formationDots.renderOrder=9;
 const scene=new THREE.Scene();scene.background=new THREE.Color('#11191c');
 const camera=new THREE.PerspectiveCamera(48,1,.02,100);camera.position.set(0,1.4,5);
 const canvas=$('canvas');let renderer;
 try{renderer=new THREE.WebGLRenderer({canvas,antialias:true,powerPreference:'low-power'});}catch{$('welcome').innerHTML='<h1>WebGL 2 is needed.</h1><p>Enable hardware acceleration and use a current browser.</p>';throw new Error('WebGL 2 unavailable');}
 renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));
 const controls=new OrbitControls(camera,canvas);controls.target.set(0,1.4,0);controls.minDistance=.3;controls.maxDistance=20;controls.enableDamping=false;controls.update();
-const group=new THREE.Group();scene.add(group);
+const group=new THREE.Group();scene.add(group);scene.add(formationDots);
 const floorGrid=new THREE.GridHelper(8,16,0x49665e,0x253c38);scene.add(floorGrid);
 const axes=new THREE.AxesHelper(.35);axes.material.depthTest=false;axes.renderOrder=3;scene.add(axes);
 const guide=new THREE.GridHelper(6,12,0x406354,0x294239);guide.material.transparent=true;guide.material.opacity=.3;guide.material.depthWrite=false;scene.add(guide);
@@ -44,7 +46,7 @@ function updateGuide(){
   $('plane-label').textContent=activePaper()?'PAPER · '+PAPER_TYPES[activePaper().paperKind].name:({wall:'WALL · Z',floor:'FLOOR · Y',side:'SIDE · X',view:'VIEW OFFSET'}[mode])+` = ${offset.toFixed(2)} m`;guide.visible=!game&&!activePaper()&&$('workspace-guides').checked;requestFrame();
 }
 controls.addEventListener('change',()=>{updateGuide();requestFrame();});
-new ResizeObserver(()=>{const box=$('viewport').getBoundingClientRect();if(!box.width||!box.height)return;if(dronePlayer?.active){renderer.setSize(box.width,box.height,false);dronePlayer.resize(box.width/box.height);requestFrame();return;}const aspect=box.width/box.height,ratio=Math.max(1,1/aspect)/Math.max(1,1/camera.aspect);if(!panoramaView)camera.position.sub(controls.target).multiplyScalar(ratio).add(controls.target);camera.aspect=aspect;camera.updateProjectionMatrix();renderer.setSize(box.width,box.height,false);if(panoramaView)updatePanorama();else controls.update();requestFrame();}).observe($('viewport'));
+new ResizeObserver(()=>{const box=$('viewport').getBoundingClientRect();if(!box.width||!box.height)return;if(dronePlayer?.active){if(dronePlayer.recorder.active)return;renderer.setSize(box.width,box.height,false);dronePlayer.resize(box.width/box.height);requestFrame();return;}const aspect=box.width/box.height,ratio=Math.max(1,1/aspect)/Math.max(1,1/camera.aspect);if(!panoramaView)camera.position.sub(controls.target).multiplyScalar(ratio).add(controls.target);camera.aspect=aspect;camera.updateProjectionMatrix();renderer.setSize(box.width,box.height,false);if(panoramaView)updatePanorama();else controls.update();requestFrame();}).observe($('viewport'));
 document.addEventListener('visibilitychange',()=>{if(document.hidden){dronePlayer?.suspend();finishGesture();void draftWriter.flush();if(raf){cancelAnimationFrame(raf);raf=0;}}else requestFrame();});
 canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();dronePlayer?.suspend();finishGesture(true);notify('Graphics paused. Your scene is still in memory; export if recovery fails.',true);});canvas.addEventListener('webglcontextrestored',()=>{notify('Graphics restored.');requestFrame();});
 function paperTexture(kind,ink=false){const key=kind+':'+ink;if(paperTextures.has(key))return paperTextures.get(key);const {pixels,size}=paperPixels(kind,ink),t=new THREE.DataTexture(pixels,size,size);t.flipY=false;t.minFilter=t.magFilter=THREE.LinearFilter;if(!ink)t.colorSpace=THREE.SRGBColorSpace;t.userData.shared=true;t.needsUpdate=true;paperTextures.set(key,t);return t;}
@@ -91,6 +93,7 @@ function updateSelectionBox(){selectionBox.box.makeEmpty();for(const id of selec
 function setDirty(value=true){dirty=value;if(value)queueDraft();$('save-state').textContent=value?'Not exported':'Exported / opened';$('save-dot').style.background=value?'#d2ac75':'#7ee8c5';}
 function label(e){return e.type==='stroke'?`${e.brush}${e.pattern&&e.pattern!=='solid'?' · '+e.pattern:''} stroke`:({paper:(e.paperName||PAPER_TYPES[e.paperKind]?.name)+(e.paperVisible===false?' guide · hidden':' paper'),image:'Curved image',block:'Solid block',start:'Start',checkpoint:'Checkpoint',goal:'Goal'}[e.type]);}
 function updateUI(){
+  updateFormationDots();
   const c=counts(entities);$('welcome').hidden=entities.length>0;$('project-name').textContent=projectName;$('object-count').textContent=`${c.objects} / 80`;$('budget').textContent=`${c.points.toLocaleString()} points / 4,000 · ${c.images} images / 6`;$('format-status').textContent=versionOf(entities)===6?'NAMED GUIDES V6 · ANDROID 0.8+':versionOf(entities)===5?'INK GUIDES V5 · ANDROID 0.6+':versionOf(entities)===4?'SURFACE FORMAT V4 · ANDROID 0.5+':versionOf(entities)===3?'PAPER FORMAT V3 · ANDROID 0.3+':versionOf(entities)===2?'PHONE FORMAT V2 · ANDROID 0.2+':'PHONE-COMPATIBLE · V1';
   $('undo').disabled=!history.past.length||!!game;$('redo').disabled=!history.future.length||!!game;$('undo').title=`Undo ${history.past.at(-1)?.label||''} (Ctrl+Z)`;$('redo').title=`Redo ${history.future.at(-1)?.label||''} (Ctrl+Shift+Z)`;$('history-status').textContent=history.past.length?`${history.past.at(-1).label} · ${history.past.length} undo steps`:'Ready to create';$('selection-actions').hidden=!selected.size||!!game;$('selection-count').textContent=`${selected.size} selected`;
   const target=$('painting-target');if(!activePaper())activePaperId='';target.replaceChildren(new Option('Free 3D space',''));entities.filter(e=>e.type==='paper').forEach((p,i)=>target.add(new Option(`${i+1} · ${p.paperName||PAPER_TYPES[p.paperKind].name}${p.paperVisible===false?' · hidden guide':''}`,p.id)));target.value=activePaperId;
@@ -252,7 +255,7 @@ function stopGame(){if(!game)return;game=null;$('game-status').hidden=true;$('pl
 function nextMarker(){const id=game.ids[game.index];for(const [key,r] of meshes)r.mesh.material.color.set(key===id?0xffffff:game.ids.includes(key)?0x526a5e:0xffffff);$('game-status').textContent=game.index===0?'Tap Start to begin':game.index===game.ids.length?'Map complete ✓':game.index===game.ids.length-1?'Now tap Goal':`Tap Checkpoint ${game.index} of ${game.ids.length-2}`;requestFrame();}
 function playHit(id){if(game&&id===game.ids[game.index]){game.index++;nextMarker();}}
 $('play').onclick=()=>{if(game){stopGame();return;}finishGesture();const start=entities.filter(e=>e.type==='start'),goal=entities.filter(e=>e.type==='goal');if(start.length!==1||goal.length!==1){notify('Place exactly one Start and one Goal to play.');return;}setTool('select');game={ids:[start[0].id,...entities.filter(e=>e.type==='checkpoint').map(e=>e.id),goal[0].id],index:0};selected=new Set();guide.visible=false;$('welcome').hidden=true;$('game-status').hidden=false;$('play').textContent='← Return to edit';updateUI();nextMarker();};$('help').onclick=()=>$('guide').showModal();$('close-guide').onclick=$('guide-done').onclick=()=>$('guide').close();
-window.addEventListener('keydown',event=>{if(dronePlayer?.active)return;if(busy||$('guide').open||$('draft-dialog').open||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;const key=event.key.toLowerCase(),modifier=event.ctrlKey||event.metaKey;if(key==='escape'){if(panoramaView){leavePanorama();return;}if(gesture)finishGesture(true);else if(game)stopGame();else select(null);return;}if(panoramaView&&['arrowleft','arrowright','arrowup','arrowdown'].includes(key)){event.preventDefault();panoramaView.yaw+=key==='arrowleft'?-.12:key==='arrowright'?.12:0;panoramaView.pitch+=key==='arrowup'?.08:key==='arrowdown'?-.08:0;updatePanorama();return;}if(modifier&&key==='s'){event.preventDefault();$('export').click();return;}if(panoramaView&&((modifier&&!['z','y'].includes(key))||(!modifier&&!keys[key])))return;if(game)return;if(modifier&&key==='z'){event.preventDefault();travelHistory(!event.shiftKey);}else if(modifier&&key==='y'){event.preventDefault();travelHistory(false);}else if(modifier&&key==='a'){event.preventDefault();finishGesture();selected=new Set(entities.filter(e=>meshes.get(e.id)?.mesh.visible).map(e=>e.id));updateUI();}else if(modifier&&key==='d'){event.preventDefault();$('duplicate').click();}else if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();$('delete').click();}else if(!modifier&&key==='f')$('fit').click();else if(!modifier&&keys[key])setTool(keys[key]);});
+window.addEventListener('keydown',event=>{if(dronePlayer?.active)return;if(busy||$('author-dialog')?.open||$('author-guide')?.open||$('guide').open||$('draft-dialog').open||['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName))return;const key=event.key.toLowerCase(),modifier=event.ctrlKey||event.metaKey;if(key==='escape'){if(panoramaView){leavePanorama();return;}if(gesture)finishGesture(true);else if(game)stopGame();else select(null);return;}if(panoramaView&&['arrowleft','arrowright','arrowup','arrowdown'].includes(key)){event.preventDefault();panoramaView.yaw+=key==='arrowleft'?-.12:key==='arrowright'?.12:0;panoramaView.pitch+=key==='arrowup'?.08:key==='arrowdown'?-.08:0;updatePanorama();return;}if(modifier&&key==='s'){event.preventDefault();if(formationSession)$('formation-save').click();else $('export').click();return;}if(panoramaView&&((modifier&&!['z','y'].includes(key))||(!modifier&&!keys[key])))return;if(game)return;if(modifier&&key==='z'){event.preventDefault();travelHistory(!event.shiftKey);}else if(modifier&&key==='y'){event.preventDefault();travelHistory(false);}else if(modifier&&key==='a'){event.preventDefault();finishGesture();selected=new Set(entities.filter(e=>meshes.get(e.id)?.mesh.visible).map(e=>e.id));updateUI();}else if(modifier&&key==='d'){event.preventDefault();$('duplicate').click();}else if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();$('delete').click();}else if(!modifier&&key==='f')$('fit').click();else if(!modifier&&keys[key])setTool(keys[key]);});
 window.addEventListener('beforeunload',event=>{if(dirty||gesture?.changed||depthGesture?.value){event.preventDefault();event.returnValue='';}});window.addEventListener('dragover',event=>event.preventDefault());window.addEventListener('drop',event=>{event.preventDefault();notify('Use Open project or Image to import your file.');});setTool('draw');updateGuide();updateUI();
 void draftStore.list().then(rows=>{if(rows.length){$('drafts').textContent='Drafts · '+rows.length;notify('Local drafts are available. Open Drafts to recover a scene.');}}).catch(error=>draftStatus(draftId,'error',error));
 
@@ -264,6 +267,7 @@ function draftStatus(id,state,error){
   $('draft-status').parentElement.dataset.state=failed?'error':draftState;$('retry-draft').hidden=!failed&&draftState!=='error';
 }
 function queueDraft(){
+  if(formationSession){showEditor?.sessionChanged(entities);return;}
   // Capture references to the committed scene, not the changing global document.
   const saved=entities,name=projectName,active=activePaperId,id=draftId,updatedAt=Date.now(),guideNames=saved.filter(e=>e.type==='paper'&&e.paperName).slice(0,3).map(e=>e.paperName).join(' · ');
   draftWriter.enqueue(id,()=>({id,name,guideNames,activePaperId:active,updatedAt,objects:saved.length,text:encode(saved)}));
@@ -343,15 +347,48 @@ $('sheet-depth').onkeydown=event=>{if(event.key==='Escape'){event.preventDefault
 // The show uses a separate scene and camera; authored entities/history are untouched.
 dronePlayer=new DronePlayer(renderer,canvas,requestFrame,()=>{
   document.body.classList.remove('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=false;
-  controls.enabled=true;updateUI();requestFrame();$('drone-demo').focus({preventScroll:true});
+  controls.enabled=true;updateUI();requestFrame();const back=showReturn;showReturn=null;if(back)back();else $('drone-demo').focus({preventScroll:true});
 });
-function startDroneShow(useDrawing=false){
+function startDroneShow(useDrawing=false,compiled=null,onReturn=null,atTime){
   if(busy||dronePlayer.active)return;
   finishGesture();leavePanorama();stopGame();
   try{
-    const show=useDrawing?buildShow(drawingFormation(entities)):(demoShow||=buildShow());
+    showReturn=onReturn;const show=compiled||(useDrawing?buildShow(drawingFormation(entities)):(demoShow||=buildShow()));
     controls.enabled=false;$('toast').hidden=true;document.body.classList.add('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=true;
-    dronePlayer.start(show);requestFrame();
+    dronePlayer.start(show);$('show-exit').textContent=onReturn?'← Back to show':'← Back to drawing';if(atTime!==undefined)dronePlayer.seek(atTime);requestFrame();
   }catch(error){if(dronePlayer.active)dronePlayer.stop();document.body.classList.remove('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=false;controls.enabled=true;notify(error.message,true);}
 }
 $('drone-demo').onclick=()=>startDroneShow();$('drone-drawing').onclick=()=>startDroneShow(true);
+
+function updateFormationDots(){
+  formationDots.visible=!!formationSession&&$('formation-dots').checked;
+  if(!formationDots.visible)return;if(dotSource===entities){formationDots.visible=!!formationDots.geometry.getAttribute('position')?.count;return;}dotSource=entities;
+  try{const f=samplePaths(drawingPaths(entities));formationDots.geometry.dispose();formationDots.geometry=new THREE.BufferGeometry();formationDots.geometry.setAttribute('position',new THREE.Float32BufferAttribute(f.positions.flat(),3));formationDots.geometry.setAttribute('color',new THREE.Float32BufferAttribute(f.colors.flat(),3));}
+  catch{formationDots.geometry.dispose();formationDots.geometry=new THREE.BufferGeometry();formationDots.visible=false;}
+}
+showEditor=new ShowEditor({
+  capture:()=>{finishGesture();return {entities,selected:new Set(selected)};},
+  play:(show,back,time)=>startDroneShow(false,show,back,time),
+  closed:()=>$('show-editor').focus({preventScroll:true}),
+  edit:(artwork,name,done)=>{
+    finishGesture();leavePanorama();stopGame();void draftWriter.flush();
+    formationSession={snapshot:snapshot(),past:history.past,future:history.future,projectName,dirty,images,tool,brush:{...brush},position:camera.position.clone(),target:controls.target.clone(),up:camera.up.clone(),aspect:camera.aspect,
+      fields:['focus-sheet','see-through','workspace-guides','mirror-strokes','snap-ends','plane','offset'].map(id=>({id,value:$(id).value,checked:$(id).checked})),done};
+    entities=artwork;selected=new Set();activePaperId=artwork.find(e=>e.type==='paper')?.id||'';images=new Map();history.clear();projectName=name+' · formation';dirty=false;
+    $('focus-sheet').checked=false;$('workspace-guides').checked=true;$('plane').value='wall';$('offset').value=0;Object.assign(brush,{brush:'Pen',width:.018,wet:false,alpha:1});
+    document.body.classList.add('formation-edit');$('editor-files').inert=true;$('formation-edit-banner').hidden=false;$('formation-edit-name').textContent=name;
+    dotSource=null;syncMeshes();setView('front');setTool('draw');if(activePaper())facePaper(activePaper());else $('fit').click();notify('Edit the ink, then Save formation & return. Your original drawing is kept.');
+  }
+});
+function finishFormation(cancel=false){
+  if(!formationSession||busy)return;finishGesture();leavePanorama();const s=formationSession,artwork=entities;
+  formationSession=null;entities=s.snapshot.entities;selected=s.snapshot.selected;activePaperId=s.snapshot.activePaperId;images=s.images;history.past=s.past;history.future=s.future;projectName=s.projectName;dirty=s.dirty;Object.assign(brush,s.brush);
+  for(const {id,value,checked}of s.fields){$(id).value=value;if(checked!==undefined)$(id).checked=checked;}
+  document.body.classList.remove('formation-edit');$('editor-files').inert=false;$('formation-edit-banner').hidden=true;formationDots.visible=false;dotSource=null;
+  camera.position.copy(s.position).sub(s.target).multiplyScalar(Math.max(1,1/camera.aspect)/Math.max(1,1/s.aspect)).add(s.target);camera.up.copy(s.up);controls.target.copy(s.target);controls.update();
+  syncMeshes();setTool(s.tool);selected=s.snapshot.selected;setDirty(s.dirty);updateUI();
+  s.done(artwork,cancel);
+}
+$('show-editor').onclick=()=>{if(busy||formationSession||dronePlayer.active)return;finishGesture();leavePanorama();stopGame();showEditor.open();};
+$('formation-save').onclick=()=>finishFormation();$('formation-cancel').onclick=()=>finishFormation(true);
+$('formation-dots').onchange=()=>{dotSource=null;updateFormationDots();requestFrame();};
