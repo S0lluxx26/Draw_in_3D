@@ -7,17 +7,18 @@
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Cpath fill='%237ee8c5' d='M20 2 37 12v18L20 40 3 30V12z'/%3E%3Cpath fill='%23111719' d='m20 9 11 7-11 7-11-7zm-11 11 9 6v8l-9-5zm13 6 9-6v9l-9 5z'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="./style.css">
   <link rel="stylesheet" href="./editor-tools.css">
+  <link rel="stylesheet" href="./drone-show.css">
   <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brandmark">◇</span><strong>DRAW IN 3D</strong><span class="edition">STUDIO 08</span></div>
-    <div class="history top-history"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button></div>
+    <div class="brand"><span class="brandmark">◇</span><strong>DRAW IN 3D</strong><span class="edition">STUDIO 09</span></div>
+    <div class="history top-history" id="editor-history"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button></div>
     <div class="project"><span class="dot" id="save-dot"></span><span id="project-name">Untitled scene</span><span id="save-state">Not exported</span></div>
-    <nav class="files" aria-label="Project files"><button id="new">New</button><button id="drafts">Drafts</button><button id="open">Open project</button><button id="export" class="primary">Export for phone <span>↗</span></button></nav>
+    <nav class="files" id="editor-files" aria-label="Project files"><button id="new">New</button><button id="drafts">Drafts</button><button id="open">Open project</button><button id="export" class="primary">Export for phone <span>↗</span></button></nav>
   </header>
   <main class="workspace">
-    <nav class="tools" aria-label="Canvas tools">
+    <nav class="tools" id="editor-tools" aria-label="Canvas tools">
       <button data-tool="draw" class="tool active" title="Draw (D)"><span>✎</span>Draw<kbd>D</kbd></button>
       <button data-tool="select" class="tool" title="Select (V)"><span>↖</span>Select<kbd>V</kbd></button>
       <button data-tool="marquee" class="tool" title="Box selection (B). Shift adds to selection."><span>⬚</span>Box select<kbd>B</kbd></button>
@@ -35,8 +36,19 @@
       <div class="spacer"></div><button id="help" class="tool" title="Controls and file transfer"><span>?</span>Guide</button>
     </nav>
     <section class="viewport" id="viewport" aria-label="3D drawing canvas">
+      <section id="drone-show" aria-label="Drone show player" hidden>
+        <div class="show-heading"><div><span class="show-eyebrow">DRAW IN 3D / SKY STUDIO</span><h1 id="show-title">SKY STORIES</h1><p>256 lights. One canvas. An open sky.</p></div><button id="show-exit">← Back to drawing</button></div>
+        <div class="show-status"><span class="show-live-dot"></span><span id="show-play-state">LIVE PREVIEW</span><span class="show-simulation">SIMULATION</span></div>
+        <div class="show-telemetry"><span>FLEET <strong>256</strong></span><span>LIGHTS ON <strong id="show-lit">0 / 256</strong></span></div>
+        <div class="show-bottom"><div class="show-phase-row"><div><span class="show-eyebrow">ON THE SKY</span><h2 id="show-phase" aria-live="polite">Launch grid</h2></div><span id="show-time">00:00 / 01:27</span></div>
+          <nav id="show-cues" aria-label="Jump to show formation"></nav>
+          <div class="show-seek"><div id="show-progress"></div><input id="show-scrub" type="range" min="0" max="87" step="0.1" value="0" aria-label="Show timeline in seconds"></div>
+          <div class="show-controls"><div><button id="show-pause" class="primary">Ⅱ Pause</button><button id="show-restart" title="Restart from launch">↻ Restart</button></div><div><label for="show-speed">Speed <select id="show-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><label class="show-trail-toggle"><input id="show-trails" type="checkbox" checked> Trails</label><button id="show-front">Front view</button></div></div>
+          <p class="show-footnote">Drag to orbit · Pinch or scroll to zoom · Space to pause · Visual choreography preview</p>
+        </div>
+      </section>
       <canvas id="canvas" aria-label="3D scene. Drag to draw; right-drag to orbit." tabindex="0"></canvas>
-      <div class="viewbar"><div class="view-presets"><button data-view="front" class="active">Front</button><button data-view="perspective">Perspective</button><button data-view="top">Top</button><button id="fit" title="Frame all objects (F)">Fit</button></div><button id="play"><span>▷</span> Play map</button></div>
+      <div class="viewbar"><div class="view-presets"><button data-view="front" class="active">Front</button><button data-view="perspective">Perspective</button><button data-view="top">Top</button><button id="fit" title="Frame all objects (F)">Fit</button></div><div class="view-play-actions"><button id="drone-demo" title="Play a drone light show: robot, fish, Eiffel Tower and fireworks">✦ Demo</button><button id="play"><span>▷</span> Play map</button></div></div>
       <div class="canvas-label"><span class="tiny-dot"></span> CAMERA-FREE WORKSPACE <span class="label-line"></span><span id="plane-label">WALL · Z = 0 m</span></div>
       <div class="welcome" id="welcome"><span class="eyebrow">SKETCH · SHAPE · BUILD</span><h1>A little sketch.<br><em>A whole world.</em></h1><p>Fluid strokes, precise shapes, solid blocks.<br>Build in space. Take it to your phone.</p><button id="example">Explore the starter scene <span>↗</span></button><small>Drag to draw · Choose a shape on the left</small></div>
       <div id="marquee" class="marquee" hidden></div><div id="eraser-cursor" class="eraser-cursor" hidden></div><div id="snap-cursor" class="snap-cursor" hidden aria-hidden="true"></div>
@@ -45,7 +57,8 @@
       <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
       <div id="sheet-focus-banner" class="sheet-focus-banner" hidden><span id="sheet-focus-label">Focused on this sheet</span><button id="show-all-sheets">Show all objects</button></div><div id="panorama-banner" class="sheet-focus-banner panorama-banner" hidden><span>Panorama preview · drag to look around</span><button id="exit-panorama">Back to drawing</button></div><div class="canvas-bottom"><span id="history-status">Ready to create</span><span class="mouse-hint" id="tool-hint">Drag to draw · Right-drag to orbit</span></div>
     </section>
-    <aside class="inspector">
+    <aside class="inspector" id="editor-inspector">
+      <section class="drone-card"><span class="show-eyebrow">NEW · SKY STUDIO</span><h2>Draw a drone show.</h2><p>Play Demo above for a robot, fish, Eiffel Tower and light fireworks.</p><button id="drone-drawing">↗ Replay my drawing</button><small>Uses stroke lines and colours, including curved sheets. Images, blocks and paper are not lights.</small></section>
       <div class="draft-status-row"><span id="draft-status" role="status">Local recovery ready</span><button id="retry-draft" hidden>Retry</button></div>
       <div class="panel-title"><h2 id="tool-name">Freehand drawing</h2><span class="tag" id="tool-key">D</span></div>
       <div id="curve-options" class="tool-options" hidden><label for="curve-kind">Curve shape</label><select id="curve-kind"><option value="arc">Arc</option><option value="s">S-curve</option></select><div class="field-head"><label for="curve-bend">Bend</label><output id="curve-bend-value">35%</output></div><input id="curve-bend" type="range" min="-100" max="100" value="35"><p class="hint">Set the bend, then drag between endpoints. Negative values bend the other way. Curves save as editable strokes.</p></div>

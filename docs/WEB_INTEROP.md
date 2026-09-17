@@ -1,6 +1,8 @@
 # Browser ↔ Android project contract
 
-16 September 2026. Browser editor v0.8.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+17 September 2026. Browser editor v0.9.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+
+**Studio 09 preview:** drone-show replay is transient browser state and does not add a drawing format version. The demo is generated from source-controlled vector formations; Replay my drawing derives a normalized preview from stroke centre lines. Export for phone still exports the unchanged artwork, not the show or an aircraft mission. Native Android has no drone-show player yet. [Show plan and boundaries](DRONE_SHOW_PLAN.md).
 
 **Studio 08 extension:** optional paper `paperName` stores a label of at most 64 UTF-16 code units, excluding U+0000–U+001F and U+007F. A nonempty name requires a paper entity and **v6 / Android 0.8+**. Empty or omitted uses the material label and adds no version requirement. Both readers now accept v1–v6. Rename, duplicate, copy and export retain names; removing all names permits the lowest remaining version. Depth dragging uses the existing surface transforms and introduces no coordinate format. Local IndexedDB drafts wrap the ordinary project JSON with browser-only name/date/active-guide metadata; exported JSON remains the portable contract. [Plan and review](IMPLEMENTATION_PLAN_08.md).
 

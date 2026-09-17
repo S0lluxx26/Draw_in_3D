@@ -1,5 +1,9 @@
 # Prototype verification and review handoff
 
+## Studio 09 drone-show preview
+
+31 web unit tests and the production build pass. Focused browser verification covers Demo launch, all requested figures, fireworks and landing, clock/playback controls, orbiting, visibility-change pause, mobile layout, curved drawing conversion and editor/history preservation across repeated replay. Screenshots were reviewed and no browser errors reported. Native Android stays at 0.8; drawing schema remains v1–v6. This is visual choreography, with physical-flight validation and device performance still pending. [Plan, implementation, review and production gates](DRONE_SHOW_PLAN.md).
+
 ## Studio 08 recovery, naming and depth
 
 27 web unit tests and 25 Android JVM tests pass. Browser flows cover recovery after reload, two-tab separation, draft download/deletion, quota failure/retry, corrupt recovery, named-guide undo/redo, live parent-depth movement, cancellation, bounds, keyboard and narrow layout. The drawing-helper regression passes. No browser errors were reported. Actual browser v6 data survives Android rendering/copy/export and web return unchanged. Android 0.8 build and lint pass (0 errors, 16 warnings). [Implementation plan and code/logic review](IMPLEMENTATION_PLAN_08.md). Physical device performance remains unmeasured.

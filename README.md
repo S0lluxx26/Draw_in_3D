@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 09: drone-show simulator
+
+Click **✦ Demo** above the canvas to play an 87-second show: takeoff → robot → fish → Eiffel Tower → light fireworks → landing. It uses 256 persistent virtual drones, timed light reveals and continuous trajectories. Pause/replay, seek a formation, change speed, orbit and toggle trails. **Replay my drawing** in the inspector turns your stroke lines and colours into a sky formation, including curved-sheet depth. Back to drawing restores your editor session.
+
+This is a browser visual simulator. Flight constraints and real drone control are future work; Android's native app remains 0.8. [Implementation, researched workflow, production roadmap and review](docs/DRONE_SHOW_PLAN.md).
+
 ## Studio 08: recovery, named sheets and drag depth
 
 **Drafts** saves committed edits in this browser and offers Restore, Download and Delete. **Sheet name** organizes your guides. **Drawing helpers → Drag depth from this view** previews moving a sheet with its ink; release applies one undo step, Esc cancels. Existing stepped depth and parallel-sheet tools remain available.

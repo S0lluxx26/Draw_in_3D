@@ -2,7 +2,11 @@
 
 Research date: 16 September 2026. Primary target: Samsung Galaxy S9+; second target: Galaxy S22 Ultra. This is a prototype-first plan with a premium production quality bar, not a claim that the first build has AAA quality or measured device performance.
 
-## Current recovery and guide-placement update
+## Current drone-show update
+
+Studio 09 adds a camera-free browser drone-show preview, a one-click Demo and replay of drawing stroke formations. The show has its own coordinates, camera and timeline; it leaves the artwork and native file contract intact. [Drone-show implementation and production roadmap](DRONE_SHOW_PLAN.md). Continuous flight separation/kinematic validation, editable choreography and vehicle integration are separate future gates.
+
+## Previous recovery and guide-placement update
 
 Studio 08 implements the next prioritized suggestions: local browser draft recovery, named guides and an undoable drag-depth control. Android 0.8 preserves names in project v6; older unnamed files keep their format. [Executed implementation plan, code review, logic review and verification](IMPLEMENTATION_PLAN_08.md). Physical phone evaluation remains the next product gate.
 
