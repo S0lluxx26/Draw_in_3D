@@ -137,6 +137,15 @@ export function buildShow(custom,options={}){
 }
 
 export function stageAt(show,time){const t=clamp(Number.isFinite(time)?time:0,0,show.duration);return show.stages.find(s=>t<s.end)||show.stages.at(-1);}
+// All trajectories interpolate between endpoints, so their combined bounds also
+// bound the complete performance. Include landing pads when framing the camera.
+export function frontView(show,aspect,fov=46,verticalOffset=0){
+  const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+  for(const stage of show.stages)for(const p of [...stage.from.positions,...stage.to.positions])for(let k=0;k<3;k++){min[k]=Math.min(min[k],p[k]);max[k]=Math.max(max[k],p[k]);}
+  const target=min.map((v,k)=>(v+max[k])/2),half=min.map((v,k)=>(max[k]-v)/2),tan=Math.tan(fov*Math.PI/360);
+  const distance=half[2]+Math.max(38,half[0]/(tan*Math.max(.1,aspect)),half[1]/(tan*Math.max(.3,1-2*Math.abs(verticalOffset))))*1.25;
+  return {target,position:[target[0],target[1]+distance*.04,target[2]+distance]};
+}
 export function createFrame(show){return {positions:new Float32Array(show.count*3),colors:new Float32Array(show.count*3),phase:'',time:0};}
 export function sampleShow(show,time,out=createFrame(show)){
   const t=clamp(Number.isFinite(time)?time:0,0,show.duration),s=stageAt(show,t),elapsed=t-s.start,duration=s.end-s.start;

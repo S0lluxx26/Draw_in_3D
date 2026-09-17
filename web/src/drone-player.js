@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {createFrame,sampleShow,ShowClock} from './drone-show.js';
+import {createFrame,sampleShow,ShowClock,frontView} from './drone-show.js';
 import {ShowRecorder} from './show-recorder.js';
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
 
@@ -18,17 +18,17 @@ export class DronePlayer{
   start(show){
     this.show=show;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:9},()=>createFrame(show));
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#030812');this.scene.fog=new THREE.FogExp2('#030812',.003);
-    this.camera=new THREE.PerspectiveCamera(46,1,.1,300);
-    this.orbit=new OrbitControls(this.camera,this.canvas);this.orbit.target.set(0,15,0);this.orbit.minDistance=22;this.orbit.maxDistance=150;this.orbit.maxPolarAngle=Math.PI*.49;this.orbit.enablePan=false;this.orbit.enableDamping=false;
-    this.orbit.addEventListener('change',()=>this.refresh());
+    this.camera=new THREE.PerspectiveCamera(46,1,.1,1000);
+    this.orbit=new OrbitControls(this.camera,this.canvas);this.orbit.target.set(0,15,0);this.orbit.minDistance=22;this.orbit.maxDistance=600;this.orbit.maxPolarAngle=Math.PI*.49;this.orbit.enablePan=false;this.orbit.enableDamping=false;
+    this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>this.frontMode=false);
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);this.front();this.createStage();this.createDrones();
     $('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
     $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.clock.play(performance.now());this.refresh();
   }
-  front(){if(!this.active)return;this.camera.position.set(0,16,62*Math.max(1,.65/this.camera.aspect));this.orbit.target.set(0,15,0);this.orbit.update();}
-  resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();this.force=true;}
+  front(){if(!this.active)return;this.frontMode=true;const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0,pose=frontView(this.show,this.camera.aspect,this.camera.fov,offset);this.camera.position.fromArray(pose.position);this.orbit.target.fromArray(pose.target);this.orbit.update();}
+  resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();if(this.frontMode)this.front();this.force=true;}
   refresh(){this.force=true;this.requestFrame();}
   seek(time){if(this.recorder.active)return;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
   toggle(){if(!this.active||this.recorder.active)return;const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}

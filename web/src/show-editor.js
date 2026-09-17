@@ -80,13 +80,20 @@ export class ShowEditor{
   }
   async recover(){
     $('recovery').hidden=false;$('drafts').textContent='Loading…';
-    try{await this.writer.flush();const stored=await this.store.list(),rows=new Map(stored.map(r=>[r.id,r]));for(const [id,job]of this.writer.failed)rows.set(id,{...job.create(),unsaved:true});$('drafts').replaceChildren();
+    try{await this.writer.flush();let stored=[];try{stored=await this.store.list();}catch(error){this.report(error.message+' Memory-only drafts are listed below; download them before closing.',true);}const rows=new Map(stored.map(r=>[r.id,r]));for(const [id,job]of this.writer.failed)rows.set(id,{...job.create(),unsaved:true});$('drafts').replaceChildren();
       for(const row of [...rows.values()].sort((a,b)=>b.updatedAt-a.updatedAt)){
         const item=document.createElement('div');item.className='author-draft';const label=document.createElement('span');label.textContent=`${row.name} · ${new Date(row.updatedAt).toLocaleString()}${row.unsaved?' · only in memory':''}`;
-        const load=async(download=false)=>{try{const record=this.writer.failed.get(row.id)?.create()||await this.store.get(row.id);if(!record)throw new Error('Draft no longer exists.');const doc=decodeShow(record.text);if(download)downloadShowFile(encodeShow(doc),doc.name);else{this.replace(doc);$('recovery').hidden=true;}}catch(e){this.report(e.message,true);}};
+        const load=download=>this.loadDraft(row.id,download);
         item.append(label,button('Restore',()=>load()),button('Download',()=>load(true)));$('drafts').append(item);
       }if(!rows.size)$('drafts').textContent='No show drafts yet. Editing a show creates one.';
     }catch(error){$('drafts').textContent=error.message;}
+  }
+  async loadDraft(id,download=false){
+    const revision=this.revision;
+    try{const record=this.writer.failed.get(id)?.create()||await this.store.get(id);if(!record)throw new Error('Draft no longer exists.');const doc=decodeShow(record.text);
+      if(download)downloadShowFile(encodeShow(doc),doc.name);
+      else{if(revision!==this.revision)throw new Error('The show changed while the draft was loading. Restore it again when ready.');this.replace(doc);$('recovery').hidden=true;}
+    }catch(error){this.report(error.message,true);}
   }
   render(){
     const c=this.cue; $('name').value=this.doc.name;$('total').textContent=`${this.doc.cues.length} / 12 formations · ${showDuration(this.doc)}s`;
