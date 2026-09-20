@@ -1,8 +1,12 @@
-# Make your own drone show — Studio 11
+# Make your own drone show — Studio 12
 
 Open [Draw in 3D](https://s0lluxx26.github.io/Draw_in_3D/) and choose **Show editor** above the canvas. The same guide is available under **How to make a show** inside the app. This workflow works in the web app on a PC, phone or tablet; it does not need a camera or IMU.
 
-## Recreate and change the demo
+## Detailed Demo settings
+
+Choose **Demo settings** in the drawing inspector or the Demo player to set the drone count, light shape, 2×–4× formation size and per-formation yellow fire. Apply restarts the Demo. The detailed 3D formations are Blender assets; **Show editor → Edit demo** opens the stroke-based version described below. [Blender source and export instructions](STUDIO12.md).
+
+## Recreate and change the stroke-based demo
 
 1. Click **Edit demo**. You get Robot, Fish, Eiffel Tower, Big ship, Firework star, Row of fire and Starship launch as editable drawings, with the original timing and a fireworks finale.
 2. Select the Robot card and click **Edit drawing**. Its original strokes open on a hidden drawing guide. Use Select or Box select to change colours or move parts; use Line, Curve, Rectangle, Ellipse or freehand Draw to add details. Undo and Redo work here. **Drone dots** previews the 4,096 samples over committed strokes.

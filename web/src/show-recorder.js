@@ -28,7 +28,7 @@ export class ShowRecorder{
     }catch(error){this.finish(true,error.message);if(this.recorder?.state==='inactive')this.recorder=null;$('show-record-status').textContent=error.message;}
   }
   lock(locked){
-    for(const id of ['show-pause','show-restart','show-speed','show-trails','show-front','show-scrub'])$(id).disabled=locked;
+    for(const id of ['show-pause','show-restart','show-speed','show-trails','show-front','show-scrub','show-demo-settings'])$(id).disabled=locked;
     for(const b of $('show-cues').children)b.disabled=locked;
   }
   fail(message){this.cancelled=true;this.chunks=[];if(this.active)this.finish(true,message);else $('show-record-status').textContent=message;}

@@ -5,7 +5,7 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = path.join(root, 'dist');
 await mkdir(path.join(dist, 'vendor'), { recursive: true });
-const files=['index.html', 'style.css', 'editor-tools.css', 'editor.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'drone-player.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'show-editor.css', 'show-worker.js', 'show-recorder.js'];
+const files=['index.html', 'style.css', 'editor-tools.css', 'editor.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'show-editor.css', 'show-worker.js', 'show-recorder.js'];
 const sources=await Promise.all(files.map(file=>readFile(path.join(root,'src',file),'utf8')));
 const revision=createHash('sha256').update(sources.join('\n')).digest('hex').slice(0,12);
 const localAssets=new Set(files.filter(file=>/\.(js|css)$/.test(file)).map(file=>'./'+file));

@@ -13,7 +13,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brandmark">◇</span><strong>DRAW IN 3D</strong><span class="edition">STUDIO 11</span></div>
+    <div class="brand"><span class="brandmark">◇</span><strong>DRAW IN 3D</strong><span class="edition">STUDIO 12</span></div>
     <div class="history top-history" id="editor-history"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button></div>
     <div class="project"><span class="dot" id="save-dot"></span><span id="project-name">Untitled scene</span><span id="save-state">Not exported</span></div>
     <nav class="files" id="editor-files" aria-label="Project files"><button id="new">New</button><button id="drafts">Drafts</button><button id="open">Open project</button><button id="export" class="primary">Export for phone <span>↗</span></button></nav>
@@ -44,7 +44,7 @@
         <div class="show-bottom"><div class="show-phase-row"><div><span class="show-eyebrow">ON THE SKY</span><h2 id="show-phase" aria-live="polite">Launch grid</h2></div><span id="show-time">00:00 / 01:27</span></div>
           <nav id="show-cues" aria-label="Jump to show formation"></nav>
           <div class="show-seek"><div id="show-progress"></div><input id="show-scrub" type="range" min="0" max="87" step="0.1" value="0" aria-label="Show timeline in seconds"></div>
-          <div class="show-controls"><div><button id="show-pause" class="primary">Ⅱ Pause</button><button id="show-restart" title="Restart from launch">↻ Restart</button></div><div><label for="show-speed">Speed <select id="show-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><label class="show-trail-toggle"><input id="show-trails" type="checkbox" checked> Trails</label><button id="show-front">Front view</button></div></div>
+          <div class="show-controls"><div><button id="show-pause" class="primary">Ⅱ Pause</button><button id="show-restart" title="Restart from launch">↻ Restart</button></div><div><label for="show-speed">Speed <select id="show-speed"><option value="0.5">0.5×</option><option value="1" selected>1×</option><option value="2">2×</option></select></label><label class="show-trail-toggle"><input id="show-trails" type="checkbox" checked> Trails</label><button id="show-demo-settings" hidden>Demo settings</button><button id="show-front">Front view</button></div></div>
           <p class="show-footnote">Drag to orbit · Pinch or scroll to zoom · Space to pause · Visual choreography preview</p>
         </div>
       </section>
@@ -60,7 +60,7 @@
       <div id="sheet-focus-banner" class="sheet-focus-banner" hidden><span id="sheet-focus-label">Focused on this sheet</span><button id="show-all-sheets">Show all objects</button></div><div id="panorama-banner" class="sheet-focus-banner panorama-banner" hidden><span>Panorama preview · drag to look around</span><button id="exit-panorama">Back to drawing</button></div><div class="canvas-bottom"><span id="history-status">Ready to create</span><span class="mouse-hint" id="tool-hint">Drag to draw · Right-drag to orbit</span></div>
     </section>
     <aside class="inspector" id="editor-inspector">
-      <section class="drone-card"><span class="show-eyebrow">NEW · SKY STUDIO</span><h2>Draw a drone show.</h2><p>Open <strong>Show editor</strong> above to edit the demo, draw formations, arrange a show and save it. Demo plays the original performance.</p><button id="drone-drawing">↗ Replay my drawing</button><small>Uses stroke lines and colours, including curved sheets. Images, blocks and paper are not lights.</small></section>
+      <section class="drone-card"><span class="show-eyebrow">NEW · SKY STUDIO</span><h2>Draw a drone show.</h2><p>Open <strong>Show editor</strong> above to edit the demo, draw formations, arrange a show and save it. Demo plays detailed Blender-built formations. Demo settings change fleet size, light shape, formation scale and fire.</p><button id="drone-demo-settings">Demo settings</button><button id="drone-drawing">↗ Replay my drawing</button><small>Uses stroke lines and colours, including curved sheets. Images, blocks and paper are not lights.</small></section>
       <div class="draft-status-row"><span id="draft-status" role="status">Local recovery ready</span><button id="retry-draft" hidden>Retry</button></div>
       <div class="panel-title"><h2 id="tool-name">Freehand drawing</h2><span class="tag" id="tool-key">D</span></div>
       <div id="curve-options" class="tool-options" hidden><label for="curve-kind">Curve shape</label><select id="curve-kind"><option value="arc">Arc</option><option value="s">S-curve</option></select><div class="field-head"><label for="curve-bend">Bend</label><output id="curve-bend-value">35%</output></div><input id="curve-bend" type="range" min="-100" max="100" value="35"><p class="hint">Set the bend, then drag between endpoints. Negative values bend the other way. Curves save as editable strokes.</p></div>

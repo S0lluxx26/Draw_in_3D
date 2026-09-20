@@ -4,6 +4,10 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 12: Blender formations and Demo settings
+
+**Demo settings** selects 256–4,096 drones, round/diamond/star lights, 2×–4× formation scale and fire for each formation. Demo now uses detailed 3D Blender meshes, including a striped fish with fins and gills, a multi-deck ship and a rising Starship. Transitions blink dim red/blue. [Controls, Blender editing and review](docs/STUDIO12.md).
+
 ## Studio 11: 4,096-drone sky performance
 
 Demo now uses **4,096 drones (16×)** with larger light dots and alternating red/blue navigation flashes during takeoff and landing. It adds a big ship, sparkling firework star, a row of falling fire and a slowly rising Starship with bright yellow exhaust. The complete demo lasts 155 seconds.

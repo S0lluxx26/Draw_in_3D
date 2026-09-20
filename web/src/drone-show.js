@@ -73,7 +73,7 @@ export function matchFormation(previous,target){
       const ranges=[0,1,2].map(k=>{let lo=Infinity,hi=-Infinity;for(const i of b){lo=Math.min(lo,target.positions[i][k]);hi=Math.max(hi,target.positions[i][k]);}return hi-lo;});const axis=ranges.indexOf(Math.max(...ranges));
       a.sort((i,j)=>previous[i][axis]-previous[j][axis]||i-j);b.sort((i,j)=>target.positions[i][axis]-target.positions[j][axis]||i-j);const mid=a.length>>1;partition(a.slice(0,mid),b.slice(0,mid));partition(a.slice(mid),b.slice(mid));};
     partition(Array.from({length:n},(_,i)=>i),Array.from({length:n},(_,i)=>i));
-    return {positions:Array.from(permutation,i=>target.positions[i]),colors:Array.from(permutation,i=>target.colors[i]),order:Array.from(permutation,i=>target.order?.[i]??i/Math.max(1,n-1))};
+    return {positions:Array.from(permutation,i=>target.positions[i]),colors:Array.from(permutation,i=>target.colors[i]),order:Array.from(permutation,i=>target.order?.[i]??i/Math.max(1,n-1)),...(target.fire?{fire:Array.from(permutation,i=>target.fire[i])}:{})};
   }
   const costs=previous.map(a=>Float64Array.from(target.positions,b=>a.reduce((s,v,k)=>s+(v-b[k])**2,0)));
   const u=new Float64Array(n+1),v=new Float64Array(n+1),p=new Int32Array(n+1),way=new Int32Array(n+1);
@@ -87,9 +87,9 @@ export function matchFormation(previous,target){
     }while(p[j0]!==0);
     do{const j1=way[j0];p[j0]=p[j1];j0=j1;}while(j0);
   }
-  const positions=new Array(n),colors=new Array(n),order=new Array(n);
-  for(let j=1;j<=n;j++){positions[p[j]-1]=target.positions[j-1];colors[p[j]-1]=target.colors[j-1];order[p[j]-1]=(target.order?.[j-1]??(j-1)/Math.max(1,n-1));}
-  return {positions,colors,order};
+  const positions=new Array(n),colors=new Array(n),order=new Array(n),fire=target.fire?new Array(n):null;
+  for(let j=1;j<=n;j++){if(fire)fire[p[j]-1]=target.fire[j-1];positions[p[j]-1]=target.positions[j-1];colors[p[j]-1]=target.colors[j-1];order[p[j]-1]=(target.order?.[j-1]??(j-1)/Math.max(1,n-1));}
+  return {positions,colors,order,...(fire?{fire}:{})};
 }
 
 export function drawingPaths(entities){
@@ -131,24 +131,24 @@ function fireworksSeeds(count){
 }
 export function buildShow(custom,options={}){
   const count=options.count??custom?.positions.length??DRONE_COUNT,side=Math.ceil(Math.sqrt(count));
-  const home=Array.from({length:count},(_,i)=>[(i%side-(side-1)/2)*15/side,.12,(Math.floor(i/side)-(side-1)/2)*13/side]);
+  const home=Array.from({length:count},(_,i)=>[(i%side-(side-1)/2)*15/side*(options.motionScale??1),.12,(Math.floor(i/side)-(side-1)/2)*13/side*(options.motionScale??1)]);
   const dark=()=>Array.from({length:count},()=>[0,0,0]);
   const ground={positions:home,colors:dark()},hover={positions:home.map(p=>[p[0],6,p[2]]),colors:dark()};
   const stages=[],cues=[];let cursor=0,previous=ground;
   const add=(name,kind,duration,target,details={})=>{const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
   const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths,count)})));
-  for(const {name,formation,hold,transfer=7,light='fade',effect='none'} of sequence){
-    const target=matchFormation(previous.positions,formation);add('Forming '+name,'move',transfer,target);cues.push({label:name,time:cursor+Math.min(hold/2,2)});if(effect==='starship'){const raised={...target,positions:target.positions.map(p=>[p[0],p[1]+10,p[2]])};add(name,'rise',hold,raised,{effect});}else add(name,'hold',hold,target,{reveal:true,light,effect});
+  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled} of sequence){
+    const target=matchFormation(previous.positions,formation);add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});cues.push({label:name,time:cursor+Math.min(hold/2,2)});if(effect==='starship'){const raised={...target,positions:target.positions.map(p=>[p[0],p[1]+10*(options.motionScale??1),p[2]])};add(name,'rise',hold,raised,{effect,fireEnabled,motionScale:options.motionScale});}else add(name,'hold',hold,target,{reveal:true,light,effect,fireEnabled,motionScale:options.motionScale});
   }
   if(options.fireworks?.enabled!==false){
-  const seeds=matchFormation(previous.positions,fireworksSeeds(count));add('Firework launch','move',7,seeds);cues.push({label:'Fireworks',time:cursor+5});
-  const centres=seeds.positions.map(p=>p[0]<0?[-7,22,0]:[7,18,-1]);
-  const burst={positions:seeds.positions.map((p,i)=>p.map((v,k)=>centres[i][k]+(v-centres[i][k])*(options.fireworks?.radius??6.3)/1.4-(k===1?2.5:0))),colors:seeds.colors};
+  const fireworks=fireworksSeeds(count),motionScale=options.motionScale??1;fireworks.positions=fireworks.positions.map(p=>p.map(v=>v*motionScale));const seeds=matchFormation(previous.positions,fireworks);add('Firework launch','move',7,seeds,{transitionLights:options.transitionLights});cues.push({label:'Fireworks',time:cursor+5});
+  const centres=seeds.positions.map(p=>(p[0]<0?[-7,22,0]:[7,18,-1]).map(v=>v*motionScale));
+  const burst={positions:seeds.positions.map((p,i)=>p.map((v,k)=>centres[i][k]+(v-centres[i][k])*(options.fireworks?.radius??6.3)/1.4-(k===1?2.5*motionScale:0))),colors:seeds.colors};
   const duration=options.fireworks?.duration??9;cues[cues.length-1].time=cursor+duration*.55;
   add('Fireworks','burst',duration,burst,{centres});
   }
-  add('Returning home','move',7,hover);cues.push({label:'Landing',time:cursor+2});add('Landing','landing',8,ground);add('Landed','hold',2,ground);
+  add('Returning home','move',7,hover,{transitionLights:options.transitionLights});cues.push({label:'Landing',time:cursor+2});add('Landing','landing',8,ground);add('Landed','hold',2,ground);
   return {count,home,stages,cues,duration:cursor,custom:!!custom,title:options.title};
 }
 
@@ -169,20 +169,20 @@ export function sampleShow(show,time,out=createFrame(show)){
   const window=Math.sin(Math.PI*elapsed/duration)**2,animated=['sparkle','fire','starship'].includes(s.effect),travel=ease((elapsed-.65)/(duration-1.3)),progress=ease(elapsed/duration),fadeOut=1-ease(elapsed/.6),fadeIn=ease(elapsed/.65),navigation=ease(elapsed/.35)*ease((duration-elapsed)/.35);
   const side=Math.ceil(Math.sqrt(show.count));
   for(let i=0;i<show.count;i++){
-    let q=0,light=0,color=s.to.colors[i];
+    let q=0,light=0,navLight=0,color=s.to.colors[i];
     if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
-    else if(s.kind==='move'){q=travel;light=fadeOut;color=s.from.colors[i];}
+    else if(s.kind==='move'){q=travel;light=fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=.12*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2)*(1-fadeOut);}
     else if(s.kind==='takeoff'||s.kind==='landing'){const row=Math.floor(i/side)/Math.max(1,side-1);q=ease((elapsed-row*.65)/(duration-.65));light=navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2);color=(Math.floor(elapsed*3)+i)%2?navigationRed:navigationBlue;}
     else if(s.kind==='burst'||s.kind==='rise'){q=progress;light=fadeIn;}
     const flameDrone=color[0]>0&&color[1]/color[0]>.7&&color[2]/color[0]<.2;
-    const falling=flameDrone&&(s.effect==='starship'||s.effect==='fire'),fallPhase=(elapsed*.65+i*.61803398875)%1,fall=fallPhase<.75?ease(fallPhase/.75):1-ease((fallPhase-.75)/.25);
+    const falling=(s.to.fire?.[i]??flameDrone)&&s.fireEnabled!==false&&(s.effect==='starship'||s.effect==='fire'),fallPhase=(elapsed*.65+i*.61803398875)%1,fall=fallPhase<.75?ease(fallPhase/.75):1-ease((fallPhase-.75)/.25);
     let pulse=animated?1-.55*window*(1+Math.sin(elapsed*9+i*.67))/2:s.kind==='burst'?1-.14*window*(1+Math.sin(elapsed*4+i*.2))/2:1;
     if(falling)pulse*=1-window+window*ease(fallPhase/.08)*(1-ease((fallPhase-.55)/.2));
     for(let k=0;k<3;k++){
       out.positions[i*3+k]=s.from.positions[i][k]+(s.to.positions[i][k]-s.from.positions[i][k])*q;
-      if(k===1&&falling)out.positions[i*3+k]-=window*(s.effect==='starship'?3:1.6)*fall;
+      if(k===1&&falling)out.positions[i*3+k]-=window*(s.effect==='starship'?3:1.6)*(s.motionScale??1)*fall;
       if(k===1)out.positions[i*3+k]=Math.max(.12,out.positions[i*3+k]);
-      out.colors[i*3+k]=color[k]*light*pulse;
+      out.colors[i*3+k]=color[k]*light*pulse+navLight*((Math.floor(elapsed*3)+i)%2?navigationRed[k]:navigationBlue[k]);
     }
   }
   return out;

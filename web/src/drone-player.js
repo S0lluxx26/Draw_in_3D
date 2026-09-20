@@ -13,10 +13,10 @@ export class DronePlayer{
     $('show-exit').onclick=()=>this.stop();$('show-speed').onchange=()=>{this.clock.speed(Number($('show-speed').value),performance.now());this.refresh();};
     $('show-scrub').oninput=()=>this.seek(Number($('show-scrub').value));
     $('show-trails').onchange=()=>this.refresh();$('show-front').onclick=()=>{this.front();this.refresh();};
-    window.addEventListener('keydown',event=>{if(!this.active)return;if(event.key==='Escape'){event.preventDefault();this.stop();return;}if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName))return;if(event.code==='Space'){event.preventDefault();this.toggle();}});
+    window.addEventListener('keydown',event=>{if(!this.active||$('demo-settings')?.open)return;if(event.key==='Escape'){event.preventDefault();this.stop();return;}if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName))return;if(event.code==='Space'){event.preventDefault();this.toggle();}});
   }
   start(show){
-    this.show=show;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:3},()=>createFrame(show));
+    this.show=show;$('show-demo-settings').hidden=!show.demo;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:3},()=>createFrame(show));
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#030812');this.scene.fog=new THREE.FogExp2('#030812',.003);
     this.camera=new THREE.PerspectiveCamera(46,1,.1,1000);
     this.orbit=new OrbitControls(this.camera,this.canvas);this.orbit.target.set(0,15,0);this.orbit.minDistance=22;this.orbit.maxDistance=600;this.orbit.maxPolarAngle=Math.PI*.49;this.orbit.enablePan=false;this.orbit.enableDamping=false;
@@ -46,9 +46,9 @@ export class DronePlayer{
   }
   createDrones(){
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(this.frame.positions,3).setUsage(THREE.DynamicDrawUsage));geo.setAttribute('color',new THREE.BufferAttribute(this.frame.colors,3).setUsage(THREE.DynamicDrawUsage));
-    const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{pixelRatio:{value:this.renderer.getPixelRatio()}},
-      vertexShader:'attribute vec3 color; varying vec3 lightColor; uniform float pixelRatio; void main(){lightColor=color; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=clamp(1200./max(1.,-mv.z),7.,36.)*pixelRatio;}',
-      fragmentShader:'varying vec3 lightColor; void main(){float r=length(gl_PointCoord-.5)*2.; if(r>1.)discard; float glow=exp(-5.*r*r)*.38+exp(-48.*r*r)*1.4; gl_FragColor=vec4(lightColor*glow,1.);}'
+    const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{lightShape:{value:Math.max(0,['round','diamond','star'].indexOf(this.show.lightShape))},pixelRatio:{value:this.renderer.getPixelRatio()}},
+      vertexShader:'attribute vec3 color; varying vec3 lightColor; uniform float pixelRatio; void main(){lightColor=color; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=clamp(1200./max(1.,-mv.z),3.,36.)*pixelRatio;}',
+      fragmentShader:'varying vec3 lightColor; uniform int lightShape; void main(){vec2 p=(gl_PointCoord-.5)*2.; float r=length(p); if(lightShape==1)r=abs(p.x)+abs(p.y); if(lightShape==2)r/= .7+.3*cos(5.*atan(p.y,p.x)-1.5707963); if(r>1.)discard; float glow=lightShape==0?exp(-5.*r*r)*.38+exp(-48.*r*r)*1.4:(1.-smoothstep(.65,1.,r))*.85; gl_FragColor=vec4(lightColor*glow,1.);}'
     });
     this.lights=new THREE.Points(geo,material);this.lights.frustumCulled=false;this.scene.add(this.lights);
     const bodies=new THREE.Points(geo,new THREE.PointsMaterial({color:0x536b85,size:.13,transparent:true,opacity:.6,depthWrite:false}));bodies.frustumCulled=false;this.scene.add(bodies);

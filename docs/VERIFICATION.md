@@ -1,3 +1,7 @@
+## Studio 12 (21 September 2026)
+
+47 unit tests pass. Demo browser checks cover detailed formations, settings, restart/cancel, persistence, mobile layout and shader compilation. See [Studio 12 review](STUDIO12.md). Real device performance is not yet measured.
+
 # Prototype verification and review handoff
 
 ## Studio 11 fleet and motion effects
