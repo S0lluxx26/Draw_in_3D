@@ -6,7 +6,7 @@ import {entity,encode} from '../src/model.js';
 
 test('editable demo reproduces source paths, timing, fleet, and exact landing after a show round trip',()=>{
   const doc=decodeShow(encodeShow(editableDemo())),compiled=compileShow(doc),original=buildShow();
-  assert.equal(compiled.duration,87);assert.equal(compiled.duration,showDuration(doc));assert.deepEqual(compiled.cues,original.cues);
+  assert.equal(compiled.duration,155);assert.equal(compiled.duration,showDuration(doc));assert.deepEqual(compiled.cues,original.cues);
   const raw=demoPaths();for(const [i,c]of doc.cues.entries()){
     const actual=cueFormation(c),expected=samplePaths(raw[i].paths);
     assert.ok(actual.positions.every((p,j)=>p.every((v,k)=>Math.abs(v-expected.positions[j][k])<1e-5)));
@@ -33,11 +33,11 @@ test('show schema rejects malformed and incompatible input; history restores com
   for(const change of [d=>d.cues.push(d.cues[0]),d=>d.cues[0].transfer=0,d=>d.cues[0].hold=Infinity,d=>d.cues[0].light='script',d=>d.count=1024,d=>d.fireworks.radius=100,d=>d.cues[0].placement.origin=[0],d=>d.cues[0].artwork[1].paperId='missing']){
     const copy=structuredClone(doc);change(copy);assert.throws(()=>validateShow(copy));
   }
-  const h=new ShowHistory(doc);h.set({...doc,cues:[...doc.cues].reverse()});assert.equal(h.doc.cues[0].name,'Eiffel Tower');h.travel(true);assert.equal(h.doc,doc);h.travel(false);assert.equal(h.doc.cues[0].name,'Eiffel Tower');h.set(newShow());assert.equal(h.future.length,0);
+  const h=new ShowHistory(doc);h.set({...doc,cues:[...doc.cues].reverse()});assert.equal(h.doc.cues[0].name,'Starship launch');h.travel(true);assert.equal(h.doc,doc);h.travel(false);assert.equal(h.doc.cues[0].name,'Starship launch');h.set(newShow());assert.equal(h.future.length,0);
 });
 test('minimum timing, draw-order lighting, no-fireworks and reordered formations preserve boundaries',()=>{
   const doc=editableDemo();doc.cues.reverse();doc.fireworks.enabled=false;
-  doc.cues=doc.cues.map((c,i)=>({...c,hold:2,transfer:2,brightness:.4,light:i%2?'bottom-up':'draw-on'}));
+  doc.cues=doc.cues.map((c,i)=>({...c,hold:2,transfer:2,brightness:.4,effect:'none',light:i%2?'bottom-up':'draw-on'}));
   const show=compileShow(doc);assert.equal(show.duration,showDuration(doc));assert.equal(show.stages.filter(s=>s.kind==='burst').length,0);
   for(const s of show.stages.slice(1)){
     const a=sampleShow(show,s.start-1e-6),b=sampleShow(show,s.start+1e-6);

@@ -8,7 +8,7 @@ const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,he
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1040},acceptDownloads:true}),page=await context.newPage(),errors=[];
   const observe=p=>{p.on('pageerror',e=>errors.push(e.message));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});p.on('dialog',d=>d.accept());};observe(page);
-  const url=process.env.DRAW3D_URL||'http://127.0.0.1:5173';await page.goto(url);await page.locator('#undo:disabled').waitFor();assert.equal(await page.locator('.edition').textContent(),'STUDIO 10');
+  const url=process.env.DRAW3D_URL||'http://127.0.0.1:5173';await page.goto(url);await page.locator('#undo:disabled').waitFor();assert.equal(await page.locator('.edition').textContent(),'STUDIO 11');
   const save=async name=>{const wait=page.waitForEvent('download');await page.locator('#export').click();const file=path.join(out,name);await(await wait).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   const settled=async()=>page.waitForFunction(()=>!document.body.classList.contains('busy'));
   const undo=async()=>{await page.locator('#undo').click();await settled();};

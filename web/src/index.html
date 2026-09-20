@@ -13,7 +13,7 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span class="brandmark">◇</span><strong>DRAW IN 3D</strong><span class="edition">STUDIO 10</span></div>
+    <div class="brand"><span class="brandmark">◇</span><strong>DRAW IN 3D</strong><span class="edition">STUDIO 11</span></div>
     <div class="history top-history" id="editor-history"><button id="undo" title="Undo (Ctrl+Z)" aria-label="Undo">↶</button><button id="redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↷</button></div>
     <div class="project"><span class="dot" id="save-dot"></span><span id="project-name">Untitled scene</span><span id="save-state">Not exported</span></div>
     <nav class="files" id="editor-files" aria-label="Project files"><button id="new">New</button><button id="drafts">Drafts</button><button id="open">Open project</button><button id="export" class="primary">Export for phone <span>↗</span></button></nav>
@@ -38,9 +38,9 @@
     </nav>
     <section class="viewport" id="viewport" aria-label="3D drawing canvas">
       <section id="drone-show" aria-label="Drone show player" hidden>
-        <div class="show-heading"><div><span class="show-eyebrow">DRAW IN 3D / SKY STUDIO</span><h1 id="show-title">SKY STORIES</h1><p>256 lights. One canvas. An open sky.</p></div><div class="show-heading-actions"><button id="show-record">Record video</button><button id="show-exit">← Back to drawing</button><span id="show-record-status" class="show-record-status" role="status"></span></div></div>
+        <div class="show-heading"><div><span class="show-eyebrow">DRAW IN 3D / SKY STUDIO</span><h1 id="show-title">SKY STORIES</h1><p id="show-tagline">4,096 lights. One canvas. An open sky.</p></div><div class="show-heading-actions"><button id="show-record">Record video</button><button id="show-exit">← Back to drawing</button><span id="show-record-status" class="show-record-status" role="status"></span></div></div>
         <div class="show-status"><span class="show-live-dot"></span><span id="show-play-state">LIVE PREVIEW</span><span class="show-simulation">SIMULATION</span></div>
-        <div class="show-telemetry"><span>FLEET <strong>256</strong></span><span>LIGHTS ON <strong id="show-lit">0 / 256</strong></span></div>
+        <div class="show-telemetry"><span>FLEET <strong id="show-fleet">4,096</strong></span><span>LIGHTS ON <strong id="show-lit">0 / 256</strong></span></div>
         <div class="show-bottom"><div class="show-phase-row"><div><span class="show-eyebrow">ON THE SKY</span><h2 id="show-phase" aria-live="polite">Launch grid</h2></div><span id="show-time">00:00 / 01:27</span></div>
           <nav id="show-cues" aria-label="Jump to show formation"></nav>
           <div class="show-seek"><div id="show-progress"></div><input id="show-scrub" type="range" min="0" max="87" step="0.1" value="0" aria-label="Show timeline in seconds"></div>

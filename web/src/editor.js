@@ -363,7 +363,7 @@ $('drone-demo').onclick=()=>startDroneShow();$('drone-drawing').onclick=()=>star
 function updateFormationDots(){
   formationDots.visible=!!formationSession&&$('formation-dots').checked;
   if(!formationDots.visible)return;if(dotSource===entities){formationDots.visible=!!formationDots.geometry.getAttribute('position')?.count;return;}dotSource=entities;
-  try{const f=samplePaths(drawingPaths(entities));formationDots.geometry.dispose();formationDots.geometry=new THREE.BufferGeometry();formationDots.geometry.setAttribute('position',new THREE.Float32BufferAttribute(f.positions.flat(),3));formationDots.geometry.setAttribute('color',new THREE.Float32BufferAttribute(f.colors.flat(),3));}
+  try{const f=samplePaths(drawingPaths(entities),showEditor?.doc.count);formationDots.geometry.dispose();formationDots.geometry=new THREE.BufferGeometry();formationDots.geometry.setAttribute('position',new THREE.Float32BufferAttribute(f.positions.flat(),3));formationDots.geometry.setAttribute('color',new THREE.Float32BufferAttribute(f.colors.flat(),3));}
   catch{formationDots.geometry.dispose();formationDots.geometry=new THREE.BufferGeometry();formationDots.visible=false;}
 }
 showEditor=new ShowEditor({

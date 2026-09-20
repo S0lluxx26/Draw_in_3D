@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 11: 4,096-drone sky performance
+
+Demo now uses **4,096 drones (16×)** with larger light dots and alternating red/blue navigation flashes during takeoff and landing. It adds a big ship, sparkling firework star, a row of falling fire and a slowly rising Starship with bright yellow exhaust. The complete demo lasts 155 seconds.
+
+**Show editor → Edit demo** exposes all seven drawings and their motion effects. Choose Fleet size for 4,096 or the legacy 256-drone option. Show v2 preserves effects and fleet size; old v1 shows still load. [Controls, performance changes and review](docs/STUDIO11.md).
+
 ## Studio 10: create the demo yourself
 
 **Show editor → Edit demo** opens the robot, fish and Eiffel Tower as editable drawings. Edit their ink with the existing drawing tools, add your own formations, reorder cards, adjust timing, placement and light reveals, and play the resulting show. Your original drawing and its undo history are preserved. Save/Open show uses a separate editable `.show.json` file, with browser-local show recovery.

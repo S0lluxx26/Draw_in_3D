@@ -1,6 +1,8 @@
 # Browser ↔ Android project contract
 
-17 September 2026. Browser editor v0.10.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+17 September 2026. Browser editor v0.11.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+
+**Studio 11:** show v2 adds a 4,096-drone fleet and optional per-cue motion effects. V1 shows load as 256 drones with no motion effect; saving promotes them to v2. Drawing-only Android formats are unchanged. [Details](STUDIO11.md).
 
 **Studio 10 authoring:** shows use a separate `format: "draw-in-3d-show", version: 1` document with source drawings, cue placement/timing/lights, fleet size and fireworks settings. Show drafts use a separate IndexedDB database. Open show accepts this format; Open project and native Android continue to accept drawing-only v1–v6 files. Video downloads are rendered output, not editable documents. [Show guide](SHOW_EDITOR_GUIDE.md).
 

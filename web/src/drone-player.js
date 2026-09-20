@@ -16,14 +16,14 @@ export class DronePlayer{
     window.addEventListener('keydown',event=>{if(!this.active)return;if(event.key==='Escape'){event.preventDefault();this.stop();return;}if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName))return;if(event.code==='Space'){event.preventDefault();this.toggle();}});
   }
   start(show){
-    this.show=show;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:9},()=>createFrame(show));
+    this.show=show;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:3},()=>createFrame(show));
     this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#030812');this.scene.fog=new THREE.FogExp2('#030812',.003);
     this.camera=new THREE.PerspectiveCamera(46,1,.1,1000);
     this.orbit=new OrbitControls(this.camera,this.canvas);this.orbit.target.set(0,15,0);this.orbit.minDistance=22;this.orbit.maxDistance=600;this.orbit.maxPolarAngle=Math.PI*.49;this.orbit.enablePan=false;this.orbit.enableDamping=false;
     this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>this.frontMode=false);
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);this.front();this.createStage();this.createDrones();
-    $('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
+    $('show-fleet').textContent=show.count.toLocaleString();$('show-tagline').textContent=show.count.toLocaleString()+' lights. One canvas. An open sky.';$('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
     $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.clock.play(performance.now());this.refresh();
   }
@@ -47,12 +47,12 @@ export class DronePlayer{
   createDrones(){
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(this.frame.positions,3).setUsage(THREE.DynamicDrawUsage));geo.setAttribute('color',new THREE.BufferAttribute(this.frame.colors,3).setUsage(THREE.DynamicDrawUsage));
     const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{pixelRatio:{value:this.renderer.getPixelRatio()}},
-      vertexShader:'attribute vec3 color; varying vec3 lightColor; uniform float pixelRatio; void main(){lightColor=color; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=clamp(820./max(1.,-mv.z),5.,26.)*pixelRatio;}',
+      vertexShader:'attribute vec3 color; varying vec3 lightColor; uniform float pixelRatio; void main(){lightColor=color; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=clamp(1200./max(1.,-mv.z),7.,36.)*pixelRatio;}',
       fragmentShader:'varying vec3 lightColor; void main(){float r=length(gl_PointCoord-.5)*2.; if(r>1.)discard; float glow=exp(-5.*r*r)*.38+exp(-48.*r*r)*1.4; gl_FragColor=vec4(lightColor*glow,1.);}'
     });
     this.lights=new THREE.Points(geo,material);this.lights.frustumCulled=false;this.scene.add(this.lights);
     const bodies=new THREE.Points(geo,new THREE.PointsMaterial({color:0x536b85,size:.13,transparent:true,opacity:.6,depthWrite:false}));bodies.frustumCulled=false;this.scene.add(bodies);
-    const trailGeometry=new THREE.BufferGeometry();this.trailPositions=new Float32Array(this.show.count*8*6);this.trailColors=new Float32Array(this.trailPositions.length);
+    const trailGeometry=new THREE.BufferGeometry();this.trailPositions=new Float32Array(this.show.count*2*6);this.trailColors=new Float32Array(this.trailPositions.length);
     trailGeometry.setAttribute('position',new THREE.BufferAttribute(this.trailPositions,3).setUsage(THREE.DynamicDrawUsage));trailGeometry.setAttribute('color',new THREE.BufferAttribute(this.trailColors,3).setUsage(THREE.DynamicDrawUsage));
     this.trails=new THREE.LineSegments(trailGeometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.24,depthWrite:false,blending:THREE.AdditiveBlending}));this.trails.frustumCulled=false;this.scene.add(this.trails);
   }
@@ -60,12 +60,12 @@ export class DronePlayer{
     if(!this.active)return false;
     if(!this.force&&this.clock.playing&&now-this.lastFrame<1000/30-.5)return true;
     this.force=false;this.lastFrame=now;const time=this.clock.read(now),frame=sampleShow(this.show,time,this.frame);
-    this.lights.geometry.attributes.position.needsUpdate=true;this.lights.geometry.attributes.color.needsUpdate=true;
+    this.lights.material.uniforms.pixelRatio.value=this.renderer.getPixelRatio();this.lights.geometry.attributes.position.needsUpdate=true;this.lights.geometry.attributes.color.needsUpdate=true;
     this.trails.visible=$('show-trails').checked;
     if(this.trails.visible){
-      for(let j=0;j<9;j++)sampleShow(this.show,time-(8-j)*.12,this.trailFrames[j]);
-      for(let i=0;i<this.show.count;i++)for(let j=0;j<8;j++)for(let end=0;end<2;end++)for(let k=0;k<3;k++){
-        const index=(i*8+j)*6+end*3+k;this.trailPositions[index]=this.trailFrames[j+end].positions[i*3+k];this.trailColors[index]=Math.max(.11,frame.colors[i*3+k])*(j+1)/8;
+      for(let j=0;j<3;j++)sampleShow(this.show,time-(2-j)*.2,this.trailFrames[j]);
+      for(let i=0;i<this.show.count;i++)for(let j=0;j<2;j++)for(let end=0;end<2;end++)for(let k=0;k<3;k++){
+        const index=(i*2+j)*6+end*3+k;this.trailPositions[index]=this.trailFrames[j+end].positions[i*3+k];this.trailColors[index]=Math.max(.11,frame.colors[i*3+k])*(j+1)/2;
       }
       this.trails.geometry.attributes.position.needsUpdate=true;this.trails.geometry.attributes.color.needsUpdate=true;
     }
@@ -76,7 +76,7 @@ export class DronePlayer{
       $('show-pause').textContent=this.clock.playing?'Ⅱ Pause':time>=this.show.duration?'↻ Replay':'▶ Play';$('show-pause').setAttribute('aria-label',this.clock.playing?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
       $('show-progress').style.width=(100*time/this.show.duration)+'%';
       const cue=[...this.show.cues].reverse().find(c=>time>=c.time-1);for(const button of $('show-cues').children){const active=Number(button.dataset.time)===cue?.time;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
-      const lit=Array.from({length:this.show.count},(_,i)=>Math.max(...frame.colors.subarray(i*3,i*3+3))>.05).filter(Boolean).length;
+      let lit=0;for(let i=0;i<frame.colors.length;i+=3)if(Math.max(frame.colors[i],frame.colors[i+1],frame.colors[i+2])>.05)lit++;
       $('show-lit').textContent=lit+' / '+this.show.count;$('show-play-state').textContent=this.clock.playing?'LIVE PREVIEW':time>=this.show.duration?'SHOW COMPLETE':'PAUSED';
     }
     return this.clock.playing;

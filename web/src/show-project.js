@@ -17,26 +17,27 @@ export function captureArtwork(entities,selection){
 }
 export function newCue(artwork=blankArtwork(),label='New formation'){
   const paths=drawingPaths(artwork);
-  return {id:crypto.randomUUID(),name:label,artwork,hold:8,transfer:7,light:'fade',brightness:1,
+  return {id:crypto.randomUUID(),name:label,artwork,hold:8,transfer:7,light:'fade',effect:'none',brightness:1,
     placement:paths.length?fitArtwork(artwork):{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
 }
 export function fitArtwork(artwork){const p=fitPaths(drawingPaths(artwork));return {...p,scale:Math.min(100,Math.max(.1,p.scale))};}
-export function newShow(){return {format:'draw-in-3d-show',version:1,name:'My sky story',count:DRONE_COUNT,cues:[],fireworks:{enabled:true,duration:9,radius:6.3}};}
+export function newShow(){return {format:'draw-in-3d-show',version:2,name:'My sky story',count:DRONE_COUNT,cues:[],fireworks:{enabled:true,duration:9,radius:6.3}};}
 export function editableDemo(){
   const doc=newShow();doc.name='Sky stories';
-  doc.cues=demoPaths().map(({name,paths,hold})=>{
+  doc.cues=demoPaths().map(({name,paths,hold,effect='none'})=>{
     const paper=blankArtwork(name+' guide')[0];
     const artwork=[paper,...paths.map(path=>({...entity('stroke'),paperId:paper.id,pointSpace:'surface',color:(0xff000000|path.color.reduce((n,v,k)=>n|(Math.round(v*255)<<(16-k*8)),0)),points:path.points.map(p=>[p[0]/10,(p[1]-18)/10,p[2]/10,1])}))];
-    return {...newCue(artwork,name),hold,placement:{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
+    return {...newCue(artwork,name),hold,effect,placement:{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
   });return validateShow(doc);
 }
 export function validateShow(doc){
-  need(doc?.format==='draw-in-3d-show'&&doc.version===1,'Open a Draw in 3D show file (version 1). Drawing files use Open project.');
-  name(doc.name,'Show name');need(doc.count===DRONE_COUNT,'This version supports a fleet of 256 drones.');
+  need(doc?.format==='draw-in-3d-show'&&[1,2].includes(doc.version),'Open a Draw in 3D show file (version 1 or 2). Drawing files use Open project.');
+  name(doc.name,'Show name');need([256,DRONE_COUNT].includes(doc.count),'Supported fleets are 256 and 4096 drones.');
   need(Array.isArray(doc.cues)&&doc.cues.length<=SHOW_LIMITS.cues,'A show can contain up to 12 formations.');
+  need(doc.version===2||doc.count===256&&doc.cues.every(c=>!c.effect||c.effect==='none'),'Large fleets and animated effects require show version 2.');
   const ids=new Set();
   for(const c of doc.cues){
-    need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');
+    need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship'].includes(c.effect??'none'),'Unknown formation effect.');
     validate(documentOf(c.artwork));need(c.artwork.every(e=>['paper','stroke'].includes(e.type)),'Formations contain strokes and their paper guides only.');
     num(c.hold,2,60,'Display duration');num(c.transfer,2,30,'Transition duration');num(c.brightness,.1,1,'Brightness');
     need(['fade','draw-on','bottom-up'].includes(c.light),'Unknown light preset.');
@@ -51,17 +52,17 @@ export function decodeShow(text){
   need(new TextEncoder().encode(text).length<=SHOW_LIMITS.bytes,'Show exceeds the 16 MiB file limit.');
   const d=validateShow(JSON.parse(text));
   // Rebuild the known schema; imported properties never become application state.
-  return {format:d.format,version:1,name:d.name,count:DRONE_COUNT,cues:d.cues.map(c=>({id:c.id,name:c.name,artwork:decode(JSON.stringify(documentOf(c.artwork))),hold:c.hold,transfer:c.transfer,light:c.light,brightness:c.brightness,placement:{origin:[...c.placement.origin],position:[...c.placement.position],scale:c.placement.scale,yaw:c.placement.yaw}})),fireworks:{enabled:d.fireworks.enabled,duration:d.fireworks.duration,radius:d.fireworks.radius}};
+  return {format:d.format,version:2,name:d.name,count:d.count,cues:d.cues.map(c=>({id:c.id,name:c.name,artwork:decode(JSON.stringify(documentOf(c.artwork))),hold:c.hold,transfer:c.transfer,light:c.light,effect:c.effect??'none',brightness:c.brightness,placement:{origin:[...c.placement.origin],position:[...c.placement.position],scale:c.placement.scale,yaw:c.placement.yaw}})),fireworks:{enabled:d.fireworks.enabled,duration:d.fireworks.duration,radius:d.fireworks.radius}};
 }
-export function cueFormation(c){
+export function cueFormation(c,count=DRONE_COUNT){
   const paths=placePaths(drawingPaths(c.artwork),c.placement);
   need(paths.every(path=>path.points.every(p=>Math.abs(p[0])<=34&&p[1]>=2&&p[1]<=46&&Math.abs(p[2])<=24)),`${c.name}: ink is outside the sky stage. Use Fit to stage or adjust placement.`);
-  const f=samplePaths(paths);f.colors=f.colors.map(c0=>c0.map(v=>v*c.brightness));return f;
+  const f=samplePaths(paths,count);f.colors=f.colors.map(c0=>c0.map(v=>v*c.brightness));return f;
 }
 export function compileShow(doc){
   validateShow(doc);need(doc.cues.length>0,'Add at least one formation to your show.');
-  const sequence=doc.cues.map(c=>{try{return {...c,formation:cueFormation(c)};}catch(error){throw new Error(c.name+': '+error.message);}});
-  return buildShow(null,{sequence,fireworks:doc.fireworks,title:doc.name});
+  const sequence=doc.cues.map(c=>{try{return {...c,formation:cueFormation(c,doc.count)};}catch(error){throw new Error(c.name+': '+error.message);}});
+  return buildShow(null,{sequence,fireworks:doc.fireworks,title:doc.name,count:doc.count});
 }
 export const showDuration=doc=>25+doc.cues.reduce((n,c)=>n+c.hold+c.transfer,0)+(doc.fireworks.enabled?7+doc.fireworks.duration:0);
 

@@ -1,5 +1,9 @@
 # Prototype verification and review handoff
 
+## Studio 11 fleet and motion effects
+
+43 unit tests and the build pass. The 4,096-drone demo browser check exercises every new ship/star/fire-row/Starship cue, player controls, mobile layout and exact landing. The authoring flow passes with seven editable presets, source preservation, recovery and save/open. A complete short 4,096-drone show was recorded as WebM and decoded at 1280 × 720. Screenshots of the new shapes were inspected. [Implementation and performance review](STUDIO11.md). Physical Galaxy performance remains unmeasured.
+
 ## Studio 10 show authoring
 
 36 web unit tests pass, including editable-demo sampling equivalence, hidden/curved parent capture, placement stability, schema rejection, undo history, minimum timing/light continuity and exact landing. The production build and diff whitespace check pass.
