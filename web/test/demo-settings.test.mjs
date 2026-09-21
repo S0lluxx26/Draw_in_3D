@@ -44,12 +44,16 @@ test('Demo fire selection is explicit; Starship still rises when its fire is dis
   const fire=Object.fromEntries(FORMATIONS.map(n=>[n,n==='Fish']));
   const show=compileDemo(assets,{count:256,scale:2,fire}),fish=show.stages.find(s=>s.name==='Fish'),rise=show.stages.find(s=>s.kind==='rise');
   assert.equal(fish.to.fire.filter(Boolean).length,32);assert.equal(rise.to.fire.filter(Boolean).length,0);
-  assert.ok(rise.to.positions.every((p,i)=>Math.abs(p[1]-rise.from.positions[i][1]-20)<1e-8));
+  assert.ok(rise.to.positions.every((p,i)=>Math.abs(p[1]-rise.from.positions[i][1]-40)<1e-8));
   assert.equal(fish.effect,'fire');assert.equal(rise.fireEnabled,false);
 });
 test('Dim transition LEDs alternate, remain bounded, and fade continuously at every boundary',()=>{
   const show=compileDemo(assets,{count:512});
   for(const s of show.stages.filter(s=>s.kind==='move')){
+    for(const elapsed of [.01,.15,.4,1,4,8.8]){
+      const f=sampleShow(show,s.start+elapsed);
+      for(let i=0;i<f.colors.length;i+=3){const [r,g,b]=f.colors.subarray(i,i+3);assert.ok(r>10*b||b>10*r||Math.max(r,g,b)<1e-8,'Only red or blue LEDs throughout transfer');}
+    }
     const a=sampleShow(show,s.start+3),b=sampleShow(show,s.start+3.4);
     assert.ok(a.colors.some(v=>v>.01));assert.ok(a.colors.every(v=>v<=.121));
     assert.notEqual(a.colors[0]>a.colors[2],b.colors[0]>b.colors[2]);
@@ -59,4 +63,9 @@ test('Dim transition LEDs alternate, remain bounded, and fade continuously at ev
     assert.ok(a.positions.every((v,i)=>Math.abs(v-b.positions[i])<.001),s.name);
     assert.ok(a.colors.every((v,i)=>Math.abs(v-b.colors[i])<.001),s.name);
   }
+});
+test('Demo formations are twice the previous dimensions for existing saved scale choices',()=>{
+  const show=compileDemo(assets,{count:512,scale:3,fire:{Fish:false}}),fish=show.stages.find(s=>s.name==='Fish');
+  const extent=(points,k)=>Math.max(...points.map(p=>p[k]))-Math.min(...points.map(p=>p[k]));
+  for(let k=0;k<3;k++)assert.ok(Math.abs(extent(fish.to.positions,k)-extent(assets.Fish.body.positions.slice(0,512),k)*6)<1e-8);
 });

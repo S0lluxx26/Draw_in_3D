@@ -4,7 +4,7 @@ Open [Draw in 3D](https://s0lluxx26.github.io/Draw_in_3D/) and choose **Show edi
 
 ## Detailed Demo settings
 
-Choose **Demo settings** in the drawing inspector or the Demo player to set the drone count, light shape, 2×–4× formation size and per-formation yellow fire. Apply restarts the Demo. The detailed 3D formations are Blender assets; **Show editor → Edit demo** opens the stroke-based version described below. [Blender source and export instructions](STUDIO12.md).
+Choose **Demo settings** in the drawing inspector or the Demo player to set the drone count, light shape, 4×–8× formation size and per-formation yellow fire. Apply restarts the Demo. The detailed 3D formations are Blender assets; **Show editor → Edit demo** opens the stroke-based version described below. [Blender source and export instructions](STUDIO12.md).
 
 ## Recreate and change the stroke-based demo
 

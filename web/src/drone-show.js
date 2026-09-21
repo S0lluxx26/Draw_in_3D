@@ -155,7 +155,7 @@ export function buildShow(custom,options={}){
   const dark=()=>Array.from({length:count},()=>[0,0,0]);
   const ground={positions:home,colors:dark()},hover={positions:home.map(p=>[p[0],6*(options.motionScale??1),p[2]]),colors:dark()};
   const stages=[],cues=[];let cursor=0,previous=ground;
-  const add=(name,kind,duration,target,details={})=>{const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
+  const add=(name,kind,duration,target,details={})=>{if(kind==='move'&&details.transitionLights&&stages.length)stages.at(-1).fadeBeforeMove=true;const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
   const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths,count)})));
   for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled} of sequence){
@@ -210,11 +210,12 @@ export function sampleShow(show,time,out=createFrame(show)){
   for(let i=0;i<show.count;i++){
     let q=0,light=0,navLight=0,color=s.to.colors[i];
     if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
-    else if(s.kind==='move'){q=travel;light=fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=.12*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2)*(1-fadeOut);}
+    else if(s.kind==='move'){q=travel;light=s.transitionLights?0:fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=.12*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2);}
     else if(s.kind==='takeoff'||s.kind==='landing'){const row=Math.floor(i/side)/Math.max(1,side-1),navTime=s.reverse?6*(1-elapsed/duration):elapsed,navDuration=s.reverse?6:duration;q=s.reverse?1-ease((navTime-row*.65)/(6-.65)):ease((elapsed-row*.65)/(duration-.65));light=ease(navTime/.35)*ease((navDuration-navTime)/.35)*(.35+.65*Math.sin(navTime*8+i*.12)**2);color=(Math.floor(navTime*3)+i)%2?navigationRed:navigationBlue;}
     else if(s.kind==='grow'){q=progress;light=fadeIn;}
     else if(s.kind==='fall'){q=(elapsed/duration)**2;light=(1-ease(elapsed/duration))*(1-.92*Math.sin(Math.PI*elapsed/duration)**2*(.5+.5*Math.sin(elapsed*12+i*2.4)));color=s.from.colors[i];}
     else if(s.kind==='burst'||s.kind==='rise'){q=progress;light=fadeIn;}
+    if(s.fadeBeforeMove)light*=ease((duration-elapsed)/.6);
     const flameDrone=color[0]>0&&color[1]/color[0]>.7&&color[2]/color[0]<.2;
     const falling=(s.to.fire?.[i]??flameDrone)&&s.fireEnabled!==false&&(s.effect==='starship'||s.effect==='fire'),fallPhase=(elapsed*.65+i*.61803398875)%1,fall=fallPhase<.75?ease(fallPhase/.75):1-ease((fallPhase-.75)/.25);
     let pulse=animated?1-.55*window*(1+Math.sin(elapsed*9+i*.67))/2:s.kind==='burst'?1-.14*window*(1+Math.sin(elapsed*4+i*.2))/2:1;

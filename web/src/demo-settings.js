@@ -10,7 +10,7 @@ export function demoSettings(value={}){
     fire:Object.fromEntries(FORMATIONS.map(name=>[name,typeof value?.fire?.[name]==='boolean'?value.fire[name]:['Row of fire','Starship launch'].includes(name)]))};
 }
 export function compileDemo(assets,value){
-  const settings=demoSettings(value),{count,scale}=settings;
+  const settings=demoSettings(value),{count}=settings,scale=settings.scale*2;
   const sequence=demoPaths().map(cue=>{
     const asset=assets[cue.name],fireCount=settings.fire[cue.name]?Math.floor(count/8):0,bodyCount=count-fireCount;
     const raw=[...asset.body.positions.slice(0,bodyCount),...asset.fire.positions.slice(0,fireCount)];
@@ -30,7 +30,7 @@ export function installDemoSettings({play,player,notify}){
   dialog.innerHTML=`<form><h2 id="demo-settings-title">Demo settings</h2><p>Blender-built 3D formations. Settings apply to this Demo; saved shows stay independent.</p>
     <label>Number of drones<select id="demo-count">${FLEET_SIZES.map(n=>`<option value="${n}">${n.toLocaleString()}</option>`).join('')}</select></label>
     <label>Drone light shape<select id="demo-shape"><option value="round">Round glow</option><option value="diamond">Diamond</option><option value="star">Star</option></select></label>
-    <label>Formation size / spacing<select id="demo-scale"><option value="2">2× larger</option><option value="3">3× larger</option><option value="4">4× larger</option></select></label>
+    <label>Formation size / spacing<select id="demo-scale"><option value="2">4× original size</option><option value="3">6× original size (default)</option><option value="4">8× original size</option></select></label>
     <fieldset><legend>Add falling yellow fire to</legend>${FORMATIONS.map((name,i)=>`<label><input type="checkbox" id="demo-fire-${i}">${name}</label>`).join('')}</fieldset>
     <p>Lower drone counts leave more space between lights and reduce phone workload. Drag to orbit and see the depth. Scale increases world-space spacing; it is not a flight-separation guarantee.</p>
     <p id="demo-settings-status" role="status"></p><div class="demo-actions"><button type="button" id="demo-cancel">Cancel</button><button class="primary" type="submit">Apply &amp; play Demo</button></div></form>`;

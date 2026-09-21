@@ -1,6 +1,6 @@
 ## Studio 12 (21 September 2026)
 
-49 unit tests pass. Added reverse-landing pose/light symmetry, camera focus timing, three expanding firework types and falling-light checks. Demo browser checks cover detailed formations, settings, restart/cancel, persistence, mobile layout and shader compilation. See [Studio 12 review](STUDIO12.md). Real device performance is not yet measured.
+50 unit tests pass. Transfers are checked for red/blue-only LEDs, including their first fraction of a second; saved scale choices now produce doubled dimensions. Added reverse-landing pose/light symmetry, camera focus timing, three expanding firework types and falling-light checks. Demo browser checks cover detailed formations, settings, restart/cancel, persistence, mobile layout and shader compilation. See [Studio 12 review](STUDIO12.md). Real device performance is not yet measured.
 
 # Prototype verification and review handoff
 

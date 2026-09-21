@@ -1,4 +1,4 @@
-# Draw in 3D — browser studio 0.12.1
+# Draw in 3D — browser studio 0.12.2
 
 **Current: Show editor → Edit demo** lets you author formations, arrange a show, save/recover it and record a 720p video. [Start here](../docs/SHOW_EDITOR_GUIDE.md).
 
