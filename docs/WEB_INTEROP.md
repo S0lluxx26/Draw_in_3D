@@ -1,6 +1,6 @@
 # Browser ↔ Android project contract
 
-17 September 2026. Browser editor v0.12.0; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
+17 September 2026. Browser editor v0.12.1; companion Android v0.8.0. Plain v1 scenes remain compatible with Android v0.1.1.
 
 **Studio 11:** show v2 adds a 4,096-drone fleet and optional per-cue motion effects. V1 shows load as 256 drones with no motion effect; saving promotes them to v2. Drawing-only Android formats are unchanged. [Details](STUDIO11.md).
 

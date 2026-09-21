@@ -17,9 +17,9 @@ export function compileDemo(assets,value){
     const formation={positions:raw.map(p=>[p[0]*scale,(p[1]+18)*scale,p[2]*scale]),
       colors:[...asset.body.colors.slice(0,bodyCount),...asset.fire.colors.slice(0,fireCount)],
       fire:Array.from({length:count},(_,i)=>i>=bodyCount)};
-    return {...cue,formation,fireEnabled:fireCount>0,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none'};
+    return {...cue,transfer:9,formation,fireEnabled:fireCount>0,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none'};
   });
-  const show=buildShow(null,{count,sequence,transitionLights:true,motionScale:scale});
+  const show=buildShow(null,{count,sequence,transitionLights:true,motionScale:scale,reverseLanding:true,fireworks:{trilogy:true}});
   show.lightShape=settings.shape;show.demo=true;return show;
 }
 

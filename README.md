@@ -6,7 +6,7 @@ Android AR drawing and small game-map editor prototype, with a **PC browser edit
 
 ## Studio 12: Blender formations and Demo settings
 
-**Demo settings** selects 256–4,096 drones, round/diamond/star lights, 2×–4× formation scale and fire for each formation. Demo now uses detailed 3D Blender meshes, including a striped fish with fins and gills, a multi-deck ship and a rising Starship. Transitions blink dim red/blue. [Controls, Blender editing and review](docs/STUDIO12.md).
+**Demo settings** selects 256–4,096 drones, round/diamond/star lights, 2×–4× formation scale and fire for each formation. Demo now uses detailed 3D Blender meshes, including a striped fish with fins and gills, a multi-deck ship and a rising Starship. Transitions blink dim red/blue and last nine seconds. The 3:49 Demo ends with growing heart/star/three-ball fireworks, blinking falling sparks and a slower 14-second reverse-takeoff landing with an elevated camera. [Controls, Blender editing and review](docs/STUDIO12.md).
 
 ## Studio 11: 4,096-drone sky performance
 

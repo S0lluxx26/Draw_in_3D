@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {createFrame,sampleShow,ShowClock,frontView} from './drone-show.js';
+import {createFrame,sampleShow,ShowClock,frontView,groundFocus} from './drone-show.js';
 import {ShowRecorder} from './show-recorder.js';
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
 
@@ -27,7 +27,8 @@ export class DronePlayer{
     $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.clock.play(performance.now());this.refresh();
   }
-  front(){if(!this.active)return;this.frontMode=true;const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0,pose=frontView(this.show,this.camera.aspect,this.camera.fov,offset);this.camera.position.fromArray(pose.position);this.orbit.target.fromArray(pose.target);this.orbit.update();}
+  front(){if(!this.active)return;this.frontMode=true;const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0;this.skyPose=frontView(this.show,this.camera.aspect,this.camera.fov,offset);this.groundPose=frontView({stages:this.show.stages.filter(s=>s.kind==='takeoff')},this.camera.aspect,this.camera.fov,offset);this.groundPose.position[1]=this.groundPose.target[1]+(this.groundPose.position[2]-this.groundPose.target[2])*.55;this.updateFrontPose(this.clock.time);}
+  updateFrontPose(time){if(!this.frontMode||!this.skyPose)return;const blend=groundFocus(this.show,time);this.camera.position.fromArray(this.skyPose.position.map((v,k)=>v+(this.groundPose.position[k]-v)*blend));this.orbit.target.fromArray(this.skyPose.target.map((v,k)=>v+(this.groundPose.target[k]-v)*blend));this.orbit.update();}
   resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();if(this.frontMode)this.front();this.force=true;}
   refresh(){this.force=true;this.requestFrame();}
   seek(time){if(this.recorder.active)return;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
@@ -59,7 +60,7 @@ export class DronePlayer{
   render(now){
     if(!this.active)return false;
     if(!this.force&&this.clock.playing&&now-this.lastFrame<1000/30-.5)return true;
-    this.force=false;this.lastFrame=now;const time=this.clock.read(now),frame=sampleShow(this.show,time,this.frame);
+    this.force=false;this.lastFrame=now;const time=this.clock.read(now),frame=sampleShow(this.show,time,this.frame);this.updateFrontPose(time);this.force=false;
     this.lights.material.uniforms.pixelRatio.value=this.renderer.getPixelRatio();this.lights.geometry.attributes.position.needsUpdate=true;this.lights.geometry.attributes.color.needsUpdate=true;
     this.trails.visible=$('show-trails').checked;
     if(this.trails.visible){
