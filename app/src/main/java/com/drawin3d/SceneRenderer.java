@@ -53,6 +53,10 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private final ArrayList<String> gameOrder=new ArrayList<>();
     private int gameStep=-1;
     private boolean playing, originTool, pendingTap, startStroke, renderFailed;
+    // dirty: scene changed since the last recovery write. activeDirty: active mesh must be re-uploaded in onDrawFrame.
+    private boolean dirty, activeDirty;
+    // Queued events can run while the GL thread is paused and no EGL context is current, so GL deletes wait for onDrawFrame.
+    private final ArrayList<Integer> deadBuffers=new ArrayList<>(), deadTextures=new ArrayList<>();
     private volatile boolean down,hold;
     private float touchX=.5f,touchY=.5f,pressure=1,lastX,lastY, yaw=0,pitch=0;
     private final float[] eye={0,1.4f,3};
@@ -90,12 +94,14 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         int buffer,count;
         Resource(Geometry mesh){int[] ids=new int[1];GLES20.glGenBuffers(1,ids,0);buffer=ids[0];update(mesh);}
         void update(Geometry mesh){count=mesh.count();GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,buffer);GLES20.glBufferData(GLES20.GL_ARRAY_BUFFER,count*Geometry.STRIDE*4,mesh.buffer(),GLES20.GL_STATIC_DRAW);GLES20.glBindBuffer(GLES20.GL_ARRAY_BUFFER,0);}
-        void dispose(){GLES20.glDeleteBuffers(1,new int[]{buffer},0);}
     }
+    private void release(Resource r){if(r!=null)deadBuffers.add(r.buffer);}
+    private void flushReleases(){for(int b:deadBuffers)GLES20.glDeleteBuffers(1,new int[]{b},0);deadBuffers.clear();for(int t:deadTextures)GLES20.glDeleteTextures(1,new int[]{t},0);deadTextures.clear();}
     @Override public void onSurfaceCreated(GL10 gl,EGLConfig config){
         requestSceneFrame();
         try {
-            resources.clear();surfaceTransforms.clear();textures.clear();activeResource=null;renderFailed=false;
+            // A new context invalidates every old GL name; never delete stale names in it.
+            resources.clear();surfaceTransforms.clear();textures.clear();activeResource=null;activeDirty=true;deadBuffers.clear();deadTextures.clear();renderFailed=false;
             program=program("uniform mat4 uM;uniform vec4 uSurface;uniform float uWet;attribute vec3 aP;attribute vec4 aC;attribute vec2 aU;attribute vec3 aF;varying vec4 vC;varying vec2 vU;void main(){vec3 pos=aP+aF*uWet;if(abs(uSurface.x)>0.000001&&dot(aF,aF)>0.0){vec2 xy=vec2((aU.x-0.5)*uSurface.y,(0.5-aU.y)*uSurface.z)-aF.xy*(1.0-uWet);float t=xy.x*uSurface.x;pos=vec3(sin(t)/uSurface.x-sin(t)*uSurface.w,xy.y,2.0*sin(t*0.5)*sin(t*0.5)/uSurface.x+cos(t)*uSurface.w);}gl_Position=uM*vec4(pos,1.0);vC=aC;vU=aU;if(uSurface.y>0.0)vU-=vec2(aF.x/uSurface.y,-aF.y/uSurface.z)*(1.0-uWet);}",
                     "precision mediump float;uniform sampler2D uT;uniform float uTextured;uniform float uHighlight;uniform float uPaperClip;varying vec4 vC;varying vec2 vU;void main(){if(uPaperClip>0.5&&(vU.x<0.0||vU.x>1.0||vU.y<0.0||vU.y>1.0))discard;vec4 c=vC;if(uTextured>0.5)c*=texture2D(uT,vU);c.rgb=mix(c.rgb,vec3(1.0,.85,.4),uHighlight);if(c.a<.01)discard;gl_FragColor=c;}");
             pPosition=GLES20.glGetAttribLocation(program,"aP");pColor=GLES20.glGetAttribLocation(program,"aC");pUv=GLES20.glGetAttribLocation(program,"aU");pFall=GLES20.glGetAttribLocation(program,"aF");
@@ -105,12 +111,11 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR);
             GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES11Ext.GL_TEXTURE_EXTERNAL_OES,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);
             quad=floats(new float[]{-1,-1,1,-1,-1,1,1,1});uv=floats(new float[8]);grid=new Resource(Geometry.grid());originIndicator=new Resource(Geometry.origin());
-            if(active!=null)activeResource=new Resource(mesh(active));
         }catch(RuntimeException e){renderFailed=true;listener.notice("Graphics initialization failed: "+e.getMessage());}
     }
     @Override public void onSurfaceChanged(GL10 gl,int width,int height){screenWidth=width;screenHeight=height;GLES20.glViewport(0,0,width,height);requestSceneFrame();}
     @Override public void onDrawFrame(GL10 gl){
-        if(renderFailed)return;
+        flushReleases();if(renderFailed)return;
         GLES20.glClearColor(.025f,.045f,.065f,1);GLES20.glDepthMask(true);GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT|GLES20.GL_DEPTH_BUFFER_BIT);
         long now=SystemClock.elapsedRealtime();if(now-lastDraw>250){fpsStart=now;frames=0;}lastDraw=now;
         frames++;if(now-fpsStart>1000){fps=frames*1000f/(now-fpsStart);fpsStart=now;frames=0;}
@@ -138,14 +143,15 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
             if(mode!=AR||(anchor!=null&&tracking)){
                 Matrix.setIdentityM(model,0);draw(originIndicator,model,0,1,false);
                 surfaceTransforms.keySet().removeIf(p->!scene.contains(p));
-                resources.entrySet().removeIf(entry->{if(entry.getKey()!=active&&!scene.contains(entry.getKey())){entry.getValue().dispose();return true;}return false;});
+                resources.entrySet().removeIf(entry->{if(entry.getKey()!=active&&!scene.contains(entry.getKey())){release(entry.getValue());return true;}return false;});
                 ordered.clear();ordered.addAll(scene);ordered.sort((a,b)->a.type.equals("paper")!=b.type.equals("paper")?(a.type.equals("paper")?-1:1):Float.compare(distanceToCamera(b),distanceToCamera(a)));
                 for(SceneData.Entity e:ordered){
                     if(playing&&gameOrder.indexOf(e.id)>=0&&gameOrder.indexOf(e.id)<gameStep)continue;
                     Resource res=resources.get(e);if(res==null){res=new Resource(mesh(e));resources.put(e,res);}
                     drawEntity(e,res,now);
                 }
-                if(active!=null&&activeResource!=null)drawEntity(active,activeResource,now);
+                if(active!=null&&(activeResource==null||activeDirty)){Geometry mesh=mesh(active);if(activeResource==null)activeResource=new Resource(mesh);else activeResource.update(mesh);activeDirty=false;}
+                if(active!=null)drawEntity(active,activeResource,now);
             }
             GLES20.glDepthMask(true);
             if(now-lastStatus>350){lastStatus=now;String state=mode==AR?(tracking?(anchor==null?"Scan a surface · Set origin to begin":"AR tracking · origin placed"):"Tracking paused · move slowly in good light"):mode==LOOK?"LOOK · orientation only; fixed position":"STUDIO · drag with Look tool to rotate";
@@ -171,9 +177,9 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         if(parent!=null){float[] cached=surfaceTransforms.get(parent);if(cached==null){float[][] axes=Surface.axes(parent);float[] orientation=new float[16];Matrix.setIdentityM(orientation,0);for(int c=0;c<3;c++)for(int i=0;i<3;i++)orientation[c*4+i]=axes[c][i];cached=new float[16];Matrix.multiplyMM(cached,0,model,0,orientation,0);surfaceTransforms.put(parent,cached);}System.arraycopy(cached,0,model,0,16);}
         int texture=0;
         if(e.type.equals("image")){
-            Integer cached=textures.get(e.id);if(cached==null){Bitmap bitmap=bitmaps.get(e.id);if(bitmap==null)return;int[] id=new int[1];GLES20.glGenTextures(1,id,0);texture=id[0];GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture);
+            Integer cached=textures.get("img:"+e.id);if(cached==null){Bitmap bitmap=bitmaps.get(e.id);if(bitmap==null)return;int[] id=new int[1];GLES20.glGenTextures(1,id,0);texture=id[0];GLES20.glBindTexture(GLES20.GL_TEXTURE_2D,texture);
                 GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MIN_FILTER,GLES20.GL_LINEAR);GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_MAG_FILTER,GLES20.GL_LINEAR);
-                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);GLUtils.texImage2D(GLES20.GL_TEXTURE_2D,0,bitmap,0);textures.put(e.id,texture);
+                GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_S,GLES20.GL_CLAMP_TO_EDGE);GLES20.glTexParameteri(GLES20.GL_TEXTURE_2D,GLES20.GL_TEXTURE_WRAP_T,GLES20.GL_CLAMP_TO_EDGE);GLUtils.texImage2D(GLES20.GL_TEXTURE_2D,0,bitmap,0);textures.put("img:"+e.id,texture);
             }else texture=cached;
         }
         SceneData.Entity paper=paper(e.paperId);boolean paperInk=paper!=null;if(e.type.equals("paper")||paperInk)texture=paperTexture(paperInk?paper.paperKind:e.paperKind,paperInk);
@@ -212,7 +218,7 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
         lastX=x;lastY=y;touchX=x;touchY=y;this.pressure=Math3.clamp(pressure,.2f,1.5f);
         if(action==0&&(tool.equals("Draw")||tool.equals("Curve"))&&!playing&&!originTool&&tracking&&(mode!=AR||anchor!=null)){startStroke=false;beginStroke(x,y);}
         if(action==1){if(active!=null){float[][] ray=ray(x,y);float[] p=strokeHit(ray);if(p!=null)addPoint(p);}down=false;finishStroke();startStroke=false;}
-        if(action==3){down=false;hold=false;startStroke=false;cancelStroke();}
+        if(action==3){down=false;hold=false;startStroke=false;pendingTap=false;cancelStroke();}
     }
     void hold(boolean held){hold=held;touchX=.5f;touchY=.5f;pressure=1;if(held){startStroke=true;down=true;}else{down=false;finishStroke();}}
     private float[][] ray(float x,float y){
@@ -259,12 +265,13 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private float[] strokeHit(float[][] r){SceneData.Entity p=paper(active.paperId);return p!=null?Surface.hit(p,r[0],r[1]):active.surface?Math3.planeHit(r[0],r[1],planePoint,planeNormal):Math3.add(r[0],Math3.mul(r[1],depth));}
     private void beginStroke(float x,float y){
         if(scene.size()>=SceneData.MAX_OBJECTS||pointCount()>=SceneData.MAX_POINTS||(tool.equals("Curve")&&SceneData.MAX_POINTS-pointCount()<3)){listener.notice("Scene budget reached. Erase objects or save and start a new map.");down=false;return;}
-        SceneData.Entity paper=paper(activePaperId);float[][] ray=ray(x,y);float[] p=paper==null?placement(x,y,surface):Surface.hit(paper,ray[0],ray[1]);if(p==null){listener.notice("Face the front of the active paper and aim inside it. In free space, Studio Surface mode uses the floor grid.");down=false;return;}
+        boolean onSurface=surface; // volatile UI toggle: read once so p, flags and planePoint agree
+        SceneData.Entity paper=paper(activePaperId);float[][] ray=ray(x,y);float[] p=paper==null?placement(x,y,onSurface):Surface.hit(paper,ray[0],ray[1]);if(p==null){listener.notice("Face the front of the active paper and aim inside it. In free space, Studio Surface mode uses the floor grid.");down=false;return;}
         if(paper==null&&Math3.length(p)>SceneData.RADIUS-.4f){listener.notice("Keep drawing within four metres of the map origin.");down=false;return;}
         activeCurve=tool.equals("Curve");activeSCurve=sCurve;activeBend=curveBend;activeCurveBudget=Math.min(65,SceneData.MAX_POINTS-pointCount());activeSmooth=smoothOnRelease;activeStrength=smoothStrength;
-        active=new SceneData.Entity();active.position=p.clone();active.brush=brush;active.pattern=pattern;active.color=ink;active.width=width;active.alpha=alpha;active.wet=wet;active.surface=paper!=null||surface;active.paperId=paper==null?"":paper.id;
+        active=new SceneData.Entity();active.position=p.clone();active.brush=brush;active.pattern=pattern;active.color=ink;active.width=width;active.alpha=alpha;active.wet=wet;active.surface=paper!=null||onSurface;active.paperId=paper==null?"":paper.id;
         if(paper!=null){active.pointSpace="surface";active.position=Surface.coordinates(paper,p);active.position[2]=0;active.normal=new float[]{0,0,1};}
-        else if(surface){planePoint=p.clone();HitResult h=mode==AR?surfaceHit(x,y):null;planeNormal=h==null?new float[]{0,1,0}:directionLocal(h.getHitPose().getTransformedAxis(1,1));active.normal=planeNormal.clone();}
+        else if(onSurface){planePoint=p.clone();HitResult h=mode==AR?surfaceHit(x,y):null;planeNormal=h==null?new float[]{0,1,0}:directionLocal(h.getHitPose().getTransformedAxis(1,1));active.normal=planeNormal.clone();}
         else active.normal=directionLocal(new float[]{cameraWorld[8],cameraWorld[9],cameraWorld[10]});
         if(activeCurve){active.surface=true;planePoint=p.clone();planeNormal=active.normal.clone();}
         long now=SystemClock.elapsedRealtime();born.put(active.id,now);if(active.wet&&(paper==null||paper.paperKind.equals("coated")))frameDemand.wakeUntil(now+4100);selected=null;addPoint(p);
@@ -272,28 +279,30 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     private void addPoint(float[] p){
         if(active==null)return;SceneData.Entity paper=paper(active.paperId);if(paper!=null&&!Paper.inside(paper,p))return;if(paper==null&&Math3.length(p)>SceneData.RADIUS-.4f){finishStroke();down=false;return;}
         float[] local=Math3.sub(paper==null?p:Surface.coordinates(paper,p),active.position);if(paper!=null)local[2]=0;int count=active.points.size();
-        if(activeCurve){if(count>0&&Math3.distance(local,active.points.get(count-1))<.001f)return;ArrayList<float[]> points=StrokeProcessing.curve(local,active.normal,activeBend,activeSCurve,activeCurveBudget,count>0?active.points.get(0)[3]:pressure,pressure);SceneData.Entity candidate=active.copy();candidate.points.clear();candidate.points.addAll(points);if(!SceneData.withinBounds(candidate))return;active.points.clear();active.points.addAll(points);Geometry mesh=mesh(active);if(activeResource==null)activeResource=new Resource(mesh);else activeResource.update(mesh);return;}
+        if(activeCurve){if(count>0&&Math3.distance(local,active.points.get(count-1))<.001f)return;ArrayList<float[]> points=StrokeProcessing.curve(local,active.normal,activeBend,activeSCurve,activeCurveBudget,count>0?active.points.get(0)[3]:pressure,pressure);SceneData.Entity candidate=active.copy();candidate.points.clear();candidate.points.addAll(points);if(!SceneData.withinBounds(candidate))return;active.points.clear();active.points.addAll(points);activeDirty=true;return;}
         if(count>0){float[] prev=active.points.get(count-1);float gap=Math3.distance(prev,local);if(gap<Math.max(.006f,active.width*.25f))return;
             if(gap>.45f){finishStroke();down=false;listener.notice("Stroke ended after a tracking/motion jump.");return;}
             int steps=Math.min(8,Math.max(1,(int)(gap/.025f)));
             for(int i=1;i<=steps;i++){if(active.points.size()>=SceneData.MAX_STROKE||pointCount()>=SceneData.MAX_POINTS)break;float t=i/(float)steps;active.points.add(new float[]{prev[0]+(local[0]-prev[0])*t,prev[1]+(local[1]-prev[1])*t,prev[2]+(local[2]-prev[2])*t,pressure});}
         }else active.points.add(new float[]{local[0],local[1],local[2],pressure});
-        Geometry geometry=mesh(active);if(activeResource==null)activeResource=new Resource(geometry);else activeResource.update(geometry);
+        activeDirty=true;
         if(active.points.size()>=SceneData.MAX_STROKE||pointCount()>=SceneData.MAX_POINTS){finishStroke();down=false;listener.notice("Stroke limit reached. Lift and start the next stroke.");}
     }
     void finishStroke(){
         if(active==null)return;if(activeCurve&&active.points.size()<3){cancelStroke();return;}
-        if(!activeCurve&&activeSmooth&&active.points.size()>2){ArrayList<float[]> points=StrokeProcessing.smooth(active.points,activeStrength,Math.min(SceneData.MAX_STROKE,SceneData.MAX_POINTS-pointCount()+active.points.size()));SceneData.Entity candidate=active.copy();candidate.points.clear();candidate.points.addAll(points);if(SceneData.withinBounds(candidate)){active.points.clear();active.points.addAll(points);if(activeResource!=null)activeResource.update(mesh(active));}}
-        if(!active.points.isEmpty()){checkpoint();scene.add(active);if(activeResource!=null)resources.put(active,activeResource);}
-        else if(activeResource!=null)activeResource.dispose();active=null;activeResource=null;
+        if(!activeCurve&&activeSmooth&&active.points.size()>2){ArrayList<float[]> points=StrokeProcessing.smooth(active.points,activeStrength,Math.min(SceneData.MAX_STROKE,SceneData.MAX_POINTS-pointCount()+active.points.size()));SceneData.Entity candidate=active.copy();candidate.points.clear();candidate.points.addAll(points);if(SceneData.withinBounds(candidate)){active.points.clear();active.points.addAll(points);activeDirty=true;}}
+        // A stale active mesh is released; onDrawFrame rebuilds the committed entity's buffer lazily.
+        if(!active.points.isEmpty()){checkpoint();scene.add(active);if(activeResource!=null&&!activeDirty)resources.put(active,activeResource);else release(activeResource);}
+        else release(activeResource);active=null;activeResource=null;activeDirty=false;
     }
-    private void cancelStroke(){if(activeResource!=null)activeResource.dispose();if(active!=null)born.remove(active.id);active=null;activeResource=null;}
+    private void cancelStroke(){release(activeResource);if(active!=null)born.remove(active.id);active=null;activeResource=null;activeDirty=false;}
     void smoothSelected(){
         if(playing)return;finishStroke();for(int i=0;i<scene.size();i++){SceneData.Entity old=scene.get(i);if(!old.id.equals(selected)||!old.type.equals("stroke")||old.points.size()<3)continue;SceneData.Entity e=old.copy();e.points.clear();e.points.addAll(StrokeProcessing.smooth(old.points,smoothStrength,Math.min(SceneData.MAX_STROKE,SceneData.MAX_POINTS-pointCount()+old.points.size())));if(!SceneData.withinBounds(e))return;checkpoint();scene.set(i,e);listener.notice("Stroke smoothed. Undo restores the original.");return;}listener.notice("Select a stroke with at least three points first.");
     }
-    private void checkpoint(){undo.addLast(new ArrayList<>(scene));while(undo.size()>20)undo.removeFirst();redo.clear();}
-    void undo(){if(playing)return;finishStroke();if(undo.isEmpty())return;redo.addLast(new ArrayList<>(scene));scene.clear();scene.addAll(undo.removeLast());selected=null;}
-    void redo(){if(playing)return;finishStroke();if(redo.isEmpty())return;undo.addLast(new ArrayList<>(scene));scene.clear();scene.addAll(redo.removeLast());selected=null;}
+    // Every scene mutation passes through checkpoint(), undo(), redo() or replace(); each marks recovery dirty.
+    private void checkpoint(){undo.addLast(new ArrayList<>(scene));while(undo.size()>20)undo.removeFirst();redo.clear();dirty=true;}
+    void undo(){if(playing)return;finishStroke();if(undo.isEmpty())return;redo.addLast(new ArrayList<>(scene));scene.clear();scene.addAll(undo.removeLast());selected=null;dirty=true;}
+    void redo(){if(playing)return;finishStroke();if(redo.isEmpty())return;undo.addLast(new ArrayList<>(scene));scene.clear();scene.addAll(redo.removeLast());selected=null;dirty=true;}
     void addPaper(String kind){
         finishStroke();if(playing||scene.size()>=SceneData.MAX_OBJECTS)return;if(mode==AR&&(!tracking||anchor==null)){listener.notice("Set an AR origin first.");return;}
         SceneData.Entity e=new SceneData.Entity();e.type="paper";e.paperKind=kind;e.panelWidth=2.4f;e.aspect=1.5f;e.color=0xffffffff;e.position=placement(.5f,.5f,false);e.normal=directionLocal(new float[]{cameraWorld[8],cameraWorld[9],cameraWorld[10]});
@@ -374,12 +383,15 @@ final class SceneRenderer implements GLSurfaceView.Renderer {
     }
     private void gameTap(){if(gameStep>=gameOrder.size())return;String id=pick(touchX,touchY);if(gameOrder.get(gameStep).equals(id)){gameStep++;listener.notice(gameStep==gameOrder.size()?"Map complete! Tap Play to return to editing.":"Good! Find the next marker.");}else listener.notice("Find "+(gameStep==0?"the green Start":gameStep==gameOrder.size()-1?"the orange Goal":"the next purple Checkpoint"));}
     void resetView(){yaw=0;pitch=0;eye[0]=0;eye[1]=1.4f;eye[2]=3;synchronized(this){rotation=null;}}
-    void moveView(float amount){if(mode!=STUDIO)return;double a=Math.toRadians(yaw);eye[0]-=(float)Math.sin(a)*amount;eye[2]-=(float)Math.cos(a)*amount;}
+    void moveView(float amount){if(mode!=STUDIO)return;float[] forward=Math3.studioForward(yaw);eye[0]+=forward[0]*amount;eye[2]+=forward[2]*amount;}
     void detachSession(){finishStroke();if(anchor!=null){anchor.detach();anchor=null;}frame=null;originTool=false;renderFailed=false;down=false;hold=false;pendingTap=false;playing=false;Matrix.setIdentityM(root,0);Matrix.setIdentityM(inverseRoot,0);}
     List<SceneData.Entity> snapshot(){finishStroke();return new ArrayList<>(scene);}
+    /** Null when there is nothing new to recover, or the scene is empty (never clobber recovery with an empty sketch). */
+    List<SceneData.Entity> recoverySnapshot(){finishStroke();if(!dirty||scene.isEmpty())return null;dirty=false;return new ArrayList<>(scene);}
+    void markDirty(){dirty=true;}
     void replace(List<SceneData.Entity> entities,Map<String,Bitmap> images){
-        finishStroke();for(Resource resource:resources.values())resource.dispose();resources.clear();
-        for(int texture:textures.values())GLES20.glDeleteTextures(1,new int[]{texture},0);textures.clear();
+        finishStroke();for(Resource resource:resources.values())release(resource);resources.clear();
+        deadTextures.addAll(textures.values());textures.clear();dirty=true;
         for(Bitmap bitmap:bitmaps.values())bitmap.recycle();bitmaps.clear();bitmaps.putAll(images);
         scene.clear();scene.addAll(entities);undo.clear();redo.clear();born.clear();selected=null;activePaperId="";playing=false;gameStep=-1;
         if(anchor!=null){anchor.detach();anchor=null;}resetView();listener.notice(mode==AR?"Project loaded. Set origin again to align it in this room.":"Project loaded. Use Look to inspect it.");

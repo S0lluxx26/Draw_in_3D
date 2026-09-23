@@ -14,7 +14,6 @@ import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.net.Uri;
 import android.opengl.GLSurfaceView;
-import android.opengl.Matrix;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
@@ -55,6 +54,8 @@ public final class MainActivity extends Activity implements SensorEventListener,
     private SensorManager sensorManager;private Sensor rotationSensor;
     private float[] initialRotation;
     private boolean resumed,installRequested,wantsAR,permissionPending,closingAR,conservePower;
+    /** True while the Resume prompt is unanswered: recovery.json must not be overwritten yet. */
+    private boolean resumePending;
     private int requestedFps=30;private long lastFrame,lastNotice;
     private long nextPowerPoll;
     private String exportText;
@@ -105,7 +106,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
         LinearLayout third=row();third.addView(button("Undo",()->queueScene(renderer::undo)));third.addView(button("Redo",()->queueScene(renderer::redo)));third.addView(button("Save",()->save(false)));third.addView(button("Files / more",this::fileMenu));third.addView(button("Play / edit",()->queueScene(renderer::togglePlay)));dock.addView(scroll(third));
         FrameLayout.LayoutParams dp=new FrameLayout.LayoutParams(-1,-2,Gravity.BOTTOM);root.addView(dock,dp);setContentView(root);
         // Camera / ARCore availability is checked only after an explicit Camera AR action.
-        if(new File(getFilesDir(),"recovery.json").exists())new AlertDialog.Builder(this).setTitle("Resume your sketch?").setMessage("A local recovery project is available. AR placement will need a new origin.").setPositiveButton("Resume",(d,w)->loadLocal("recovery.json")).setNegativeButton("New sketch",null).show();
+        if(new File(getFilesDir(),"recovery.json").exists()){resumePending=true;new AlertDialog.Builder(this).setTitle("Resume your sketch?").setMessage("A local recovery project is available. AR placement will need a new origin.").setCancelable(false).setPositiveButton("Resume",(d,w)->{resumePending=false;loadLocal("recovery.json");}).setNegativeButton("New sketch",(d,w)->resumePending=false).show();}
         else new AlertDialog.Builder(this).setTitle("Create with the camera off").setMessage("Studio and Look / gyro keep the camera off. Start in Studio: drag to draw in 3D. Use Look / gyro to explore a curved image by turning the phone.\n\nCamera AR is optional and uses more power. Enable it to place art in a real room and walk around it: scan a surface, tap Origin, then tap the floor or wall.\n\nSwitch back to Studio or Look to stop the camera. Gyro-only viewing cannot track your position. Files / more contains the guide and project import/export.").setPositiveButton("Create",null).show();
     }
     private int dp(int value){return Math.round(value*getResources().getDisplayMetrics().density);}
@@ -168,7 +169,9 @@ public final class MainActivity extends Activity implements SensorEventListener,
             notice("Could not start AR: "+e.getClass().getSimpleName()+". Update Google Play Services for AR, then retry.");
         }
     }
-    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){super.onRequestPermissionsResult(code,permissions,results);if(code==CAMERA_PERMISSION){permissionPending=false;if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED)switchMode(SceneRenderer.AR);else{wantsAR=false;notice("Camera access denied. Studio is available; enable camera in Android settings to use AR.");}}}
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){super.onRequestPermissionsResult(code,permissions,results);if(code==CAMERA_PERMISSION){permissionPending=false;
+            // ARCore sample pattern: the result arrives before onResume; onResume starts the session. Start here only if already resumed.
+            if(results.length>0&&results[0]==PackageManager.PERMISSION_GRANTED){wantsAR=true;if(resumed){pauseGL();startAR();renderer.requestSceneFrame();surfaceView.onResume();}}else{wantsAR=false;notice("Camera access denied. Studio is available; enable camera in Android settings to use AR.");}}}
     @Override protected void onResume(){super.onResume();resumed=true;nextPowerPoll=0;if(wantsAR)startAR();else if(renderer.mode==SceneRenderer.LOOK&&rotationSensor!=null){initialRotation=null;sensorManager.registerListener(this,rotationSensor,33_333);}renderer.requestSceneFrame();surfaceView.onResume();Choreographer.getInstance().removeFrameCallback(ticker);Choreographer.getInstance().postFrameCallback(ticker);}
     @Override protected void onPause(){
         resumed=false;Choreographer.getInstance().removeFrameCallback(ticker);sensorManager.unregisterListener(this);save(true);pauseGL();if(renderer.session!=null)renderer.session.pause();super.onPause();
@@ -176,7 +179,7 @@ public final class MainActivity extends Activity implements SensorEventListener,
     @Override protected void onDestroy(){wantsAR=false;if(renderer.session!=null)releaseAR();arCloser.shutdown();io.shutdown();super.onDestroy();}
     @Override public void onSensorChanged(SensorEvent event){
         float[] r=new float[16];SensorManager.getRotationMatrixFromVector(r,event.values);if(initialRotation==null)initialRotation=r.clone();
-        float[] inverse=new float[16],relative=new float[16];Matrix.transposeM(inverse,0,r,0);Matrix.multiplyMM(relative,0,inverse,0,initialRotation,0);renderer.setRotation(relative);
+        renderer.setRotation(Math3.relativeRotation(r,initialRotation));
     }
     @Override public void onAccuracyChanged(Sensor sensor,int accuracy){}
     private interface Value {void set(float v);}
@@ -243,13 +246,14 @@ public final class MainActivity extends Activity implements SensorEventListener,
             }
         }).show();
     }
-    private void save(boolean recovery){queueScene(()->{List<SceneData.Entity> snapshot=renderer.snapshot();io.execute(()->{try{ProjectIO.save(this,recovery?"recovery.json":"project.json",SceneData.encode(snapshot));if(!recovery)notice("Saved locally. Use Export for a portable copy.");}catch(Exception e){notice("Save failed: "+e.getMessage());}});});}
-    private void loadLocal(String name){io.execute(()->{try{ProjectIO.Project p=ProjectIO.decode(ProjectIO.load(this,name));queueScene(()->renderer.replace(p.entities,p.images));}catch(Exception e){notice("Load failed; current scene kept: "+e.getMessage());}});}
-    private void export(){queueScene(()->{List<SceneData.Entity> snapshot=renderer.snapshot();io.execute(()->{try{String text=SceneData.encode(snapshot);runOnUiThread(()->{exportText=text;Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"draw-in-3d-"+System.currentTimeMillis()+".json");startActivityForResult(i,EXPORT_PROJECT);});}catch(Exception e){notice("Export failed: "+e.getMessage());}});});}
+    // Recovery is written only for unsaved, non-empty edits and never while the Resume prompt is open.
+    private void save(boolean recovery){if(recovery&&resumePending)return;queueScene(()->{List<SceneData.Entity> snapshot=recovery?renderer.recoverySnapshot():renderer.snapshot();if(snapshot==null)return;io.execute(()->{try{ProjectIO.save(this,recovery?"recovery.json":"project.json",SceneData.encode(snapshot));if(!recovery)notice("Saved locally. Use Export for a portable copy.");}catch(Throwable e){if(recovery)queueScene(renderer::markDirty);notice("Save failed: "+e.getMessage());}});});}
+    private void loadLocal(String name){io.execute(()->{try{ProjectIO.Project p=ProjectIO.decode(ProjectIO.load(this,name));queueScene(()->renderer.replace(p.entities,p.images));}catch(Throwable e){notice("Load failed; current scene kept: "+e.getMessage());}});}
+    private void export(){queueScene(()->{List<SceneData.Entity> snapshot=renderer.snapshot();io.execute(()->{try{String text=SceneData.encode(snapshot);runOnUiThread(()->{exportText=text;Intent i=new Intent(Intent.ACTION_CREATE_DOCUMENT);i.setType("application/json");i.addCategory(Intent.CATEGORY_OPENABLE);i.putExtra(Intent.EXTRA_TITLE,"draw-in-3d-"+System.currentTimeMillis()+".json");startActivityForResult(i,EXPORT_PROJECT);});}catch(Throwable e){notice("Export failed: "+e.getMessage());}});});}
     @Override protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null){if(request==EXPORT_PROJECT)exportText=null;return;}Uri uri=data.getData();
-        if(request==PICK_IMAGE)io.execute(()->{try{ProjectIO.Image image=ProjectIO.image(this,uri);queueScene(()->renderer.addImage(image.payload,image.aspect,image.bitmap));notice("Image imported. Select / Adjust positions it; settings change its curve.");}catch(Exception e){notice("Image import failed: "+e.getMessage());}});
-        if(request==PICK_PROJECT)io.execute(()->{try{String text=new String(ProjectIO.readBounded(getContentResolver().openInputStream(uri),SceneData.MAX_JSON_BYTES),StandardCharsets.UTF_8);ProjectIO.Project p=ProjectIO.decode(text);queueScene(()->renderer.replace(p.entities,p.images));}catch(Exception e){notice("Invalid project; current scene kept: "+e.getMessage());}});
-        if(request==EXPORT_PROJECT){String text=exportText;exportText=null;if(text==null){notice("Export expired after app restart. Please export again.");return;}io.execute(()->{try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){if(output==null)throw new java.io.IOException("Cannot open destination");output.write(text.getBytes(StandardCharsets.UTF_8));notice("Project exported.");}catch(Exception e){notice("Export failed: "+e.getMessage());}});}
+        if(request==PICK_IMAGE)io.execute(()->{try{ProjectIO.Image image=ProjectIO.image(this,uri);queueScene(()->renderer.addImage(image.payload,image.aspect,image.bitmap));notice("Image imported. Select / Adjust positions it; settings change its curve.");}catch(Throwable e){notice("Image import failed: "+e.getMessage());}});
+        if(request==PICK_PROJECT)io.execute(()->{try{String text=new String(ProjectIO.readBounded(getContentResolver().openInputStream(uri),SceneData.MAX_JSON_BYTES),StandardCharsets.UTF_8);ProjectIO.Project p=ProjectIO.decode(text);queueScene(()->renderer.replace(p.entities,p.images));}catch(Throwable e){notice("Invalid project; current scene kept: "+e.getMessage());}});
+        if(request==EXPORT_PROJECT){String text=exportText;exportText=null;if(text==null){notice("Export expired after app restart. Please export again.");return;}io.execute(()->{try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){if(output==null)throw new java.io.IOException("Cannot open destination");output.write(text.getBytes(StandardCharsets.UTF_8));notice("Project exported.");}catch(Throwable e){notice("Export failed: "+e.getMessage());}});}
     }
 }

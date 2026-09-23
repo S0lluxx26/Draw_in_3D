@@ -35,7 +35,7 @@ final class ProjectIO {
         BitmapFactory.Options options=new BitmapFactory.Options();options.inJustDecodeBounds=true;BitmapFactory.decodeByteArray(data,0,data.length,options);
         if(options.outWidth<=0||options.outHeight<=0||options.outWidth>32768||options.outHeight>32768)throw new IOException("Unsupported or oversized image");
         float aspect=options.outWidth/(float)options.outHeight;if(aspect<.1f||aspect>10)throw new IOException("Use an image with aspect ratio between 1:10 and 10:1");
-        options.inSampleSize=1;while(Math.max(options.outWidth,options.outHeight)/options.inSampleSize>1024)options.inSampleSize*=2;
+        options.inSampleSize=sampleSize(options.outWidth,options.outHeight,MAX_EDGE);
         options.inJustDecodeBounds=false;options.inPreferredConfig=Bitmap.Config.ARGB_8888;
         Bitmap bitmap=BitmapFactory.decodeByteArray(data,0,data.length,options);if(bitmap==null)throw new IOException("Could not decode image");
         // Phone photographs may store their orientation in EXIF rather than in pixels.
@@ -53,6 +53,9 @@ final class ProjectIO {
             default:break;
         }
         if(orientation>=2&&orientation<=8){Bitmap upright=Bitmap.createBitmap(bitmap,0,0,bitmap.getWidth(),bitmap.getHeight(),transform,true);if(upright!=bitmap)bitmap.recycle();bitmap=upright;}
+        // Decoders may round a subsampled edge up (2049/2 -> 1025); loaders reject > 1024, so fit after decoding.
+        int[] fitted=fit(bitmap.getWidth(),bitmap.getHeight(),MAX_EDGE);
+        if(fitted[0]!=bitmap.getWidth()||fitted[1]!=bitmap.getHeight()){Bitmap scaled=Bitmap.createScaledBitmap(bitmap,fitted[0],fitted[1],true);if(scaled!=bitmap)bitmap.recycle();bitmap=scaled;}
         aspect=bitmap.getWidth()/(float)bitmap.getHeight();
         ByteArrayOutputStream bytes=new ByteArrayOutputStream();bitmap.compress(Bitmap.CompressFormat.PNG,100,bytes);
         if(bytes.size()>1500000){bitmap.recycle();throw new IOException("Image is too detailed for the prototype. Resize it below 768 pixels.");}
@@ -67,7 +70,15 @@ final class ProjectIO {
                 if(Math.abs(o.outWidth/(float)o.outHeight-e.aspect)>.03f)throw new IOException("Image aspect ratio does not match the project");
                 o.inJustDecodeBounds=false;Bitmap bitmap=BitmapFactory.decodeByteArray(bytes,0,bytes.length,o);if(bitmap==null)throw new IOException("Invalid embedded image");result.images.put(e.id,bitmap);
             }return result;
-        }catch(Exception error){for(Bitmap bitmap:result.images.values())bitmap.recycle();throw error;}
+        }catch(Throwable error){for(Bitmap bitmap:result.images.values())bitmap.recycle();throw error;}
+    }
+    static final int MAX_EDGE=1024;
+    /** Power-of-two subsample that bounds decode memory; the decoded edge may still round up past max. */
+    static int sampleSize(int width,int height,int max){int sample=1;while(Math.max(width,height)/sample>max)sample*=2;return sample;}
+    /** Longest edge <= max, aspect preserved, each edge >= 1. */
+    static int[] fit(int width,int height,int max){
+        int longest=Math.max(width,height);if(longest<=max)return new int[]{width,height};double s=max/(double)longest;
+        return new int[]{Math.max(1,Math.min(max,(int)Math.round(width*s))),Math.max(1,Math.min(max,(int)Math.round(height*s)))};
     }
     static void save(Context context,String name,String text) throws IOException {
         byte[] bytes=text.getBytes(StandardCharsets.UTF_8);if(bytes.length>SceneData.MAX_JSON_BYTES)throw new IOException("Project exceeds save budget");

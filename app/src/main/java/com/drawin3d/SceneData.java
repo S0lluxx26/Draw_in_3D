@@ -56,9 +56,23 @@ final class SceneData {
         for(int i=0;i<count;i++){double n=a.getDouble(i);if(!Double.isFinite(n)||Math.abs(n)>max)throw new JSONException("Invalid coordinate");v[i]=(float)n;}
         return v;
     }
+    static final int MAX_DEPTH=64;
+    /** Android's org.json recurses per [ or { without a limit (StackOverflowError). Pre-scan with its tokenizer rules:
+     *  "/' strings with escapes, / * * /, // and # comments, unquoted literals (a quote inside a literal is not a string). */
+    static void checkDepth(String text,int max) throws JSONException {
+        int depth=0,n=text.length();
+        for(int i=0;i<n;i++){char c=text.charAt(i);
+            if(c=='"'||c=='\''){for(i++;i<n&&text.charAt(i)!=c;i++)if(text.charAt(i)=='\\')i++;}
+            else if(c=='/'&&i+1<n&&text.charAt(i+1)=='*'){int end=text.indexOf("*/",i+2);i=end<0?n:end+1;}
+            else if(c=='#'||(c=='/'&&i+1<n&&text.charAt(i+1)=='/')){while(i<n&&text.charAt(i)!='\n'&&text.charAt(i)!='\r')i++;}
+            else if(c=='['||c=='{'){if(++depth>max)throw new JSONException("Project nesting is too deep");}
+            else if(c==']'||c=='}')depth--;
+            else if(" \t\n\r:,=;/\\>".indexOf(c)<0){while(i+1<n&&"{}[]/\\:,=;# \t\f\r\n".indexOf(text.charAt(i+1))<0)i++;}
+        }
+    }
     static ArrayList<Entity> decode(String text) throws JSONException {
         if(text.length()>MAX_JSON_BYTES)throw new JSONException("Project too large");
-        JSONObject doc=new JSONObject(text);
+        checkDepth(text,MAX_DEPTH);JSONObject doc=new JSONObject(text);
         int version=doc.getInt("version");
         if((version!=1&&version!=2&&version!=3&&version!=4&&version!=5&&version!=6)||!"metres".equals(doc.getString("units"))||!"right-handed-y-up".equals(doc.getString("coordinates")))
             throw new JSONException("Unsupported project format");
