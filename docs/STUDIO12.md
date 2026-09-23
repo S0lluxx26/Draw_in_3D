@@ -8,6 +8,8 @@ The separate **Show editor → Edit demo** still opens the editable stroke-based
 
 ## Blender workflow
 
+> **Superseded in Studio 13.** The formation builder is now Z-up native with v2 sampling and a compact export; see [Studio 13](STUDIO13.md#blender-pipeline). The notes below describe the Studio 12 asset.
+
 Source: `assets/drone-formations.blend`. Created and exported with official Blender 4.5.11 LTS. Each named collection is a formation in the same local coordinates; isolate a collection in the Outliner to edit it. Application coordinates are X/right, Y/up, Z/depth. Colours come from material diffuse colours; objects with the custom `fire` property are optional exhaust emitters. Keep the seven collection names and at least one nonzero-area mesh in both the body and fire groups.
 
 Regenerate the original source and browser asset:

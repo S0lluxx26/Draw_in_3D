@@ -62,19 +62,70 @@ function fireRow(){return Array.from({length:9},(_,i)=>{const x=(i-4)*3;return l
 function starship(){return [line([[-2,-5],[-2,5],[-1.6,8],[0,11],[1.6,8],[2,5],[2,-5],[-2,-5]],white),line([[-2,6],[-4,3],[-4,0],[-2,1]],cyan),line([[2,6],[4,3],[4,0],[2,1]],cyan),line([[-2,-1],[-5,-6],[-5,-8],[-2,-5]],blue),line([[2,-1],[5,-6],[5,-8],[2,-5]],blue),box(-1.3,-4,2.6,1,gold),ellipse(0,5,.65,1,cyan),...[-1.2,0,1.2].map(x=>line([[x,-5],[x-.35,-7],[x,-11],[x+.35,-7],[x,-5]],flame))];}
 export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:8},{name:'Fish',paths:fish(),hold:8},{name:'Eiffel Tower',paths:tower(),hold:9},{name:'Big ship',paths:ship(),hold:9},{name:'Firework star',paths:star(),hold:8,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:9,effect:'fire'},{name:'Starship launch',paths:starship(),hold:14,effect:'starship'}];
 
-// Small fleets use exact Hungarian matching. Large fleets use deterministic
-// recursive spatial partitions (O(n log² n), O(n) live storage), not an n² matrix.
-// Matching shortens paths; it DOES NOT establish minimum flight separation.
+// Median-split partition, in place (O(n log n)). Each level splits on the axis where both clouds are widest, so a flat
+// launch grid never decides a vertical split by index. Quickselect with an (axis, index) tie-break is deterministic.
+function partitionAssign(previous,targets,permutation){
+  const n=previous.length,A=new Int32Array(n),B=new Int32Array(n),pa=new Float64Array(n*3),pb=new Float64Array(n*3),stack=[0,n];
+  for(let i=0;i<n;i++){A[i]=B[i]=i;for(let k=0;k<3;k++){pa[i*3+k]=previous[i][k];pb[i*3+k]=targets[i][k];}}
+  const range=(ids,p,k,lo,hi)=>{let min=Infinity,max=-Infinity;for(let m=lo;m<hi;m++){const v=p[ids[m]*3+k];if(v<min)min=v;if(v>max)max=v;}return max-min;};
+  const select=(ids,p,k,lo,hi,kth)=>{let l=lo,r=hi-1;while(r>l){const pid=ids[(l+r)>>1],pv=p[pid*3+k];let i=l,j=r;
+    while(i<=j){while(p[ids[i]*3+k]<pv||p[ids[i]*3+k]===pv&&ids[i]<pid)i++;while(p[ids[j]*3+k]>pv||p[ids[j]*3+k]===pv&&ids[j]>pid)j--;if(i<=j){const t=ids[i];ids[i]=ids[j];ids[j]=t;i++;j--;}}
+    if(kth<=j)r=j;else if(kth>=i)l=i;else break;}};
+  while(stack.length){const hi=stack.pop(),lo=stack.pop();if(hi-lo===1){permutation[A[lo]]=B[lo];continue;}
+    let axis=0,best=-1;for(let k=0;k<3;k++){const rb=range(B,pb,k,lo,hi),score=Math.min(range(A,pa,k,lo,hi),rb)+1e-6*rb;if(score>best){best=score;axis=k;}}
+    const mid=lo+((hi-lo)>>1);select(A,pa,axis,lo,hi,mid);select(B,pb,axis,lo,hi,mid);stack.push(lo,mid,mid,hi);}
+}
+// Pairwise uncrossing. Swapping the targets of i and j changes Σ|a−b|² by 2(aᵢ−aⱼ)·(bᵢ−bⱼ). A pair is swapped only
+// when that is negative and the pair would pass closer than min(start gap, end gap, reach)/√2, so every swap shortens
+// squared travel and the search terminates. reach ≥ the fleet's smallest start/end gap, hence every checked pair keeps
+// ≥ min(start gap, end gap)/√2 apart during a synchronized straight transfer. Candidates share or touch a hash cell
+// (about two drones each) at q = 0, ½ or 1; a worklist rescans only drones whose target changed. Deterministic.
+function uncross(previous,targets,permutation){
+  const n=permutation.length,size=1<<Math.ceil(Math.log2(n*2)),mask=size-1,a=new Float64Array(n*3),b=new Float64Array(n*3),T=new Float64Array(n*3),inv=new Int32Array(n),seen=new Uint32Array(size);
+  for(let i=0;i<n;i++){inv[permutation[i]]=i;for(let k=0;k<3;k++){a[i*3+k]=previous[i][k];T[i*3+k]=targets[i][k];b[i*3+k]=targets[permutation[i]][k];}}
+  const lo=[0,1,2].map(k=>{let m=Infinity;for(let i=k;i<n*3;i+=3)m=Math.min(m,a[i],T[i]);return m;});
+  const hash=(x,y,z)=>(Math.imul(x,73856093)^Math.imul(y,19349663)^Math.imul(z,83492791))&mask;let stamp=0;
+  const binning=(P,cells)=>{const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];for(let i=0;i<n*3;i++){min[i%3]=Math.min(min[i%3],P[i]);max[i%3]=Math.max(max[i%3],P[i]);}
+    const e=max.map((v,k)=>Math.max(v-min[k],1e-9));let cell=Math.max(Math.cbrt(e[0]*e[1]*e[2]/n),Math.sqrt(Math.max(e[0]*e[1],e[1]*e[2],e[0]*e[2])/n),Math.max(...e)/n);
+    for(let r=0;r<5;r++){stamp++;let used=0;for(let i=0;i<n*3;i+=3){for(let k=0;k<3;k++)cells[i+k]=Math.floor((P[i+k]-lo[k])/cell);const h=hash(cells[i],cells[i+1],cells[i+2]);if(seen[h]!==stamp){seen[h]=stamp;used++;}}
+      if(n/used<=2.6||r===4)break;cell*=Math.sqrt(2*used/n);}
+    return cell;};
+  // Static grids for start and end points; gap is an upper bound on the smallest gap in that point set.
+  const grid=P=>{const cells=new Int32Array(n*3),cell=binning(P,cells),head=new Int32Array(size+1),fill=new Int32Array(size),items=new Int32Array(n);let gap=Infinity;
+    for(let i=0;i<n;i++)head[hash(cells[i*3],cells[i*3+1],cells[i*3+2])+1]++;for(let h=0;h<size;h++){head[h+1]+=head[h];fill[h]=head[h];}for(let i=0;i<n;i++)items[fill[hash(cells[i*3],cells[i*3+1],cells[i*3+2])]++]=i;
+    for(let h=0;h<size;h++)if(head[h+1]-head[h]>1){const i=items[head[h]]*3,j=items[head[h]+1]*3;gap=Math.min(gap,Math.hypot(P[i]-P[j],P[i+1]-P[j+1],P[i+2]-P[j+2]));}
+    return {cells,cell,head,items,gap};};
+  const G0=grid(a),G1=grid(T),reach=Math.max(Math.min(G0.cell,G1.cell),Math.min(G0.gap,G1.gap))**2;
+  // The mid-flight grid changes with assignments: per-bucket linked lists allow O(1) moves.
+  const mid=new Float64Array(n*3);for(let i=0;i<n*3;i++)mid[i]=(a[i]+b[i])/2;const cm=new Int32Array(n*3),midCell=binning(mid,cm),mh=new Int32Array(size).fill(-1),mn=new Int32Array(n),mp=new Int32Array(n),mb=new Int32Array(n);
+  const place=i=>{for(let k=0;k<3;k++)cm[i*3+k]=Math.floor(((a[i*3+k]+b[i*3+k])/2-lo[k])/midCell);const h=mb[i]=hash(cm[i*3],cm[i*3+1],cm[i*3+2]);mp[i]=-1;mn[i]=mh[h];if(mh[h]>=0)mp[mh[h]]=i;mh[h]=i;};
+  const unplace=i=>{if(mp[i]>=0)mn[mp[i]]=mn[i];else mh[mb[i]]=mn[i];if(mn[i]>=0)mp[mn[i]]=mp[i];};
+  for(let i=n-1;i>=0;i--)place(i);
+  const queue=new Int32Array(n),queued=new Uint8Array(n);let head=0,tail=0,waiting=0;
+  const push=i=>{if(!queued[i]){queued[i]=1;queue[tail]=i;tail=(tail+1)%n;waiting++;}};
+  const check=(i,j)=>{const i3=i*3,j3=j*3,x0=a[i3]-a[j3],y0=a[i3+1]-a[j3+1],z0=a[i3+2]-a[j3+2],x1=b[i3]-b[j3],y1=b[i3+1]-b[j3+1],z1=b[i3+2]-b[j3+2],dot=x0*x1+y0*y1+z0*z1;if(dot>=-1e-9)return false;
+    const s0=x0*x0+y0*y0+z0*z0,s1=x1*x1+y1*y1+z1*z1,u=Math.min(1,Math.max(0,(s0-dot)/(s0+s1-2*dot||1)));
+    if((1-u)*(1-u)*s0+u*u*s1+2*u*(1-u)*dot>=Math.min(s0,s1,reach)/2)return false;
+    const t=permutation[i];permutation[i]=permutation[j];permutation[j]=t;inv[permutation[i]]=i;inv[permutation[j]]=j;for(let k=0;k<3;k++){const v=b[i3+k];b[i3+k]=b[j3+k];b[j3+k]=v;}
+    unplace(i);unplace(j);place(i);place(j);push(i);push(j);return true;};
+  // The first sweep visits each cell pair once (half stencil); a swap requeues both drones for a full rescan.
+  const scan=(i,half)=>{for(let g=0;g<3;g++){const cells=g===0?G0.cells:g===1?G1.cells:cm,o=g===1?permutation[i]*3:i*3,X=cells[o],Y=cells[o+1],Z=cells[o+2];
+    for(let dx=-1;dx<=1;dx++){const hx=Math.imul(X+dx,73856093);for(let dy=-1;dy<=1;dy++){const hxy=hx^Math.imul(Y+dy,19349663);for(let dz=-1;dz<=1;dz++){
+      if(half&&(dx<0||dx===0&&(dy<0||dy===0&&dz<0)))continue;const h=(hxy^Math.imul(Z+dz,83492791))&mask,same=half&&dx===0&&dy===0&&dz===0;
+      if(g===2){for(let j=mh[h];j>=0;j=mn[j])if(j!==i&&!(same&&j<i)&&check(i,j))return;}
+      else{const G=g?G1:G0;for(let m=G.head[h],end=G.head[h+1];m<end;m++){const j=g?inv[G.items[m]]:G.items[m];if(j!==i&&!(same&&j<i)&&check(i,j))return;}}
+    }}}}};
+  for(let i=0;i<n;i++)if(!queued[i])scan(i,true);
+  for(let work=0;waiting&&work<64*n;work++){const i=queue[head];head=(head+1)%n;waiting--;queued[i]=0;scan(i,false);}
+}
+// Small fleets use exact Hungarian matching (minimum squared travel, hence uncrossed). Large fleets use a deterministic
+// median-split partition (O(n log n), O(n) live storage), then pairwise uncrossing of spatial neighbours.
+// This is a visual preview: it is not a certified separation or aircraft-feasibility check.
 export function matchFormation(previous,target){
   const n=previous.length;if(target.positions.length!==n)throw new Error('Formation must match the fleet size.');
-  if(n>256){
-    const permutation=new Int32Array(n);
-    const partition=(a,b)=>{if(a.length===1){permutation[a[0]]=b[0];return;}
-      const ranges=[0,1,2].map(k=>{let lo=Infinity,hi=-Infinity;for(const i of b){lo=Math.min(lo,target.positions[i][k]);hi=Math.max(hi,target.positions[i][k]);}return hi-lo;});const axis=ranges.indexOf(Math.max(...ranges));
-      a.sort((i,j)=>previous[i][axis]-previous[j][axis]||i-j);b.sort((i,j)=>target.positions[i][axis]-target.positions[j][axis]||i-j);const mid=a.length>>1;partition(a.slice(0,mid),b.slice(0,mid));partition(a.slice(mid),b.slice(mid));};
-    partition(Array.from({length:n},(_,i)=>i),Array.from({length:n},(_,i)=>i));
-    return {positions:Array.from(permutation,i=>target.positions[i]),colors:Array.from(permutation,i=>target.colors[i]),order:Array.from(permutation,i=>target.order?.[i]??i/Math.max(1,n-1)),...(target.fire?{fire:Array.from(permutation,i=>target.fire[i])}:{})};
-  }
+  const permutation=new Int32Array(n),pick=values=>Array.from(permutation,i=>values[i]);
+  const result=()=>({positions:pick(target.positions),colors:pick(target.colors),order:Array.from(permutation,i=>target.order?.[i]??i/Math.max(1,n-1)),...(target.fire?{fire:pick(target.fire)}:{}),...(target.pad?{pad:pick(target.pad)}:{})});
+  if(n>256){partitionAssign(previous,target.positions,permutation);uncross(previous,target.positions,permutation);return result();}
   const costs=previous.map(a=>Float64Array.from(target.positions,b=>a.reduce((s,v,k)=>s+(v-b[k])**2,0)));
   const u=new Float64Array(n+1),v=new Float64Array(n+1),p=new Int32Array(n+1),way=new Int32Array(n+1);
   for(let i=1;i<=n;i++){
@@ -87,9 +138,8 @@ export function matchFormation(previous,target){
     }while(p[j0]!==0);
     do{const j1=way[j0];p[j0]=p[j1];j0=j1;}while(j0);
   }
-  const positions=new Array(n),colors=new Array(n),order=new Array(n),fire=target.fire?new Array(n):null;
-  for(let j=1;j<=n;j++){if(fire)fire[p[j]-1]=target.fire[j-1];positions[p[j]-1]=target.positions[j-1];colors[p[j]-1]=target.colors[j-1];order[p[j]-1]=(target.order?.[j-1]??(j-1)/Math.max(1,n-1));}
-  return {positions,colors,order,...(fire?{fire}:{})};
+  for(let j=1;j<=n;j++)permutation[p[j]-1]=j-1;
+  return result();
 }
 
 export function drawingPaths(entities){
@@ -179,7 +229,9 @@ export function buildShow(custom,options={}){
   const duration=options.fireworks?.duration??9;cues[cues.length-1].time=cursor+duration*.55;
   add('Fireworks','burst',duration,burst,{centres});
   }
-  add('Returning home','move',options.reverseLanding?9:7,hover,{transitionLights:options.transitionLights});cues.push({label:'Landing',time:cursor+(options.reverseLanding?4:2)});add('Landing','landing',options.reverseLanding?14:8,ground,{reverse:options.reverseLanding});add('Landed','hold',options.reverseLanding?4:2,ground);
+  // Return to the nearest free pads (uncrossed), not each drone's own pad; `pad` carries the landing permutation.
+  const back=matchFormation(previous.positions,{...hover,pad:Array.from({length:count},(_,i)=>i)}),landed={positions:back.pad.map(k=>home[k]),colors:dark(),pad:back.pad};
+  add('Returning home','move',options.reverseLanding?9:7,back,{transitionLights:options.transitionLights});cues.push({label:'Landing',time:cursor+(options.reverseLanding?4:2)});add('Landing','landing',options.reverseLanding?14:8,landed,{reverse:options.reverseLanding});add('Landed','hold',options.reverseLanding?4:2,landed);
   return {count,home,stages,cues,duration:cursor,custom:!!custom,title:options.title};
 }
 
@@ -211,9 +263,11 @@ export function sampleShow(show,time,out=createFrame(show)){
     let q=0,light=0,navLight=0,color=s.to.colors[i];
     if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
     else if(s.kind==='move'){q=travel;light=s.transitionLights?0:fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=.12*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2);}
-    else if(s.kind==='takeoff'||s.kind==='landing'){const row=Math.floor(i/side)/Math.max(1,side-1),navTime=s.reverse?6*(1-elapsed/duration):elapsed,navDuration=s.reverse?6:duration;q=s.reverse?1-ease((navTime-row*.65)/(6-.65)):ease((elapsed-row*.65)/(duration-.65));light=ease(navTime/.35)*ease((navDuration-navTime)/.35)*(.35+.65*Math.sin(navTime*8+i*.12)**2);color=(Math.floor(navTime*3)+i)%2?navigationRed:navigationBlue;}
+    else if(s.kind==='takeoff'||s.kind==='landing'){// Row and LED phase follow the pad, so each pad reverses its own takeoff.
+      const pad=s.to.pad?.[i]??i,row=Math.floor(pad/side)/Math.max(1,side-1),navTime=s.reverse?6*(1-elapsed/duration):elapsed,navDuration=s.reverse?6:duration;q=s.reverse?1-ease((navTime-row*.65)/(6-.65)):ease((elapsed-row*.65)/(duration-.65));light=ease(navTime/.35)*ease((navDuration-navTime)/.35)*(.35+.65*Math.sin(navTime*8+pad*.12)**2);color=(Math.floor(navTime*3)+pad)%2?navigationRed:navigationBlue;}
     else if(s.kind==='grow'){q=progress;light=fadeIn;}
-    else if(s.kind==='fall'){q=(elapsed/duration)**2;light=(1-ease(elapsed/duration))*(1-.92*Math.sin(Math.PI*elapsed/duration)**2*(.5+.5*Math.sin(elapsed*12+i*2.4)));color=s.from.colors[i];}
+    // Sparks accelerate uniformly for 80% of the fall, then brake to rest, matching the next transfer's zero start speed.
+    else if(s.kind==='fall'){const u=elapsed/duration;q=u<.8?u*u/.8:.8+2*(u-.8)-(u-.8)**2/.2;light=(1-ease(elapsed/duration))*(1-.92*Math.sin(Math.PI*elapsed/duration)**2*(.5+.5*Math.sin(elapsed*12+i*2.4)));color=s.from.colors[i];}
     else if(s.kind==='burst'||s.kind==='rise'){q=progress;light=fadeIn;}
     if(s.fadeBeforeMove)light*=ease((duration-elapsed)/.6);
     const flameDrone=color[0]>0&&color[1]/color[0]>.7&&color[2]/color[0]<.2;

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildShow,sampleShow,matchFormation} from '../src/drone-show.js';
 import {editableDemo,compileShow,encodeShow,decodeShow} from '../src/show-project.js';
+import {byPad,droneAtPad} from './pads.mjs';
 test('4096-drone spatial assignment remains deterministic, bijective and carries colour/order',()=>{
   const n=4096,previous=Array.from({length:n},(_,i)=>[i%64,Math.floor(i/64),0]),target={positions:[...previous].reverse(),colors:previous.map((_,i)=>[i/n,0,0])};
   const a=matchFormation(previous,target),b=matchFormation(previous,target);assert.deepEqual(a,b);assert.equal(new Set(a.positions).size,n);
@@ -10,11 +11,12 @@ test('4096-drone spatial assignment remains deterministic, bijective and carries
 test('takeoff and landing alternate red and blue and end dark at exact home positions',()=>{
   const show=buildShow();assert.equal(show.count,4096);
   for(const stage of show.stages.filter(s=>['takeoff','landing'].includes(s.kind))){
-    const a=sampleShow(show,stage.start+1),b=sampleShow(show,stage.start+1.4);
-    assert.ok(a.colors[0]>a.colors[2]&&b.colors[0]<b.colors[2]||a.colors[0]<a.colors[2]&&b.colors[0]>b.colors[2]);
-    assert.ok(a.colors[0]>a.colors[2]!==a.colors[3]>a.colors[5]);
+    // Compare the drones standing on pads 0 and 1 (landing uses the returned pad permutation).
+    const a=sampleShow(show,stage.start+1),b=sampleShow(show,stage.start+1.4),[p,q]=[0,1].map(k=>(stage.kind==='landing'?droneAtPad(show,k):k)*3);
+    assert.ok(a.colors[p]>a.colors[p+2]&&b.colors[p]<b.colors[p+2]||a.colors[p]<a.colors[p+2]&&b.colors[p]>b.colors[p+2]);
+    assert.ok(a.colors[p]>a.colors[p+2]!==a.colors[q]>a.colors[q+2]);
   }
-  assert.deepEqual(sampleShow(show,show.duration).positions,sampleShow(show,0).positions);assert.ok(sampleShow(show,show.duration).colors.every(v=>v===0));
+  assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);assert.ok(sampleShow(show,show.duration).colors.every(v=>v===0));
 });
 test('editable effects survive save/open, Starship rises with a yellow exhaust subset, legacy fleets load',()=>{
   const doc=decodeShow(encodeShow(editableDemo())),show=compileShow(doc),rise=show.stages.find(s=>s.kind==='rise');

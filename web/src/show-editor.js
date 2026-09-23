@@ -99,7 +99,7 @@ export class ShowEditor{
   }
   render(){
     $('count').value=this.doc.count;const c=this.cue; $('name').value=this.doc.name;$('total').textContent=`${this.doc.cues.length} / 12 formations · ${showDuration(this.doc)}s`;
-    $('undo').disabled=!this.state.past.length;$('redo').disabled=!this.state.future.length;$('play').disabled=!this.doc.cues.length;
+    $('undo').disabled=!this.state.past.length;$('redo').disabled=!this.state.future.length;$('play').disabled=!this.doc.cues.length||!!this.worker;// stays off while a preview is preparing
     $('cards').replaceChildren();let time=8;
     for(const [index,cue]of this.doc.cues.entries()){
       const card=button('',()=>{this.active=cue.id;this.render();});card.className='author-card'+(cue.id===this.active?' active':'');card.dataset.cueId=cue.id;card.setAttribute('aria-pressed',String(cue.id===this.active));

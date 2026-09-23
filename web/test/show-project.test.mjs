@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {editableDemo,newCue,newShow,captureArtwork,validateShow,decodeShow,encodeShow,cueFormation,compileShow,showDuration,ShowHistory} from '../src/show-project.js';
 import {buildShow,sampleShow,samplePaths,demoPaths,drawingPaths} from '../src/drone-show.js';
 import {entity,encode} from '../src/model.js';
+import {byPad} from './pads.mjs';
 
 test('editable demo reproduces source paths, timing, fleet, and exact landing after a show round trip',()=>{
   const doc=decodeShow(encodeShow(editableDemo())),compiled=compileShow(doc),original=buildShow();
@@ -12,7 +13,7 @@ test('editable demo reproduces source paths, timing, fleet, and exact landing af
     assert.ok(actual.positions.every((p,j)=>p.every((v,k)=>Math.abs(v-expected.positions[j][k])<1e-5)));
     assert.deepEqual(actual.colors,expected.colors);assert.doesNotThrow(()=>encode(c.artwork));
   }
-  assert.deepEqual(sampleShow(compiled,0).positions,sampleShow(compiled,compiled.duration).positions);
+  assert.deepEqual(byPad(compiled,sampleShow(compiled,compiled.duration).positions),sampleShow(compiled,0).positions);
   assert.ok(sampleShow(compiled,compiled.duration).colors.every(v=>v===0));
 });
 test('capturing selected ink retains hidden curved parents, excludes unrelated objects and preserves source',()=>{
@@ -46,4 +47,12 @@ test('minimum timing, draw-order lighting, no-fireworks and reordered formations
   }
   const hold=show.stages.find(s=>s.reveal),partial=sampleShow(show,hold.start+.5),full=sampleShow(show,hold.end-.01);
   assert.ok(partial.colors.some(v=>v===0));assert.ok(full.colors.some(v=>v>0));assert.ok(full.colors.every(v=>v<=.40001));
+});
+test('null formations and non-list artwork fail with readable messages, not TypeErrors',()=>{
+  const doc=editableDemo();
+  for(const [change,message] of [[d=>d.cues=[null],/Each formation/],[d=>d.cues[0]=[],/Each formation/],[d=>d.cues[0]='Robot',/Each formation/],[d=>d.cues[1].artwork={},/artwork must be a list/],[d=>d.cues[1].artwork=[null],/artwork must be a list/],[d=>d.cues[1].artwork=undefined,/artwork must be a list/]]){
+    const copy=structuredClone(doc);change(copy);
+    assert.throws(()=>validateShow(copy),error=>!(error instanceof TypeError)&&message.test(error.message));
+    assert.throws(()=>decodeShow(JSON.stringify(copy)),error=>!(error instanceof TypeError)&&message.test(error.message));
+  }
 });

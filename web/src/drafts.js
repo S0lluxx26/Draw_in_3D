@@ -18,13 +18,16 @@ export function createDraftStore(indexedDB = globalThis.indexedDB, databaseName 
       if (settled) { db.close(); return; }
       settled = true; clearTimeout(timer);
       db.onversionchange = () => { db.close(); connection = undefined; };
+      // The browser can close a connection itself (site data cleared, disk error): reopen on next use.
+      db.onclose = () => { connection = undefined; };
       resolve(db);
     };
   }).catch(error => { connection = undefined; throw error; });
   async function transaction(mode, work) {
     const db = await open();
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(['scenes', 'summaries'], mode);
+      let tx;
+      try { tx = db.transaction(['scenes', 'summaries'], mode); } catch { connection = undefined; reject(new Error('Local save failed. Export your project and retry.')); return; }
       let result;
       tx.oncomplete = () => resolve(result?.result);
       tx.onerror = tx.onabort = () => reject(new Error(tx.error?.name === 'QuotaExceededError' ? 'Browser storage is full. Download drafts, then delete ones you no longer need.' : 'Local save failed. Export your project and retry.'));

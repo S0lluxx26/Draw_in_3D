@@ -13,3 +13,4 @@ web/test-output/
 .env
 .env.*
 !.env.example
+*.blend1

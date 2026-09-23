@@ -26,12 +26,19 @@ export function withinBounds(e) {
 function need(ok, message) { if (!ok) throw new Error(message); }
 function number(v, lo, hi, label) { need(typeof v === 'number' && Number.isFinite(v) && v >= lo-1e-7 && v <= hi+1e-7, `Invalid ${label}.`); }
 function vector(v, length, max) { need(Array.isArray(v) && v.length === length, 'Invalid coordinate vector.'); v.forEach(n => number(n,-max,max,'coordinate')); }
+// Payloads that already passed the (pure) image check; previews re-validate them on every pointer move.
+const checkedImages = new Set();
+function checkImage(image) {
+  if (checkedImages.has(image)) return;
+  need(image.length > 0 && image.length <= LIMITS.imageChars && /^[A-Za-z0-9+/\r\n]*={0,2}$/.test(image), 'Missing or oversized image data.');
+  if (checkedImages.size >= 2*LIMITS.images) checkedImages.delete(checkedImages.values().next().value); checkedImages.add(image);
+}
 export function validate(doc) {
   need(doc && [1,2,3,4,5,6].includes(doc.version) && doc.units === 'metres' && doc.coordinates === 'right-handed-y-up', 'This file is not a supported Draw in 3D project.');
   need(Array.isArray(doc.entities) && doc.entities.length <= LIMITS.objects, 'A project can contain at most 80 objects.');
   const ids = new Set();
   for (const e of doc.entities) {
-    need(e && typeof e.id === 'string' && e.id.length <= 100 && !ids.has(e.id), 'Invalid or duplicate object ID.'); ids.add(e.id);
+    need(e && typeof e.id === 'string' && e.id.length > 0 && e.id.length <= 100 && !ids.has(e.id), 'Invalid or duplicate object ID.'); ids.add(e.id);
     need(TYPES.includes(e.type) && BRUSHES.includes(e.brush), 'Unknown object or brush type.');
     need(['solid','dash','dot'].includes(e.pattern??'solid'), 'Unknown stroke pattern.');
     need(doc.version>=2 || e.type!=='block' && (!e.pattern||e.pattern==='solid'), 'Blocks and patterned strokes need project version 2.');
@@ -59,12 +66,13 @@ export function validate(doc) {
     if(e.pointSpace==='surface')need(Math.abs(e.position[2])<1e-7&&e.points.every(p=>Math.abs(p[2])<1e-7),'Surface points must have zero depth.');
     need(e.type !== 'stroke' || e.points.length > 0, 'Empty stroke.');
     need(typeof e.image === 'string', 'Invalid image data.');
-    if (e.type === 'image') need(e.image.length > 0 && e.image.length <= LIMITS.imageChars && /^[A-Za-z0-9+/\r\n]*={0,2}$/.test(e.image), 'Missing or oversized image data.');
+    if (e.type === 'image') checkImage(e.image);
     else need(e.image.length === 0, 'Unexpected image data.');
     need(withinBounds(e), 'This edit exceeds the shared 4 m map radius. Move or shrink the object.');
   }
   const c = counts(doc.entities);
   for(const e of doc.entities)if(e.paperId)need(e.type==='stroke'&&doc.entities.some(p=>p.id===e.paperId&&p.type==='paper'),'Attached stroke has no paper sheet.');
+  need(['start','goal'].every(type=>doc.entities.filter(e=>e.type===type).length<=1),'A map has at most one Start and one Goal.');
   need(c.points <= LIMITS.points && c.images <= LIMITS.images, 'Phone budget exceeded: 4,000 points or 6 images.');
   return doc;
 }

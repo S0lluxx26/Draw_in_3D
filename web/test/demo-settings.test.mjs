@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import assets from '../src/formation-assets.js';
 import {demoSettings,compileDemo,FORMATIONS} from '../src/demo-settings.js';
 import {sampleShow,groundFocus} from '../src/drone-show.js';
+import {byPad} from './pads.mjs';
 
 test('Demo settings bound untrusted saved values and preserve explicit fire choices',()=>{
   assert.deepEqual(demoSettings(null),demoSettings());
@@ -14,8 +15,10 @@ test('Landing reverses takeoff poses and navigation lights at a slower pace, wit
   assert.equal(down.end-down.start,14);
   for(const f of [.13,.37,.71,.91]){
     const a=sampleShow(show,up.start+(up.end-up.start)*(1-f)),b=sampleShow(show,down.start+(down.end-down.start)*f);
-    assert.ok(a.positions.every((v,i)=>Math.abs(v-b.positions[i])<.0001));
-    assert.ok(a.colors.every((v,i)=>Math.abs(v-b.colors[i])<.0001));
+    // Pad by pad: the drone landing on pad k retraces pad k's takeoff, lights included.
+    const pos=byPad(show,b.positions),col=byPad(show,b.colors);
+    assert.ok(a.positions.every((v,i)=>Math.abs(v-pos[i])<.0001));
+    assert.ok(a.colors.every((v,i)=>Math.abs(v-col[i])<.0001));
   }
   assert.equal(groundFocus(show,down.start),1);assert.equal(groundFocus(show,up.start),1);
   assert.equal(groundFocus(show,show.cues.find(c=>c.label==='Fish').time),0);
@@ -38,7 +41,7 @@ test('Blender formations have depth, distinct well-spaced samples and exact flee
   const show=compileDemo(assets,{count:512,scale:4,shape:'star'});
   assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,229);
   for(const s of show.stages){assert.equal(s.to.positions.length,512);assert.equal(s.to.colors.length,512);}
-  assert.deepEqual(sampleShow(show,0).positions,sampleShow(show,show.duration).positions);
+  assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);
 });
 test('Demo fire selection is explicit; Starship still rises when its fire is disabled',()=>{
   const fire=Object.fromEntries(FORMATIONS.map(n=>[n,n==='Fish']));

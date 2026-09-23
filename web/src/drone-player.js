@@ -1,89 +1,167 @@
 import * as THREE from 'three';
 import {OrbitControls} from './vendor/OrbitControls.js';
-import {createFrame,sampleShow,ShowClock,frontView,groundFocus} from './drone-show.js';
+import {EffectComposer} from './vendor/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from './vendor/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from './vendor/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from './vendor/addons/postprocessing/OutputPass.js';
+import {createFrame,sampleShow,ShowClock} from './drone-show.js';
+import {directorView,framingAt} from './show-camera.js';
+import {SkyStage,loadStageAsset,stageScale} from './sky-stage.js';
+import {TIERS,QUALITY_LEVELS,resolveTier,browserEnvironment,FrameGovernor} from './quality.js';
 import {ShowRecorder} from './show-recorder.js';
+import {hardenOrbit} from './editor-look.js';
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
+const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);},QUALITY_KEY='draw3d-graphics-v1';
+// LEDs: HDR point sprites sized in world metres (so previews and 720p recordings match),
+// with an energy-preserving minimum size so distant lights shimmer less.
+const LED_VERTEX=`attribute vec3 color;uniform float ledSize,viewport,minSize;varying vec3 vColor;varying float vEnergy;
+void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;
+  float px=ledSize*projectionMatrix[1][1]*viewport*.5/max(-mv.z,.001),size=clamp(px,minSize,110.);
+  vEnergy=px<minSize?px*px/(minSize*minSize):1.;vColor=pow(max(color,vec3(0.)),vec3(2.2));vColor*=min(1.,.55/max(dot(vColor,vec3(.2126,.7152,.0722)),1e-4));
+  if(max(vColor.r,max(vColor.g,vColor.b))<1e-6)gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=size;}`;
+const LED_FRAGMENT=`uniform int lightShape;uniform float gain;varying vec3 vColor;varying float vEnergy;
+void main(){vec2 p=(gl_PointCoord-.5)*2.;float r=length(p);if(lightShape==1)r=abs(p.x)+abs(p.y);if(lightShape==2)r/=.7+.3*cos(5.*atan(p.y,p.x)-1.5707963);if(r>1.)discard;
+  float core=exp(-r*r*22.),halo=exp(-r*r*4.5)*(1.-r);gl_FragColor=vec4(vColor*(core*gain+halo*.5)*vEnergy,1.);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+const TRAIL_VERTEX='attribute vec3 color;attribute float fade;varying vec3 vColor;void main(){vColor=pow(max(color,vec3(0.)),vec3(2.2))*fade;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}';
+const TRAIL_FRAGMENT='varying vec3 vColor;void main(){gl_FragColor=vec4(vColor,1.);\n#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}';
 
 export class DronePlayer{
   active=false;
   constructor(renderer,canvas,requestFrame,onExit){
     Object.assign(this,{renderer,canvas,requestFrame,onExit});
-    this.recorder=new ShowRecorder(this);
+    this.recorder=new ShowRecorder(this);this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    try{this.quality=QUALITY_LEVELS.includes(localStorage.getItem(QUALITY_KEY))?localStorage.getItem(QUALITY_KEY):'auto';}catch{this.quality='auto';}
     $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{this.clock.seek(0,performance.now());this.clock.play(performance.now());this.refresh();};
     $('show-exit').onclick=()=>this.stop();$('show-speed').onchange=()=>{this.clock.speed(Number($('show-speed').value),performance.now());this.refresh();};
     $('show-scrub').oninput=()=>this.seek(Number($('show-scrub').value));
-    $('show-trails').onchange=()=>this.refresh();$('show-front').onclick=()=>{this.front();this.refresh();};
+    $('show-trails').onchange=()=>this.refresh();$('show-front').onclick=()=>{this.front(true);this.refresh();};
     window.addEventListener('keydown',event=>{if(!this.active||$('demo-settings')?.open)return;if(event.key==='Escape'){event.preventDefault();this.stop();return;}if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName))return;if(event.code==='Space'){event.preventDefault();this.toggle();}});
+    // Fetch the harbour scenery as soon as the user shows interest in a show.
+    for(const id of ['drone-demo','show-editor','drone-drawing'])$(id)?.addEventListener('pointerenter',()=>loadStageAsset(),{once:true});
+  }
+  setQuality(choice){
+    if(!QUALITY_LEVELS.includes(choice)||choice===this.quality)return;this.quality=choice;try{localStorage.setItem(QUALITY_KEY,choice);}catch{}
+    if(!this.active||this.recorder.active)return;const time=this.clock.time,playing=this.clock.playing,rate=this.clock.rate;this.start(this.show);this.clock.seek(time,performance.now());this.clock.speed(rate,performance.now());if(!playing)this.clock.pause(performance.now());this.refresh();
   }
   start(show){
-    this.show=show;$('show-demo-settings').hidden=!show.demo;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:3},()=>createFrame(show));
-    this.scene=new THREE.Scene();this.scene.background=new THREE.Color('#030812');this.scene.fog=new THREE.FogExp2('#030812',.003);
-    this.camera=new THREE.PerspectiveCamera(46,1,.1,1000);
-    this.orbit=new OrbitControls(this.camera,this.canvas);this.orbit.target.set(0,15,0);this.orbit.minDistance=22;this.orbit.maxDistance=600;this.orbit.maxPolarAngle=Math.PI*.49;this.orbit.enablePan=false;this.orbit.enableDamping=false;
-    this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>this.frontMode=false);
-    this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;
-    this.resize(this.canvas.clientWidth/this.canvas.clientHeight);this.front();this.createStage();this.createDrones();
+    if(this.active)this.teardown();
+    this.show=show;$('show-demo-settings').hidden=!show.demo;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:2},()=>createFrame(show));
+    this.tierName=resolveTier(this.quality,browserEnvironment(this.renderer));this.tier=TIERS[this.tierName];
+    const r=this.renderer;this.saved={toneMapping:r.toneMapping,exposure:r.toneMappingExposure,pixelRatio:r.getPixelRatio()};
+    r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.05;this.basePixelRatio=Math.min(devicePixelRatio||1,this.tier.pixelRatio);r.setPixelRatio(this.basePixelRatio);
+    this.governor=new FrameGovernor(1,.6);this.cw=0;
+    const s=this.scale=stageScale(show);
+    this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(46,1,.25*s,20000*s);
+    this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.orbit.minDistance=8*s;this.orbit.maxDistance=3200*s;this.orbit.maxPolarAngle=Math.PI*.64;this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
+    this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
+    this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;
+    this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r});this.createDrones();this.precrowd(show);
+    if(this.tier.bloom){
+      this.composer=new EffectComposer(r,new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:this.tierName==='high'?4:0}));
+      this.composer.addPass(new RenderPass(this.scene,this.camera));this.bloom=new UnrealBloomPass(new THREE.Vector2(256,256),.78,.55,1.05);this.composer.addPass(this.bloom);this.composer.addPass(new OutputPass());
+    }
+    const loading=$('show-loading');loading.hidden=false;
+    loadStageAsset().then(gltf=>{if(this.show!==show||!this.active)return;this.stage.attach(gltf);loading.hidden=true;if(!gltf)$('show-quality').textContent+=' · scenery unavailable';this.refresh();});
     $('show-fleet').textContent=show.count.toLocaleString();$('show-tagline').textContent=show.count.toLocaleString()+' lights. One canvas. An open sky.';$('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
+    $('show-quality').textContent={high:'CINEMATIC',balanced:'BALANCED',battery:'BATTERY SAVER'}[this.tierName];
     $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.clock.play(performance.now());this.refresh();
   }
-  front(){if(!this.active)return;this.frontMode=true;const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0;this.skyPose=frontView(this.show,this.camera.aspect,this.camera.fov,offset);const distance=Math.hypot(...this.skyPose.position.map((v,k)=>v-this.skyPose.target[k]));this.orbit.maxDistance=Math.max(600,distance*2);this.camera.far=Math.max(1000,distance*4);this.camera.updateProjectionMatrix();this.groundPose=frontView({stages:this.show.stages.filter(s=>s.kind==='takeoff')},this.camera.aspect,this.camera.fov,offset);this.groundPose.position[1]=this.groundPose.target[1]+(this.groundPose.position[2]-this.groundPose.target[2])*.55;this.updateFrontPose(this.clock.time);}
-  updateFrontPose(time){if(!this.frontMode||!this.skyPose)return;const blend=groundFocus(this.show,time);this.camera.position.fromArray(this.skyPose.position.map((v,k)=>v+(this.groundPose.position[k]-v)*blend));this.orbit.target.fromArray(this.skyPose.target.map((v,k)=>v+(this.groundPose.target[k]-v)*blend));this.orbit.update();}
+  // Automatic director camera. smooth=true eases from a manual orbit back to it.
+  front(smooth=false){if(!this.active)return;if(smooth&&!this.frontMode)this.blend={position:this.camera.position.toArray(),target:this.orbit.target.toArray(),start:performance.now()};this.frontMode=true;this.updateCamera(this.clock.time,performance.now());}
+  updateCamera(time,now){
+    if(!this.frontMode){this.orbit.update();const floor=1.5*this.scale;if(this.camera.position.y<floor){this.camera.position.y=floor;this.camera.lookAt(this.orbit.target);}return;}
+    const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0;
+    const pose=directorView(this.show,time,this.camera.aspect,this.camera.fov,offset,{drift:this.reducedMotion?0:1});let {position,target}=pose;
+    if(this.blend){const k=smooth((now-this.blend.start)/1400),mix=(a,b)=>a.map((v,i)=>v+(b[i]-v)*k);position=mix(this.blend.position,position);target=mix(this.blend.target,target);if(k>=1)this.blend=null;}
+    this.camera.position.fromArray(position);this.orbit.target.fromArray(target);this.orbit.update();
+  }
   resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();if(this.frontMode)this.front();this.force=true;}
   refresh(){this.force=true;this.requestFrame();}
   seek(time){if(this.recorder.active)return;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
   toggle(){if(!this.active||this.recorder.active)return;const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}
   suspend(){if(this.active){this.recorder.finish(true);this.clock.pause(performance.now());this.refresh();}}
-  createStage(){
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(180,180),new THREE.MeshBasicMaterial({color:0x071019}));ground.rotation.x=-Math.PI/2;ground.position.y=-.05;this.scene.add(ground);
-    const grid=new THREE.GridHelper(48,24,0x234153,0x112230);grid.material.transparent=true;grid.material.opacity=.5;this.scene.add(grid);
-    const pads=new THREE.BufferGeometry();pads.setAttribute('position',new THREE.Float32BufferAttribute(this.show.home.flatMap(p=>[p[0],.025,p[2]]),3));
-    this.scene.add(new THREE.Points(pads,new THREE.PointsMaterial({color:0x527284,size:.17,transparent:true,opacity:.7})));
-    let seed=8127;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
-    const stars=new THREE.BufferGeometry(),starPositions=[];for(let i=0;i<380;i++)starPositions.push((rand()-.5)*180,15+rand()*80,-45-rand()*40);stars.setAttribute('position',new THREE.Float32BufferAttribute(starPositions,3));
-    this.scene.add(new THREE.Points(stars,new THREE.PointsMaterial({color:0x6689a1,size:.12,transparent:true,opacity:.48})));
-    const skyline=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),new THREE.MeshBasicMaterial({color:0x0c1723}),45),matrix=new THREE.Matrix4();
-    for(let i=0;i<45;i++){const height=1+rand()*3;matrix.makeScale(.8+rand()*1.6,height,1);matrix.setPosition((i-22)*2,height/2,-24-rand()*4);skyline.setMatrixAt(i,matrix);}this.scene.add(skyline);
-  }
   createDrones(){
-    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(this.frame.positions,3).setUsage(THREE.DynamicDrawUsage));geo.setAttribute('color',new THREE.BufferAttribute(this.frame.colors,3).setUsage(THREE.DynamicDrawUsage));
-    const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,uniforms:{lightShape:{value:Math.max(0,['round','diamond','star'].indexOf(this.show.lightShape))},pixelRatio:{value:this.renderer.getPixelRatio()}},
-      vertexShader:'attribute vec3 color; varying vec3 lightColor; uniform float pixelRatio; void main(){lightColor=color; vec4 mv=modelViewMatrix*vec4(position,1.); gl_Position=projectionMatrix*mv; gl_PointSize=clamp(1200./max(1.,-mv.z),3.,36.)*pixelRatio;}',
-      fragmentShader:'varying vec3 lightColor; uniform int lightShape; void main(){vec2 p=(gl_PointCoord-.5)*2.; float r=length(p); if(lightShape==1)r=abs(p.x)+abs(p.y); if(lightShape==2)r/= .7+.3*cos(5.*atan(p.y,p.x)-1.5707963); if(r>1.)discard; float glow=lightShape==0?exp(-5.*r*r)*.38+exp(-48.*r*r)*1.4:(1.-smoothstep(.65,1.,r))*.85; gl_FragColor=vec4(lightColor*glow,1.);}'
-    });
-    this.lights=new THREE.Points(geo,material);this.lights.frustumCulled=false;this.scene.add(this.lights);
-    const bodies=new THREE.Points(geo,new THREE.PointsMaterial({color:0x536b85,size:.13,transparent:true,opacity:.6,depthWrite:false}));bodies.frustumCulled=false;this.scene.add(bodies);
-    const trailGeometry=new THREE.BufferGeometry();this.trailPositions=new Float32Array(this.show.count*2*6);this.trailColors=new Float32Array(this.trailPositions.length);
-    trailGeometry.setAttribute('position',new THREE.BufferAttribute(this.trailPositions,3).setUsage(THREE.DynamicDrawUsage));trailGeometry.setAttribute('color',new THREE.BufferAttribute(this.trailColors,3).setUsage(THREE.DynamicDrawUsage));
-    this.trails=new THREE.LineSegments(trailGeometry,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:.24,depthWrite:false,blending:THREE.AdditiveBlending}));this.trails.frustumCulled=false;this.scene.add(this.trails);
+    const show=this.show,n=show.count,geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(this.frame.positions,3).setUsage(THREE.DynamicDrawUsage));geo.setAttribute('color',new THREE.BufferAttribute(this.frame.colors,3).setUsage(THREE.DynamicDrawUsage));
+    const ledSize=.24*this.scale*6*Math.sqrt(4096/n)**.5;
+    const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:LED_VERTEX,fragmentShader:LED_FRAGMENT,
+      uniforms:{lightShape:{value:Math.max(0,['round','diamond','star'].indexOf(show.lightShape))},ledSize:{value:ledSize},viewport:{value:720},minSize:{value:2},gain:{value:this.tier.bloom?5:3}}});
+    this.lights=new THREE.Points(geo,material);this.lights.frustumCulled=false;this.lights.renderOrder=2;this.scene.add(this.lights);
+    // Sprite size follows the target being rendered: canvas, bloom buffer or water reflection.
+    this.lights.onBeforeRender=renderer=>{const target=renderer.getRenderTarget(),h=target?target.height:this.drawHeight||720,u=material.uniforms;u.viewport.value=h;u.minSize.value=Math.max(1,1.8*renderer.getPixelRatio()*h/(this.drawHeight||h));material.uniformsNeedUpdate=true;};
+    // Trails: two fading segments per drone (t-0.4 → t-0.2 → t), tinted by the current LED colour.
+    const trail=new THREE.BufferGeometry();this.trailPositions=new Float32Array(n*12);this.trailColors=new Float32Array(n*12);const fade=new Float32Array(n*4);for(let i=0;i<n;i++)fade.set([0,.16,.16,.42],i*4);
+    trail.setAttribute('position',new THREE.BufferAttribute(this.trailPositions,3).setUsage(THREE.DynamicDrawUsage));trail.setAttribute('color',new THREE.BufferAttribute(this.trailColors,3).setUsage(THREE.DynamicDrawUsage));trail.setAttribute('fade',new THREE.BufferAttribute(fade,1));
+    this.trails=new THREE.LineSegments(trail,new THREE.ShaderMaterial({vertexShader:TRAIL_VERTEX,fragmentShader:TRAIL_FRAGMENT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));this.trails.frustumCulled=false;this.trails.renderOrder=1;this.scene.add(this.trails);
+  }
+  // LEDs packed closer than their glow (dense strokes, contour fireworks) add up to white.
+  // Dim each light by how many neighbours share its glow in the stage's target layout.
+  // Numeric grid keys keep this ~4 ms per 4,096-light stage; it is precomputed while idle.
+  crowding(stage){
+    if(stage.crowd)return stage.crowd;
+    const points=stage.to.positions,n=points.length,r=this.lights.material.uniforms.ledSize.value*1.2,r2=r*r,crowd=new Float32Array(n).fill(1);
+    if(!['hold','grow','burst','rise','fall'].includes(stage.kind))return stage.crowd=crowd;// lights are off or dim
+    const cell=new Int32Array(n*3),key=(x,y,z)=>((x+4096)*8192+(y+4096))*8192+(z+4096),cells=new Map();
+    for(let i=0;i<n;i++){const p=points[i];for(let k=0;k<3;k++)cell[i*3+k]=Math.floor(p[k]/r);const id=key(cell[i*3],cell[i*3+1],cell[i*3+2]);const list=cells.get(id);if(list)list.push(i);else cells.set(id,[i]);}
+    for(let i=0;i<n;i++){const p=points[i],cx=cell[i*3],cy=cell[i*3+1],cz=cell[i*3+2];let k=0;
+      for(let x=-1;x<=1;x++)for(let y=-1;y<=1;y++)for(let z=-1;z<=1;z++){const list=cells.get(key(cx+x,cy+y,cz+z));if(!list)continue;for(const j of list){if(j===i)continue;const q=points[j],dx=q[0]-p[0],dy=q[1]-p[1],dz=q[2]-p[2];if(dx*dx+dy*dy+dz*dz<r2)k++;}}
+      crowd[i]=Math.min(1,Math.sqrt(4/(1+k)));}// evenly spaced formations have about three neighbours in range
+    return stage.crowd=crowd;
+  }
+  precrowd(show){const queue=[...show.stages],step=deadline=>{if(this.show!==show)return;do this.crowding(queue.shift());while(queue.length&&deadline?.timeRemaining?.()>4);if(queue.length)idle(step);},idle=globalThis.requestIdleCallback||(f=>setTimeout(f,30));idle(step);}
+  decrowd(frame,time){
+    const stage=this.show.stages.find(s=>time<s.end)||this.show.stages.at(-1),crowd=this.crowding(stage),c=frame.colors;
+    for(let i=0;i<crowd.length;i++){const f=crowd[i];if(f<1){c[i*3]*=f;c[i*3+1]*=f;c[i*3+2]*=f;}}
+  }
+  syncSize(){
+    const r=this.renderer,size=r.getSize(this.size),ratio=r.getPixelRatio();if(size.x===this.cw&&size.y===this.ch&&ratio===this.cratio)return;
+    this.cw=size.x;this.ch=size.y;this.cratio=ratio;this.drawHeight=Math.max(1,Math.round(size.y*ratio));
+    if(this.composer){this.composer.setPixelRatio(ratio);this.composer.setSize(size.x,size.y);}this.stage.setSize(size.x*ratio,size.y*ratio);
   }
   render(now){
     if(!this.active)return false;
-    if(!this.force&&this.clock.playing&&now-this.lastFrame<1000/30-.5)return true;
-    this.force=false;this.lastFrame=now;const time=this.clock.read(now),frame=sampleShow(this.show,time,this.frame);this.updateFrontPose(time);this.force=false;
-    this.lights.material.uniforms.pixelRatio.value=this.renderer.getPixelRatio();this.lights.geometry.attributes.position.needsUpdate=true;this.lights.geometry.attributes.color.needsUpdate=true;
+    const playing=this.clock.playing,cap=this.tierName==='battery'?30:60;
+    if(!this.force&&playing&&now-this.lastFrame<1000/cap-.5)return true;
+    this.force=false;this.lastFrame=now;
+    // Adaptive resolution while playing (never while recording a fixed 720p video).
+    if(playing&&!this.recorder.active){const k=this.governor.sample(now),ratio=+(this.basePixelRatio*k).toFixed(3);if(Math.abs(ratio-this.renderer.getPixelRatio())>.01)this.renderer.setPixelRatio(ratio);}else this.governor.last=0;
+    this.syncSize();
+    const time=this.clock.read(now),frame=sampleShow(this.show,time,this.frame);this.updateCamera(time,now);this.decrowd(frame,time);
+    this.lights.geometry.attributes.position.needsUpdate=true;this.lights.geometry.attributes.color.needsUpdate=true;
     this.trails.visible=$('show-trails').checked;
     if(this.trails.visible){
-      for(let j=0;j<3;j++)sampleShow(this.show,time-(2-j)*.2,this.trailFrames[j]);
-      for(let i=0;i<this.show.count;i++)for(let j=0;j<2;j++)for(let end=0;end<2;end++)for(let k=0;k<3;k++){
-        const index=(i*2+j)*6+end*3+k;this.trailPositions[index]=this.trailFrames[j+end].positions[i*3+k];this.trailColors[index]=frame.colors[i*3+k]*(j+1)/2;
-      }
+      sampleShow(this.show,time-.4,this.trailFrames[0]);sampleShow(this.show,time-.2,this.trailFrames[1]);
+      const a=this.trailFrames[0].positions,b=this.trailFrames[1].positions,c=frame.positions,col=frame.colors,P=this.trailPositions,C=this.trailColors;
+      for(let i=0,n=this.show.count;i<n;i++){const j=i*3,o=i*12;
+        for(let k=0;k<3;k++){P[o+k]=a[j+k];P[o+3+k]=P[o+6+k]=b[j+k];P[o+9+k]=c[j+k];C[o+k]=C[o+3+k]=C[o+6+k]=C[o+9+k]=col[j+k];}}
       this.trails.geometry.attributes.position.needsUpdate=true;this.trails.geometry.attributes.color.needsUpdate=true;
     }
-    this.renderer.render(this.scene,this.camera);
+    this.stage.update(time,frame,this.camera,now);
+    if(this.composer)this.composer.render();else this.renderer.render(this.scene,this.camera);
     this.recorder.frame();
     if(now-this.lastUI>100||!this.clock.playing||$('show-phase').textContent!==frame.phase){
       this.lastUI=now;$('show-phase').textContent=frame.phase;$('show-time').textContent=stamp(time)+' / '+stamp(this.show.duration);$('show-scrub').value=time;
       $('show-pause').textContent=this.clock.playing?'Ⅱ Pause':time>=this.show.duration?'↻ Replay':'▶ Play';$('show-pause').setAttribute('aria-label',this.clock.playing?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
       $('show-progress').style.width=(100*time/this.show.duration)+'%';
       const cue=[...this.show.cues].reverse().find(c=>time>=c.time-1);for(const button of $('show-cues').children){const active=Number(button.dataset.time)===cue?.time;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
-      let lit=0;for(let i=0;i<frame.colors.length;i+=3)if(Math.max(frame.colors[i],frame.colors[i+1],frame.colors[i+2])>.05)lit++;
+      let lit=0,sum=[0,0,0];const colors=frame.colors;for(let i=0;i<colors.length;i+=3){const r=colors[i],g=colors[i+1],b=colors[i+2];if(Math.max(r,g,b)>.05){lit++;sum[0]+=r;sum[1]+=g;sum[2]+=b;}}
+      const glow=new THREE.Color().setRGB(...sum.map(v=>lit?(v/lit)**2.2:0)),center=framingAt(this.show,time).center;this.stage.setGlow(center,glow,1.6*lit/this.show.count);
       $('show-lit').textContent=lit+' / '+this.show.count;$('show-play-state').textContent=this.clock.playing?'LIVE PREVIEW':time>=this.show.duration?'SHOW COMPLETE':'PAUSED';
     }
-    return this.clock.playing;
+    return this.clock.playing||!!this.blend;
+  }
+  teardown(){
+    this.orbit.dispose();this.stage.dispose();this.composer?.dispose();this.bloom?.dispose();this.composer?.passes.forEach(p=>p.dispose?.());
+    for(const o of [this.lights,this.trails]){o.geometry.dispose();o.material.dispose();}
+    const r=this.renderer;r.toneMapping=this.saved.toneMapping;r.toneMappingExposure=this.saved.exposure;r.setPixelRatio(this.saved.pixelRatio);
+    this.scene=null;this.lights=null;this.trails=null;this.stage=null;this.composer=null;this.bloom=null;this.frame=null;this.trailFrames=null;this.trailPositions=null;this.trailColors=null;
   }
   stop(){
-    if(!this.active)return;this.recorder.finish(true);this.active=false;this.orbit.dispose();const geometries=new Set(),materials=new Set();this.scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry)geometries.add(o.geometry);if(o.material)materials.add(o.material);});for(const g of geometries)g.dispose();for(const m of materials)m.dispose();
-    $('drone-show').hidden=true;this.scene=null;this.lights=null;this.trails=null;this.show=null;this.frame=null;this.trailFrames=null;this.trailPositions=null;this.trailColors=null;this.onExit();
+    if(!this.active)return;this.recorder.finish(true);this.active=false;this.teardown();
+    $('drone-show').hidden=true;$('show-loading').hidden=true;this.show=null;this.onExit();
   }
 }

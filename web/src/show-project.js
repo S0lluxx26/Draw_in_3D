@@ -34,10 +34,12 @@ export function validateShow(doc){
   need(doc?.format==='draw-in-3d-show'&&[1,2].includes(doc.version),'Open a Draw in 3D show file (version 1 or 2). Drawing files use Open project.');
   name(doc.name,'Show name');need([256,DRONE_COUNT].includes(doc.count),'Supported fleets are 256 and 4096 drones.');
   need(Array.isArray(doc.cues)&&doc.cues.length<=SHOW_LIMITS.cues,'A show can contain up to 12 formations.');
+  need(doc.cues.every(c=>c&&typeof c==='object'&&!Array.isArray(c)),'Each formation must be an object with a name, artwork and timing.');
   need(doc.version===2||doc.count===256&&doc.cues.every(c=>!c.effect||c.effect==='none'),'Large fleets and animated effects require show version 2.');
   const ids=new Set();
   for(const c of doc.cues){
     need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship'].includes(c.effect??'none'),'Unknown formation effect.');
+    need(Array.isArray(c.artwork)&&c.artwork.every(e=>e&&typeof e==='object'&&!Array.isArray(e)),`${c.name}: formation artwork must be a list of strokes and paper guides.`);
     validate(documentOf(c.artwork));need(c.artwork.every(e=>['paper','stroke'].includes(e.type)),'Formations contain strokes and their paper guides only.');
     num(c.hold,2,60,'Display duration');num(c.transfer,2,30,'Transition duration');num(c.brightness,.1,1,'Brightness');
     need(['fade','draw-on','bottom-up'].includes(c.light),'Unknown light preset.');

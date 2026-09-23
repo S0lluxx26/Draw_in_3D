@@ -1,5 +1,8 @@
 // Real-time canvas recording. Source JSON remains the editable show document.
 const $=id=>document.getElementById(id);
+// The whole show must fit the in-memory budget: bitrate adapts to its length, with 20% headroom for encoder overshoot.
+const BUDGET=160*1024*1024,MAX_BITS=4e6,MIN_BITS=8e5;
+export const recordingBitrate=duration=>Math.min(MAX_BITS,.8*BUDGET*8/duration);
 export class ShowRecorder{
   active=false;
   constructor(player){this.player=player;$('show-record').onclick=()=>this.active?this.finish(true,'Recording cancelled.'):this.start();}
@@ -7,6 +10,8 @@ export class ShowRecorder{
   reset(){const supported=this.available();$('show-record').disabled=!supported;$('show-record').textContent='Record video';$('show-record-status').textContent=supported?'Silent video · real time · keep this tab visible':'Canvas recording is unavailable in this browser.';}
   start(){
     if(!this.available()||!this.player.active||this.active||this.recorder)return;
+    const bits=recordingBitrate(this.player.show?.duration);
+    if(!(bits>=MIN_BITS)){$('show-record-status').textContent=`This show is too long to record within the 160 MiB video budget (about ${Math.floor(.8*BUDGET*8/MIN_BITS/60)} minutes at minimum quality). Shorten it, then record again.`;return;}
     const p=this.player;this.cancelled=false;this.chunks=[];this.bytes=0;
     try{
       const mime=['video/webm;codecs=vp8','video/webm','video/webm;codecs=vp9','video/mp4'].find(t=>MediaRecorder.isTypeSupported(t));
@@ -15,8 +20,8 @@ export class ShowRecorder{
       this.active=true;p.orbit.enabled=false;p.clock.pause(performance.now());p.clock.speed(1,performance.now());p.clock.seek(0,performance.now());
       p.renderer.setPixelRatio(1);p.renderer.setSize(1280,720,false);p.camera.clearViewOffset();p.camera.aspect=16/9;p.front();p.camera.updateProjectionMatrix();p.canvas.style.objectFit='contain';
       p.force=true;p.render(performance.now());this.stream=p.canvas.captureStream(30);this.stream.getTracks().forEach(t=>t.addEventListener('ended',()=>this.finish(true,'Canvas capture ended. No incomplete video was saved.')));
-      const recorder=this.recorder=new MediaRecorder(this.stream,{mimeType:mime,videoBitsPerSecond:4000000});
-      recorder.ondataavailable=e=>{if(e.data.size&&!this.cancelled){this.bytes+=e.data.size;if(this.bytes>160*1024*1024){this.fail('Video exceeded the 160 MiB recording budget. Try a shorter show.');return;}this.chunks.push(e.data);}};
+      const recorder=this.recorder=new MediaRecorder(this.stream,{mimeType:mime,videoBitsPerSecond:Math.round(bits)});
+      recorder.ondataavailable=e=>{if(e.data.size&&!this.cancelled){this.bytes+=e.data.size;if(this.bytes>BUDGET){this.fail('Video exceeded the 160 MiB recording budget. Try a shorter show.');return;}this.chunks.push(e.data);}};
       recorder.onerror=()=>this.fail('Recording failed. Try a shorter show or another browser.');
       recorder.onstop=()=>{
         if(this.active)this.finish(true,'Recording stopped early. No incomplete video was saved.');

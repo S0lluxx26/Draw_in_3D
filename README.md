@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 13: cinematic sky stage
+
+![Fish formation over the Blender-built harbour stage](docs/media/sky-studio-hero.jpg)
+
+Drone shows now perform over a **night harbour built in Blender**: a lit launch deck, skyline, bridge, mountains, a moonlit sky and reflective water. HDR **bloom**, a **director camera** that frames every formation and a **Graphics quality** choice (Auto, Cinematic, Balanced, Battery saver) come with adaptive resolution for phones. All seven Demo formations were **remodelled in Blender** with colour gradients and cleaner LED sampling; the asset shrank from 1.27 MB to 389 KB. A three-part logic audit fixed editor, drone-show and Android bugs, including the Android gyro view, lost crash recovery, the eraser cutting hidden strokes and texture re-uploads while dragging images. [What changed, the Blender pipeline, every fix and how it was verified](docs/STUDIO13.md).
+
 ## Studio 12: Blender formations and Demo settings
 
 **Demo settings** selects 256–4,096 drones, round/diamond/star lights, 4×–8× formation scale (twice the previous size) and fire for each formation. Demo now uses detailed 3D Blender meshes, including a striped fish with fins and gills, a multi-deck ship and a rising Starship. Transitions and their trails blink only dim red/blue and last nine seconds. The 3:49 Demo ends with growing heart/star/three-ball fireworks, blinking falling sparks and a slower 14-second reverse-takeoff landing with an elevated camera. [Controls, Blender editing and review](docs/STUDIO12.md).

@@ -48,16 +48,18 @@ function cutIntervals(a,b,from,to,r){
   for(const interval of intervals){const last=merged.at(-1);if(last&&interval[0]<=last[1]+1e-7)last[1]=Math.max(last[1],interval[1]);else merged.push([...interval]);}
   return merged;
 }
+// samples: e.points (by reference, in order) plus optional extra hit-test samples on the same
+// segments. Extra samples only locate cuts; results keep the original points and new cut ends.
 export function eraseStroke(e,project,from,to,radius,samples=e.points){
   if(e.type!=='stroke')return [e];
   if(e.points.length===1){const p=project(e,e.points[0]);return p&&cutIntervals(p,p,from,to,radius).length?[]:[e];}
-  const chunks=[];let chunk=[],changed=false;
-  const finish=()=>{if(chunk.length)chunks.push(chunk);chunk=[];};
+  const chunks=[],original=new Set(e.points),ends=new Set();let chunk=[],changed=false,last=project(e,samples[0]);
+  const finish=()=>{if(chunk.length)chunks.push(chunk.filter((p,i)=>original.has(p)||ends.has(p)||!i||i===chunk.length-1));chunk=[];};
   for(let i=0;i<samples.length-1;i++){
-    const a=samples[i],b=samples[i+1],pa=project(e,a),pb=project(e,b),cuts=pa&&pb?cutIntervals(pa,pb,from,to,radius):[];
+    const a=samples[i],b=samples[i+1],pa=last,pb=last=project(e,b),cuts=pa&&pb?cutIntervals(pa,pb,from,to,radius):[];
     if(!cuts.length){if(!chunk.length)chunk.push(a);chunk.push(b);continue;}
     // Projected screen fractions are perspective-corrected back to local 3D.
-    const at=t=>{const wa=pa[2]??1,wb=pb[2]??1;return interpolate(a,b,t*wa/((1-t)*wb+t*wa));};
+    const at=t=>{const wa=pa[2]??1,wb=pb[2]??1,p=interpolate(a,b,t*wa/((1-t)*wb+t*wa));ends.add(p);return p;};
     changed=true;let cursor=0;
     for(const [lo,hi] of cuts){
       if(lo>cursor+1e-7){if(!chunk.length)chunk.push(at(cursor));chunk.push(at(lo));}finish();cursor=hi;
@@ -65,7 +67,8 @@ export function eraseStroke(e,project,from,to,radius,samples=e.points){
     if(cursor<1-1e-7){chunk.push(at(cursor));chunk.push(b);}
   }
   finish();if(!changed)return [e];
-  const bounded=chunks.flatMap(points=>{const parts=[];for(let i=0;i<points.length;i+=383)parts.push(points.slice(i,i+384));return parts;});
+  // Overlap by one point so split parts still join; never emit a lone trailing point.
+  const bounded=chunks.flatMap(points=>{const parts=[];for(let i=0;;i+=383){parts.push(points.slice(i,i+384));if(i+384>=points.length)break;}return parts;});
   return bounded.map((points,i)=>({...clone(e),id:i?crypto.randomUUID():e.id,points}));
 }
 export function shapeEntity(kind,start,end,basis,style,{depth=.4,constrain=false,bend=.35,curveKind='arc',pointBudget=65}={}){

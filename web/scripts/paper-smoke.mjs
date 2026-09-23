@@ -15,16 +15,18 @@ try{
   const download=async name=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const d=await waiting,file=path.join(out,name);await d.saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   await page.locator('#width').fill('130');await page.locator('#width').dispatchEvent('change');
   await drag([.33,.41],[.64,.44]);await count(2);await page.locator('[data-color="#f47e97"]').click();await drag([.35,.48],[.62,.57]);await count(3);
-  const initial=await download('paper-initial.json');assert.equal(initial.version,3);assert.equal(initial.entities[1].paperId,initial.entities[0].id);
+  const initial=await download('paper-initial.json');assert.ok(initial.version>=3);// paper files export v4+ since Studio 05assert.equal(initial.entities[1].paperId,initial.entities[0].id);
   // Change the finish under existing paint; its pigment geometry must rebuild.
   await page.locator('#paper-kind').selectOption('rough');await count(3);assert.equal((await download('paper-rough.json')).entities[0].paperKind,'rough');
   await page.locator('#undo').click();await page.waitForFunction(()=>document.querySelector('#paper-kind').value==='watercolor');
   await page.locator('#outliner .object-row').first().click();await page.locator('#pos-x').fill('0.2');await page.locator('#pos-x').dispatchEvent('change');
-  const moved=await download('paper-moved.json');for(let i=0;i<3;i++)assert.ok(Math.abs(moved.entities[i].position[0]-initial.entities[i].position[0]-.2)<1e-6);
+  const moved=await download('paper-moved.json');assert.ok(Math.abs(moved.entities[0].position[0]-initial.entities[0].position[0]-.2)<1e-6);
+  // Since Studio 05 attached ink stores sheet-local points: moving the sheet carries it without rewriting them.
+  for(let i=1;i<3;i++){const e=moved.entities[i];assert.equal(e.paperId,moved.entities[0].id);if(e.pointSpace==='surface')assert.deepEqual(e.points,initial.entities[i].points);else assert.ok(Math.abs(e.position[0]-initial.entities[i].position[0]-.2)<1e-6);}
   await page.locator('#duplicate').click();await count(6);const dup=await download('paper-duplicate.json');assert.equal(dup.entities[4].paperId,dup.entities[3].id);
   await page.locator('#undo').click();await count(3);await page.locator('#delete').click();await count(0);await page.locator('#undo').click();await count(3);
   // Save a v3 fixture for the native reader, then reopen and continue on paper.
-  const doc=await download('paper-v3.json');await writeFile(path.join(root,'../samples/paper-v3.json'),JSON.stringify(doc));
+  const doc=await download('paper-v3.json');if(doc.version===3)await writeFile(path.join(root,'../samples/paper-v3.json'),JSON.stringify(doc));// keep the v3 fixture v3
   await page.locator('#project-file').setInputFiles(path.join(out,'paper-v3.json'));await count(3);
   await page.locator('#painting-target').selectOption(doc.entities[0].id);await page.locator('#paper-kind').selectOption('coated');await drag([.37,.6],[.64,.6]);await count(4);
   await page.locator('#undo').click();await count(3);await page.locator('#undo').click();await page.waitForFunction(()=>document.querySelector('#paper-kind').value==='watercolor');

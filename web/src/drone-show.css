@@ -8,3 +8,14 @@
 #demo-settings{max-height:85dvh;overflow:auto}#demo-settings form>label{display:block;margin:14px 0}#demo-settings select{margin-top:6px}#demo-settings fieldset{border:1px solid #4b6657;border-radius:8px;padding:12px}#demo-settings fieldset label{display:flex;align-items:center;gap:8px;margin:9px 0}#demo-settings .demo-actions{display:flex;justify-content:flex-end;gap:12px;align-items:center}.show-controls>div{flex-wrap:wrap}@media(max-width:560px){.viewbar{flex-wrap:wrap}.view-play-actions{flex-wrap:wrap}#demo-settings{padding:20px}}
 
 #demo-settings .demo-actions{position:sticky;bottom:-20px;background:#1c2925;padding:10px 0}#drone-demo-settings{margin-bottom:8px}
+
+/* Studio 13: cinematic sky stage */
+.drone-card button{font-size:12px;font-weight:550;letter-spacing:.2px;transition:background .15s,border-color .15s}.drone-card button:hover{background:#3f5d53;border-color:#8fb5a4}
+.show-quality{color:#b9d7e6;border-color:#3d6178}.show-loading{display:inline-flex;align-items:center;gap:7px;margin-left:8px;color:#9fc3d6;letter-spacing:1px}.show-loading i{width:10px;height:10px;border-radius:50%;border:2px solid #365a70;border-top-color:#9fe7ff;animation:show-spin .8s linear infinite}
+@keyframes show-spin{to{transform:rotate(360deg)}}
+#drone-show .show-heading h1{text-shadow:0 2px 24px #000a}.show-bottom{background:linear-gradient(transparent,#02060dcc 28%,#03080fee 100%)}
+#show-cues button{transition:color .15s,border-color .15s,background .15s}#show-cues button:hover{color:#cde8f5;border-color:#3c6479}
+.show-controls button:hover,.show-heading button:hover{border-color:#5c8aa3}
+@media(prefers-reduced-motion:reduce){.show-loading i{animation:none}}
+@media(max-width:560px){#show-cues{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-18px;margin-right:-18px;padding:0 18px;mask-image:linear-gradient(90deg,transparent,#000 18px,#000 calc(100% - 18px),transparent)}#show-cues::-webkit-scrollbar{display:none}#show-cues button{flex:none}.show-quality{display:none}}
+#drone-demo.busy{pointer-events:none;opacity:.75;background:linear-gradient(90deg,#3b3326 0%,#5a4a2c 50%,#3b3326 100%) 0 0/200% 100%;animation:demo-busy 1s linear infinite}@keyframes demo-busy{to{background-position:-200% 0}}@media(prefers-reduced-motion:reduce){#drone-demo.busy{animation:none}}

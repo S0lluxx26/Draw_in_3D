@@ -1,4 +1,4 @@
-# Draw in 3D — browser studio 0.12.2
+# Draw in 3D — browser studio 0.13.0
 
 **Current: Show editor → Edit demo** lets you author formations, arrange a show, save/recover it and record a 720p video. [Start here](../docs/SHOW_EDITOR_GUIDE.md).
 
@@ -54,7 +54,7 @@ The export contains editable objects, not a screenshot or a baked model. IDs, br
 
 ## Shared limits and review
 
-Limits match Android v0.1.1: 80 objects, 4,000 total stroke points, 384 points per stroke, 6 images, 1,024 px maximum image edge, 16 MiB project, 4 m map radius. Web edits reject out-of-bounds content. The renderer redraws on changes and while bounded wet effects run, then idles. Pixel ratio is capped at 1.5; there are no shadows, bloom passes or physical fluids.
+Limits match Android v0.1.1: 80 objects, 4,000 total stroke points, 384 points per stroke, 6 images, 1,024 px maximum image edge, 16 MiB project, 4 m map radius. Web edits reject out-of-bounds content. The renderer redraws on changes and while bounded wet effects run, then idles. The drawing editor caps pixel ratio at 1.5 and uses no shadows, bloom or physical fluids. The sky show (Studio 13) has its own graphics tiers with HDR bloom, water reflections and adaptive resolution; see [Studio 13](../docs/STUDIO13.md).
 
 Brush geometry uses the same cylindrical curve, tube/spray construction, Java-compatible random seed and gravity projection as Android. Pixel-perfect rendering is not promised: the web engine's colour/transparency pipeline differs from GLES, and transparent intersections can still show artifacts. Gyro/AR, surface detection and room localization are **not implemented in the web editor**.
 
