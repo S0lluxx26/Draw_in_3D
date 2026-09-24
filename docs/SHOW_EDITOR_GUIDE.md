@@ -32,7 +32,7 @@ The sky uses stroke centre lines and stroke colours. Brush width, paint spread, 
 
 ## Record a video
 
-In the player, click **Record video**. Recording resets the show to takeoff at 1× and uses the front audience view at 1280 × 720. It captures a silent canvas video, without editor panels or HTML labels. Playback controls and orbit are locked for a consistent camera; **Cancel recording** or leaving the player cancels the recording.
+In the player, click **Record video**. Recording resets the show to takeoff at 1× and uses the front audience view at 1280 × 720. It captures the canvas with the show music, without editor panels or HTML labels. Turn **♪ Music** off first for a silent video. Record video becomes available once the harbour scenery has loaded. Playback controls and orbit are locked for a consistent camera; **Cancel recording** or leaving the player cancels the recording.
 
 Keep the tab visible until landing. The video downloads automatically on completion. This is real-time recording: a 90-second show takes 90 seconds to record, and a slow device can drop frames. The app chooses a supported format, preferring WebM/VP8; MP4 is only used where supported. Recording is unavailable when the browser cannot capture/encode the canvas. Tab hiding, graphics loss, capture interruption or the 160 MiB memory limit cancels the recording rather than downloading an incomplete result. For long or complex shows, record on a PC.
 

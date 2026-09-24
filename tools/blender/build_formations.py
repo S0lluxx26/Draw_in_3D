@@ -34,7 +34,9 @@ from mathutils.bvhtree import BVHTree
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 EXPORT_ONLY = '--export-only' in sys.argv
 BODY, FIRE = 4096, 512
-NAMES = ['Robot', 'Fish', 'Eiffel Tower', 'Big ship', 'Firework star', 'Row of fire', 'Starship launch']
+NAMES = ['Robot', 'Fish', 'Butterfly', 'Hot air balloon', 'Eiffel Tower', 'Big ship', 'Firework star', 'Row of fire', 'Birthday cake', 'Starship launch', 'Happy day']
+# Stable per-formation seeds: adding formations never reshuffles existing ones.
+SEEDS = {'Robot': 0, 'Fish': 1, 'Eiffel Tower': 2, 'Big ship': 3, 'Firework star': 4, 'Row of fire': 5, 'Starship launch': 6, 'Butterfly': 7, 'Hot air balloon': 8, 'Birthday cake': 9, 'Happy day': 10}
 AUDIENCE_LIGHT = np.array(Vector((-0.3, 0.42, 0.86)).normalized())  # app coordinates
 APP_TO_BLENDER = Matrix.Rotation(math.radians(90), 4, 'X')  # modelled in app axes, stored Z-up
 to_app = lambda a: np.stack([a[..., 0], a[..., 2], -a[..., 1]], axis=-1)
@@ -388,8 +390,135 @@ def starship():
         plume.lathe([(x, -6.3 - 5.5 * k / 14, z) for k in range(15)], [.35 + .45 * math.sin(math.pi * .5 * k / 14) - .25 * (k / 14) ** 3 for k in range(15)], 14)
     plume.finish('Exhaust plume', 'fire', fire=True)
 
-BUILDERS = {'Robot': robot, 'Fish': fish, 'Eiffel Tower': tower, 'Big ship': ship,
-            'Firework star': star, 'Row of fire': fire_row, 'Starship launch': starship}
+def butterfly():
+    """Morpho-style butterfly: raised wings, radial colour bands, spots, veins."""
+    fore = [(0.8, 2.2), (2.5, 4.8), (5, 7.2), (7.8, 8.6), (10, 8.8), (11.2, 7.6), (11.3, 5.6), (10.4, 3.4), (8.6, 1.6), (6.2, 0.4), (3.5, -0.2), (1.2, 0.1)]
+    hind = [(1.2, -0.4), (3.6, -0.6), (6.4, -1.4), (8.4, -3.2), (8.8, -5.6), (7.6, -7.6), (5.6, -8.6), (3.6, -8.4), (2.2, -6.8), (1.2, -4.4), (0.6, -2.2)]
+    spots = [(9.2, 6.6, .9), (7.4, 7.4, .6), (10.2, 5.0, .55), (6.6, -5.4, .75)]
+    def wing(outline, root, stops, name):
+        reach = max(math.hypot(ox - root[0], oy - root[1]) for ox, oy in outline)
+        cx = sum(x for x, _ in outline) / len(outline); cy = sum(y for _, y in outline) / len(outline)
+        rings = [[(cx + (x - cx) * k / 4, cy + (y - cy) * k / 4) for x, y in outline] for k in range(1, 5)]
+        n = len(outline)
+        for s in (-1, 1):
+            def colour(p):
+                x, y = abs(p.x), p.y
+                for sx, sy, r in spots:
+                    if (x - sx) ** 2 + (y - sy) ** 2 < r * r:
+                        return (1, 1, 1)
+                return ramp(stops, math.hypot(x - root[0], y - root[1]) / reach)
+            part = Part(colour)
+            pt = lambda x, y, s=s: (s * x, y, .32 * x + .02 * x * x)  # dihedral: tips toward the audience
+            for i in range(n):
+                j = (i + 1) % n
+                part.face([pt(cx, cy), pt(*rings[0][i]), pt(*rings[0][j])][::s])
+                for k in range(3):
+                    part.face([pt(*rings[k][i]), pt(*rings[k + 1][i]), pt(*rings[k + 1][j]), pt(*rings[k][j])][::s])
+            part.finish(name, 'blue', smooth=True)
+            veins = Part((1, .8, .35))
+            for x, y in outline[1::2]:
+                veins.path([pt(cx + (x - cx) * k / 6, cy + (y - cy) * k / 6) for k in range(1, 6)], .05, 5)
+            veins.finish(name + ' veins', 'gold')
+    wing(fore, (0.6, 1.0), [(0, (.1, .45, 1)), (.45, (.35, .3, 1)), (.75, (1, .22, .6)), (1, (1, .6, .15))], 'Forewing')
+    wing(hind, (0.6, -0.8), [(0, (.1, .85, 1)), (.5, (.15, .4, 1)), (.85, (.9, .25, .8)), (1, (1, .75, .2))], 'Hindwing')
+    body = Part(lambda p: ramp([(-4.6, (.55, .2, .9)), (3.8, (.95, .5, 1))], p.y))
+    ys = np.linspace(-4.6, 3.8, 14)
+    body.lathe([(0, y, .3) for y in ys], [.25 + .45 * math.sin(math.pi * (y + 4.6) / 8.4) ** .6 for y in ys], 14)
+    body.sphere((0, 4.5, .35), .7)
+    body.finish('Body', 'pink')
+    antennae = Part((1, .9, .5))
+    for s in (-1, 1):
+        pts = [(s * (.3 + 1.6 * t * t), 5 + 3.2 * t, .4 + .4 * t) for t in np.linspace(0, 1, 10)]
+        antennae.path(pts, .06, 5); antennae.sphere(pts[-1], .28, 12, 6)
+    antennae.finish('Antennae', 'gold')
+    exhaust([-2, 2], -9.2, .3, 2.8, .45)
+
+def balloon():
+    """Striped hot air balloon with load tapes, basket, ropes and burner flame."""
+    profile = [(-3.2, 1.1), (-2, 2.6), (0, 4.6), (2, 6.0), (4, 6.6), (6, 6.3), (7.5, 5.4), (8.7, 4.0), (9.6, 2.2), (10, .02)]
+    gores = [(1, .15, .35), (1, .72, .1), (.1, .8, 1), (1, 1, 1), (1, .38, .08), (.25, .35, 1)]
+    def envelope(p):
+        if -1.2 < p.y < -.4:
+            return (1, .85, .3)
+        return gores[int((math.atan2(p.z, p.x) + math.pi) / (2 * math.pi) * 12) % 6]
+    env = Part(envelope)
+    env.lathe([(0, y, 0) for y, r in profile], [r for y, r in profile], 48)
+    env.finish('Envelope', 'pink')
+    tapes = Part((1, .9, .6))
+    for k in range(12):
+        a = k * 2 * math.pi / 12 - math.pi
+        tapes.path([(math.cos(a) * (r + .06), y, math.sin(a) * (r + .06)) for y, r in profile[:-1]], .05, 5)
+    tapes.finish('Load tapes', 'gold')
+    basket = Part(lambda p: ramp([(-8, (1, .45, .1)), (-6.4, (1, .7, .3))], p.y)); basket.box((0, -7.2, 0), (2.2, 1.6, 2.2), .12); basket.finish('Basket', 'orange')
+    ropes = Part((.85, .9, 1))
+    for sx in (-1, 1):
+        for sz in (-1, 1):
+            ropes.tube((sx * 1.0, -6.4, sz * 1.0), (sx * .8, -3.2, sz * .8), .05, .05, 5)
+    ropes.finish('Ropes', 'silver')
+    flame('Burner flame', (0, -5.6, 0), 2.2, .55, twist=.6, fire=False)
+    exhaust([-1.1, 1.1], -8.2, 0, 2.6, .4)
+
+def cake():
+    """Three-tier birthday cake: frosting drips, sprinkles, candles with flames."""
+    tiers = [(-8.0, -4.4, 8.0, (1, .35, .62)), (-4.4, -1.0, 6.0, (1, .9, .78)), (-1.0, 2.2, 4.0, (.45, .8, 1))]
+    for i, (y0, y1, r, colour) in enumerate(tiers):
+        tier = Part(colour); tier.lathe([(0, y0, 0), (0, y1, 0)], [r, r], 56); tier.finish('Tier %d' % (i + 1), 'pink')
+        icing = Part((1, 1, 1))
+        icing.path([(math.cos(a) * (r + .1), y1 - .15 + .12 * math.sin(a * 9), math.sin(a) * (r + .1)) for a in np.linspace(0, 2 * math.pi, 72, endpoint=False)], .16, 6, closed=True)
+        for k in range(14):
+            a = k * 2 * math.pi / 14 + i
+            d = .5 + .5 * ((k * 7) % 3)
+            icing.tube((math.cos(a) * (r + .08), y1 - .1, math.sin(a) * (r + .08)), (math.cos(a) * (r + .1), y1 - d, math.sin(a) * (r + .1)), .13, .13, 6)
+            icing.sphere((math.cos(a) * (r + .1), y1 - d, math.sin(a) * (r + .1)), .17, 8, 5)
+        icing.finish('Icing %d' % (i + 1), 'white')
+        sprinkles = Part(lambda p: [(1, .75, .1), (.2, .9, 1), (1, .3, .7), (.5, 1, .4)][int((p.x * 7 + p.y * 13) % 4)])
+        for k in range(22):
+            a = k * 2.399 + i
+            y = y0 + (y1 - y0) * (.2 + .6 * ((k * .618) % 1))
+            sprinkles.sphere((math.cos(a) * (r + .08), y, math.sin(a) * (r + .08)), .22, 8, 5)
+        sprinkles.finish('Sprinkles %d' % (i + 1), 'gold')
+    plate = Part((.75, .85, 1)); plate.lathe([(0, -8.35, 0), (0, -8.05, 0)], [9.3, 9.1], 56); plate.finish('Plate', 'silver')
+    candles = Part(lambda p: (1, .3, .55) if int((p.y - 2.2) * 3.5) % 2 else (1, 1, 1))
+    spots = [(0, 0), (2.4, .8), (-2.4, .8), (1.4, -2.2), (-1.4, -2.2)]
+    for x, z in spots:
+        candles.tube((x, 2.2, z), (x, 4.8, z), .22, .22, 10)
+    candles.finish('Candles', 'white')
+    for i, (x, z) in enumerate(spots):
+        flame('Candle flame', (x, 4.85, z), 2.3, .55, twist=i, fire=False)
+    exhaust([-6, -2, 2, 6], -8.8, 0, 2.8, .45)
+
+def happy_day():
+    """HAPPY / DAY in extruded 3D letters with a rainbow sweep, a smile and sparkles."""
+    font_path = next((f for f in ('C:/Windows/Fonts/ariblk.ttf', '/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf') if pathlib.Path(f).exists()), None)
+    rainbow = lambda p: ramp([(-11, (1, .2, .45)), (-6, (1, .5, .1)), (-1.5, (1, .85, .15)), (2.5, (.3, 1, .45)), (6.5, (.15, .7, 1)), (11, (.65, .35, 1))], p.x)
+    for text, y_centre, width in (('HAPPY', 5.2, 22.5), ('DAY', -2.8, 13.5)):
+        curve = bpy.data.curves.new(text, 'FONT'); curve.body = text; curve.align_x = 'CENTER'; curve.align_y = 'CENTER'
+        if font_path:
+            curve.font = bpy.data.fonts.load(font_path, check_existing=True)
+        curve.extrude = .3; curve.bevel_depth = .05; curve.bevel_resolution = 2; curve.resolution_u = 6
+        obj = bpy.data.objects.new(text, curve); bpy.context.scene.collection.objects.link(obj)
+        bpy.context.view_layer.update()
+        me = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+        bpy.data.objects.remove(obj); bpy.data.curves.remove(curve)
+        xs = [v.co.x for v in me.vertices]; ys = [v.co.y for v in me.vertices]
+        k = width / (max(xs) - min(xs)); cx = (max(xs) + min(xs)) / 2; cy = (max(ys) + min(ys)) / 2
+        bm = bmesh.new(); bm.from_mesh(me); bpy.data.meshes.remove(me)
+        for v in bm.verts:
+            v.co = Vector(((v.co.x - cx) * k, (v.co.y - cy) * k + y_centre, v.co.z * 1.75))  # ~1.2 units deep: thin letters read cleanly
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        part = Part(rainbow); part.merge(bm); part.finish(text, 'gold', smooth=False)
+    smile = Part((1, .85, .3))
+    smile.path([(math.sin(a) * 7.2, -7.0 - math.cos(a) * 1.6 + 1.6, .2) for a in np.linspace(-1.15, 1.15, 30)], .22, 8)
+    smile.finish('Smile', 'gold')
+    sparkles = Part((1, 1, .92))
+    for x, y, r in [(-11.2, 9.6, 1.1), (11.4, 9.2, 1.3), (-9.6, -1.6, .9), (9.8, -1.2, 1.0), (0, 11.2, .8), (-4.8, -8.4, .6), (4.8, -8.4, .6)]:
+        pts = [(x + math.cos(a) * (r if i % 2 == 0 else r * .28), y + math.sin(a) * (r if i % 2 == 0 else r * .28)) for i, a in enumerate(np.linspace(0, 2 * math.pi, 8, endpoint=False))]
+        sparkles.prism(pts, -.15, .15)
+    sparkles.finish('Sparkles', 'white', smooth=False)
+    exhaust([-8, -3, 3, 8], -9.4, 0, 2.6, .4)
+
+BUILDERS = {'Robot': robot, 'Fish': fish, 'Butterfly': butterfly, 'Hot air balloon': balloon, 'Eiffel Tower': tower, 'Big ship': ship,
+            'Firework star': star, 'Row of fire': fire_row, 'Birthday cake': cake, 'Starship launch': starship, 'Happy day': happy_day}
 
 # ---------------------------------------------------------------- sampling
 def mesh_data(o):
@@ -519,8 +648,8 @@ for i, name in enumerate(NAMES):
         BUILDERS[name]()
     bpy.context.view_layer.update()
     objects = list(collection.all_objects)
-    body = sample([o for o in objects if not o.get('fire')], BODY, 100 + i)
-    fire = sample([o for o in objects if o.get('fire')], FIRE, 200 + i)
+    body = sample([o for o in objects if not o.get('fire')], BODY, 100 + SEEDS[name])
+    fire = sample([o for o in objects if o.get('fire')], FIRE, 200 + SEEDS[name])
     encoded[name] = {'body': encode(*body), 'fire': encode(*fire)}
     print('Exported', name, flush=True)
 if not EXPORT_ONLY:

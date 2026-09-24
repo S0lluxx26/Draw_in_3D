@@ -7,16 +7,17 @@ export const TIERS={
   battery:{bloom:false,reflection:0,bodies:false,pixelRatio:1,stars:.5}
 };
 export function detectTier(env={}){
-  const {mobile=false,cores=4,memory=4,saveData=false,maxTexture=4096,webgl2=true}=env;
-  if(saveData||!webgl2||maxTexture<4096)return 'battery';
+  const {mobile=false,cores=4,memory=4,saveData=false,maxTexture=4096,webgl2=true,software=false}=env;
+  if(software||saveData||!webgl2||maxTexture<4096)return 'battery';// CPU rasterizers (SwiftShader, llvmpipe) cannot afford post effects
   if(!mobile&&cores>=6&&memory>=4)return 'high';
   if(!mobile||(cores>=8&&memory>=6))return 'balanced';
   return 'battery';
 }
 export function browserEnvironment(renderer){
   const nav=globalThis.navigator||{},coarse=globalThis.matchMedia?.('(pointer:coarse)').matches;
+  let gpu='';try{const gl=renderer?.getContext?.(),info=gl?.getExtension('WEBGL_debug_renderer_info');gpu=info?gl.getParameter(info.UNMASKED_RENDERER_WEBGL):'';}catch{}
   return {mobile:/Android|iPhone|iPad|Mobile/i.test(nav.userAgent||'')||(!!coarse&&(nav.maxTouchPoints||0)>1),cores:nav.hardwareConcurrency||4,memory:nav.deviceMemory||4,
-    saveData:!!nav.connection?.saveData,maxTexture:renderer?.capabilities?.maxTextureSize??4096,webgl2:renderer?.capabilities?.isWebGL2!==false};
+    saveData:!!nav.connection?.saveData,maxTexture:renderer?.capabilities?.maxTextureSize??4096,webgl2:renderer?.capabilities?.isWebGL2!==false,software:/SwiftShader|llvmpipe|Software|Basic Render/i.test(gpu)};
 }
 export function resolveTier(choice,env){return TIERS[choice]?choice:detectTier(env);}
 // Frame-time governor: lowers the render scale when frames are slow, recovers slowly when fast.

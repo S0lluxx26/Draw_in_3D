@@ -10,7 +10,8 @@ Everything is generated from fixed seeds, so the output is reproducible.
 Blender is Z-up; the glTF exporter converts to the app's Y-up. The audience
 camera sits at Blender -Y (app +Z) looking across the water toward +Y.
 Runtime code finds nodes and materials by the names used here:
-  nodes:     Drone (parent of DroneFrame and DroneLED), Beacons; the rest is scenery
+  nodes:     Drone (DroneFrame, DroneProps, DroneLED, DroneLow), Beacons, Ship_* (bobbing
+             vessels) and Pyro_* (firework launch points); the rest is scenery
   materials: Deck, DeckLights, Buildings, Roofs, Beacons, Shore, ShoreLights,
              Mountains, Hills, Bridge, BridgeLights, BuoyLights, DroneBody, DroneLED
 """
@@ -323,41 +324,194 @@ def build_stage(root):
     ridge('Hills', 2100, 2700, 6000, 30, 150, 0.0018, 3.0, M['Hills'], (.006, .01, .016), (.018, .03, .05))
     ridge('Mountains', 3600, 5200, 9000, 100, 560, 0.0007, 9.0, M['Mountains'], (.014, .024, .042), (.05, .07, .11))
 
+def cylinder(m, c, r, h, mat, sides=16, r2=None):
+    """Closed cylinder (or frustum) standing on centre c, height h."""
+    c = Vector(c); top = c + Vector((0, 0, h)); r2 = r if r2 is None else r2
+    ring = lambda z, rr: [Vector((c.x + math.cos(a) * rr, c.y + math.sin(a) * rr, z)) for a in (i * 2 * math.pi / sides for i in range(sides))]
+    lo, hi = ring(c.z, r), ring(top.z, r2)
+    for i in range(sides):
+        j = (i + 1) % sides
+        m.face([lo[i], lo[j], hi[j], hi[i]], None, mat)
+    m.face(hi, None, mat); m.face(lo[::-1], None, mat)
+
+def ellipsoid(m, c, r, mat, seg=18, rings=9, lat0=-math.pi / 2, lat1=math.pi / 2):
+    c = Vector(c)
+    p = lambda a, b: c + Vector((math.cos(a) * math.cos(b) * r[0], math.sin(a) * math.cos(b) * r[1], math.sin(b) * r[2]))
+    for j in range(rings):
+        b0 = lat0 + (lat1 - lat0) * j / rings; b1 = lat0 + (lat1 - lat0) * (j + 1) / rings
+        for i in range(seg):
+            a0, a1 = i * 2 * math.pi / seg, (i + 1) * 2 * math.pi / seg
+            m.face([p(a0, b0), p(a1, b0), p(a1, b1), p(a0, b1)], None, mat)
+
+def ring_path(m, c, radius, r, mat, segments=28, z=0.0):
+    c = Vector(c)
+    pts = [c + Vector((math.cos(a) * radius, math.sin(a) * radius, z)) for a in (i * 2 * math.pi / segments for i in range(segments + 1))]
+    for a, b in zip(pts, pts[1:]):
+        m.tube(a, b, r, 5, mat)
+
 def build_drone(root):
-    """0.62 m quadcopter: frame and rotors (one mesh) plus a separately tinted LED dome."""
-    body, led = bpy.data.materials['DroneBody'], bpy.data.materials['DroneLED']
-    frame = Mesh()
-    frame.box((0, 0, 0.0), (0.2, 0.2, 0.07), mat_side=0, mat_top=0)
-    frame.box((0, 0, 0.05), (0.12, 0.14, 0.04), mat_side=0, mat_top=0)
+    """Light-show quadcopter, 0.56 m span: rounded shell, carbon arms, motors, twisted
+    two-blade props inside guards, battery, GPS puck, landing gear and an LED pod.
+    DroneFrame + DroneProps are the close-up model, DroneLow the distant one."""
+    mats = [bpy.data.materials[n] for n in ('DroneShell', 'DroneCarbon', 'DroneMotor', 'DroneBattery')]
+    SHELL, CARBON, MOTOR, BATTERY = range(4)
+    frame, props, low = Mesh(), Mesh(), Mesh()
+    ellipsoid(frame, (0, 0, 0.012), (0.105, 0.078, 0.034), SHELL, 20, 8, 0, math.pi / 2)  # canopy
+    ellipsoid(frame, (0, 0, 0.012), (0.105, 0.078, 0.03), CARBON, 20, 5, -math.pi / 2, 0)  # belly pan
+    frame.box((0, 0.004, 0.05), (0.12, 0.066, 0.03), mat_side=BATTERY, mat_top=BATTERY)
+    frame.box((0, 0.004, 0.066), (0.122, 0.018, 0.003), mat_side=MOTOR, mat_top=MOTOR)  # battery strap
+    frame.tube((0, -0.056, 0.03), (0, -0.056, 0.095), 0.003, 6, CARBON)
+    cylinder(frame, (0, -0.056, 0.095), 0.02, 0.008, SHELL, 16)  # GPS puck on a mast behind the battery
+    for sx in (-1, 1):
+        frame.tube((sx * 0.03, 0.07, 0.03), (sx * 0.036, 0.078, 0.08), 0.002, 4, CARBON)  # antennas
+        frame.tube((sx * 0.05, -0.06, -0.01), (sx * 0.075, -0.06, -0.085), 0.0045, 6, CARBON)  # landing gear
+        frame.tube((sx * 0.05, 0.06, -0.01), (sx * 0.075, 0.06, -0.085), 0.0045, 6, CARBON)
+        frame.tube((sx * 0.075, -0.085, -0.085), (sx * 0.075, 0.085, -0.085), 0.005, 6, CARBON)
     for sx in (-1, 1):
         for sy in (-1, 1):
-            tip = Vector((sx * 0.21, sy * 0.21, 0.01))
-            frame.tube((sx * 0.06, sy * 0.06, 0.0), tip, 0.014, 6, 0)
-            frame.tube(tip - Vector((0, 0, 0.02)), tip + Vector((0, 0, 0.035)), 0.028, 10, 0)
-            # Rotor disc (two blades as flat quads) reads at close range.
-            c = tip + Vector((0, 0, 0.04))
-            for a in (0.4 + sx * sy * 0.3, 0.4 + sx * sy * 0.3 + math.pi / 2):
-                d = Vector((math.cos(a), math.sin(a), 0)) * 0.12
-                n = Vector((-math.sin(a), math.cos(a), 0)) * 0.012
-                frame.face([c - d - n, c + d - n, c + d + n, c - d + n])
-                frame.face([c - d + n, c + d + n, c + d - n, c - d - n])
-    for sx in (-1, 1):  # landing skids
-        frame.tube((sx * 0.07, -0.09, -0.035), (sx * 0.07, -0.09, -0.1), 0.006, 4, 0)
-        frame.tube((sx * 0.07, 0.09, -0.035), (sx * 0.07, 0.09, -0.1), 0.006, 4, 0)
-        frame.tube((sx * 0.07, -0.12, -0.1), (sx * 0.07, 0.12, -0.1), 0.007, 4, 0)
-    f = frame.object('DroneFrame', [body], root)
-    bulb = Mesh()
-    for i in range(8):  # hemispherical LED dome under the body
-        a0, a1 = i * math.pi / 4, (i + 1) * math.pi / 4
-        for j in range(3):
-            b0, b1 = j * math.pi / 6, (j + 1) * math.pi / 6
-            p = lambda a, b: (math.cos(a) * math.cos(b) * 0.045, math.sin(a) * math.cos(b) * 0.045, -0.035 - math.sin(b) * 0.045)
-            bulb.face([p(a0, b0), p(a1, b0), p(a1, b1), p(a0, b1)][::-1])
-    l = bulb.object('DroneLED', [led], root, smooth=True)
+            motor = Vector((sx * 0.19, sy * 0.19, 0.0))
+            frame.tube((sx * 0.07, sy * 0.045, 0.004), motor + Vector((0, 0, 0.004)), 0.011, 8, CARBON)
+            frame.box(tuple(Vector((sx * 0.075, sy * 0.05, 0.004))), (0.022, 0.022, 0.018), mat_side=CARBON, mat_top=CARBON)  # arm clamp
+            cylinder(frame, motor - Vector((0, 0, 0.012)), 0.021, 0.03, MOTOR, 18)
+            cylinder(frame, motor + Vector((0, 0, 0.018)), 0.011, 0.01, MOTOR, 12, 0.007)
+            ring_path(frame, motor, 0.127, 0.0042, CARBON, 32, 0.042)  # prop guard
+            ring_path(frame, motor, 0.127, 0.003, CARBON, 32, 0.022)
+            for a in (math.atan2(sy, sx) + math.pi * .75, math.atan2(sy, sx) - math.pi * .75):
+                d = Vector((math.cos(a), math.sin(a), 0))
+                frame.tube(motor + d * 0.02 + Vector((0, 0, 0.01)), motor + d * 0.127 + Vector((0, 0, 0.042)), 0.003, 4, CARBON)
+            # Two twisted, tapered blades; spin direction alternates by quadrant.
+            hub = motor + Vector((0, 0, 0.034))
+            for blade in (0, math.pi):
+                a = 0.6 * sx * sy + blade
+                d = Vector((math.cos(a), math.sin(a), 0)); n = Vector((-math.sin(a), math.cos(a), 0)) * (sx * sy)
+                stations = []
+                for k in range(8):
+                    t = k / 7; radius = 0.012 + 0.098 * t
+                    chord = 0.017 + 0.011 * math.sin(math.pi * min(1, t * 1.3)) - 0.012 * t * t
+                    twist = math.radians(24 - 16 * t)
+                    centre = hub + d * radius
+                    lead = centre + n * (chord / 2 * math.cos(twist)) + Vector((0, 0, chord / 2 * math.sin(twist)))
+                    trail = centre - n * (chord / 2 * math.cos(twist)) - Vector((0, 0, chord / 2 * math.sin(twist)))
+                    stations.append((lead, trail))
+                for (l0, t0), (l1, t1) in zip(stations, stations[1:]):
+                    props.face([l0, l1, t1, t0], None, 0); props.face([t0, t1, l1, l0], None, 0)
+            cylinder(props, hub - Vector((0, 0, 0.004)), 0.009, 0.008, 0, 10)
+    f = frame.object('DroneFrame', mats, root, smooth=False)
+    pr = props.object('DroneProps', [bpy.data.materials['DroneProp']], root)
+    pod = Mesh()
+    cylinder(pod, (0, 0, -0.034), 0.03, 0.01, 0, 18)
+    ellipsoid(pod, (0, 0, -0.034), (0.03, 0.03, 0.028), 0, 18, 6, -math.pi / 2, 0)
+    led = pod.object('DroneLED', [bpy.data.materials['DroneLED']], root, smooth=True)
+    # Distant level of detail: ~150 triangles, one material.
+    low.box((0, 0, 0.02), (0.2, 0.15, 0.07), mat_side=0, mat_top=0)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            low.tube((sx * 0.06, sy * 0.04, 0.01), (sx * 0.19, sy * 0.19, 0.01), 0.012, 4, 0)
+            c = Vector((sx * 0.19, sy * 0.19, 0.04))
+            pts = [c + Vector((math.cos(a) * 0.127, math.sin(a) * 0.127, 0)) for a in (i * 2 * math.pi / 10 for i in range(10))]
+            low.face(pts, None, 0); low.face(pts[::-1], None, 0)
+    lo = low.object('DroneLow', [bpy.data.materials['DroneLow']], root)
     empty = bpy.data.objects.new('Drone', None)
     root.objects.link(empty)
-    f.parent = empty; l.parent = empty
+    for o in (f, pr, led, lo):
+        o.parent = empty
     empty.location = (0, 0, -60)  # parked below the water; the app reads it by name
+
+def build_ships(root):
+    """Vessels on the harbour. Barges and the yacht carry Pyro_* launch points."""
+    M = {n: i for i, n in enumerate(('ShipHull', 'ShipDeck', 'ShipMetal', 'ShipCabin', 'ShipWindows', 'ShipLights', 'NavRed', 'NavGreen', 'StringRed', 'StringGold', 'StringBlue', 'ShipSail'))}
+    mats = [bpy.data.materials[n] for n in M]
+    def place(m, name, location, heading, pyro=(), scale=1.0):
+        o = m.object(name, mats, root)
+        o.location = location; o.rotation_euler = (0, 0, math.radians(heading)); o.scale = (scale,) * 3
+        for i, p in enumerate(pyro):
+            e = bpy.data.objects.new('Pyro_%s_%d' % (name.split('_', 1)[1], i), None)
+            root.objects.link(e); e.parent = o; e.location = p
+        return o
+    def nav(m, bow_x, beam, z):
+        m.light((bow_x, beam, z), 0.35, M['NavRed']); m.light((bow_x, -beam, z), 0.35, M['NavGreen'])
+    def string(m, pts, sag, spacing, r=0.28):
+        k = 0
+        for a, b in zip(pts, pts[1:]):
+            a, b = Vector(a), Vector(b); n = max(2, int((b - a).length / spacing))
+            for i in range(n):
+                t = i / n
+                p = a + (b - a) * t - Vector((0, 0, sag * 4 * t * (1 - t)))
+                m.light(p, r, (M['StringRed'], M['StringGold'], M['StringBlue'])[k % 3]); k += 1
+    def barge(name, location, heading):
+        m = Mesh()
+        m.box((0, 0, -0.2), (36, 12, 2.8), mat_side=M['ShipHull'], mat_top=M['ShipDeck'])
+        for dx in (-18.6, 18.6):  # raked ends
+            s = 1 if dx > 0 else -1
+            m.face([(s * 18, -6, 1.2), (s * 20, -6, 0.2), (s * 20, 6, 0.2), (s * 18, 6, 1.2)][::s], None, M['ShipHull'])
+        for rack in (-5, 2, 9):
+            m.box((rack, 0, 1.6), (4.2, 8.4, 0.8), mat_side=M['ShipMetal'], mat_top=M['ShipMetal'])
+            for i in range(4):
+                for j in range(7):
+                    base = Vector((rack - 1.5 + i, -3.3 + j * 1.1, 2.0))
+                    m.tube(base, base + Vector((0.18 * (i - 1.5), 0.1 * (j - 3), 1.3)), 0.2, 6, M['ShipMetal'])
+        m.box((-13.5, 0, 2.6), (5, 4.4, 2.8), mat_side=M['ShipCabin'], mat_top=M['ShipMetal'])
+        for y in (-1.2, 0.2, 1.6):
+            m.box((-11.0, y - 0.4, 2.9), (0.05, 0.8, 0.7), mat_side=M['ShipWindows'], mat_top=M['ShipWindows'])
+        m.tube((15, 0, 1.2), (15, 0, 9.5), 0.14, 6, M['ShipMetal']); m.light((15, 0, 9.8), 0.4, M['ShipLights'])
+        for x in range(-17, 18, 3):
+            for y in (-5.8, 5.8):
+                m.light((x, y, 1.7), 0.18, M['ShipLights'])
+        nav(m, 17, 5.9, 2.2)
+        return place(m, name, location, heading, pyro=[(2, 0, 3.4)], scale=1.7)
+    def yacht(name, location, heading):
+        m = Mesh()
+        stations = []
+        for x in [-22, -18, -12, -6, 0, 6, 12, 17, 21, 24]:
+            t = (x + 22) / 46
+            beam = 4.4 * (1 - max(0, (t - .7) / .3) ** 1.8) + .08
+            deck = 2.2 + 1.2 * max(0, t - .75) ** 1.4 * 4
+            keel = -1.8 + 1.6 * max(0, t - .85) / .15
+            stations.append([(x, beam * math.sin(math.pi / 2 * f) ** .5, keel + (deck - keel) * f) for f in (0, .25, .5, .75, 1)])
+        for s0, s1 in zip(stations, stations[1:]):
+            for side in (1, -1):
+                for k in range(4):
+                    q = [s0[k], s1[k], s1[k + 1], s0[k + 1]]
+                    q = [(x, y * side, z) for x, y, z in q]
+                    m.face(q if side > 0 else q[::-1], None, M['ShipHull'])
+            m.face([(s0[4][0], -s0[4][1], s0[4][2]), (s1[4][0], -s1[4][1], s1[4][2]), (s1[4][0], s1[4][1], s1[4][2]), (s0[4][0], s0[4][1], s0[4][2])], None, M['ShipDeck'])
+        m.face([(-22, y, z) for x, y, z in stations[0]] + [(-22, -y, z) for x, y, z in stations[0][:0:-1]], None, M['ShipHull'])  # transom
+        for (x, w, l, z) in [(-4, 7.2, 26, 3.6), (-2, 6.0, 18, 5.6), (0, 4.4, 9, 7.4)]:
+            m.box((x, 0, z), (l, w, 2.0), mat_side=M['ShipCabin'], mat_top=M['ShipCabin'])
+            for s in (-1, 1):
+                m.box((x, s * (w / 2 + 0.03), z + 0.2), (l * 0.86, 0.06, 0.7), mat_side=M['ShipWindows'], mat_top=M['ShipWindows'])
+        m.tube((2, 0, 8.4), (2, 0, 20), 0.18, 6, M['ShipMetal']); m.light((2, 0, 20.3), 0.45, M['ShipLights'])
+        string(m, [(23.5, 0, 4.6), (2, 0, 20), (-21.5, 0, 3.4)], 1.4, 1.2)
+        nav(m, 16, 3.6, 4)
+        return place(m, name, location, heading, pyro=[(-17, 0, 3.6)], scale=1.8)
+    def tug(name, location, heading):
+        m = Mesh()
+        m.box((0, 0, 0.2), (20, 7.5, 2.8), mat_side=M['ShipHull'], mat_top=M['ShipDeck'])
+        m.box((2, 0, 3.0), (6, 5.2, 2.8), mat_side=M['ShipCabin'], mat_top=M['ShipMetal'])
+        m.box((2.5, 0, 5.2), (3.6, 4.2, 1.6), mat_side=M['ShipCabin'], mat_top=M['ShipMetal'])
+        for s in (-1, 1):
+            m.box((2.5, s * 2.13, 5.3), (3.2, 0.05, 0.6), mat_side=M['ShipWindows'], mat_top=M['ShipWindows'])
+        m.tube((-1, 0, 4.4), (-1, 0, 8.2), 0.5, 10, M['ShipMetal'])
+        m.tube((4.5, 0, 6), (4.5, 0, 11), 0.1, 6, M['ShipMetal']); m.light((4.5, 0, 11.3), 0.35, M['ShipLights'])
+        for y in (-3.9, 3.9):
+            for x in range(-9, 10, 2):
+                m.light((x, y, 1.9), 0.14, M['ShipLights'])
+        nav(m, 8, 3.9, 3)
+        return place(m, name, location, heading, scale=1.5)
+    def sailboat(name, location, heading):
+        m = Mesh()
+        m.box((0, 0, 0), (8.5, 2.6, 1.4), mat_side=M['ShipCabin'], mat_top=M['ShipDeck'])
+        m.tube((0.5, 0, 0.7), (0.5, 0, 12), 0.08, 5, M['ShipMetal']); m.light((0.5, 0, 12.2), 0.28, M['ShipLights'])
+        m.face([(0.6, 0, 1.4), (0.6, 0, 11.5), (-3.6, 0, 1.6)], None, M['ShipSail']); m.face([(-3.6, 0, 1.6), (0.6, 0, 11.5), (0.6, 0, 1.4)], None, M['ShipSail'])
+        nav(m, 3.5, 1.3, 1.2)
+        return place(m, name, location, heading, scale=1.4)
+    # Blender (x, y, z) = app (x, -z, y); the water surface is at z = -1.1.
+    barge('Ship_BargeWest', (-270, 270, -1.1), 8)
+    barge('Ship_BargeEast', (285, 250, -1.1), -12)
+    yacht('Ship_Yacht', (-175, 410, -1.1), 2)
+    tug('Ship_Tug', (200, 560, -1.1), 25)
+    for i, (x, y, h) in enumerate([(-520, 220, 40), (500, 480, -30), (-300, 640, 70)]):
+        sailboat('Ship_Sail%d' % i, (x, y, -1.1), h)
 
 def build():
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -374,10 +528,28 @@ def build():
     material('Bridge', base=(0.03, 0.035, 0.045), rough=0.5, metal=0.6)
     material('BridgeLights', emit=(0.75, 0.88, 1.0), strength=7.0)
     material('BuoyLights', emit=(1.0, 0.95, 0.85), strength=6.0)
-    material('DroneBody', base=(0.035, 0.038, 0.045), rough=0.35, metal=0.55)
+    material('DroneShell', base=(0.62, 0.64, 0.68), rough=0.32, metal=0.0)
+    material('DroneCarbon', base=(0.018, 0.019, 0.022), rough=0.38, metal=0.25)
+    material('DroneMotor', base=(0.42, 0.44, 0.5), rough=0.28, metal=0.9)
+    material('DroneBattery', base=(0.05, 0.055, 0.065), rough=0.55)
+    material('DroneProp', base=(0.03, 0.03, 0.035), rough=0.45)
+    material('DroneLow', base=(0.2, 0.21, 0.24), rough=0.5, metal=0.3)
     material('DroneLED', base=(0.9, 0.9, 0.9), emit=(1, 1, 1), strength=2.0, rough=0.2)
+    material('ShipHull', base=(0.06, 0.03, 0.03), rough=0.55, metal=0.2)
+    material('ShipDeck', base=(0.08, 0.07, 0.06), rough=0.8)
+    material('ShipMetal', base=(0.09, 0.095, 0.1), rough=0.45, metal=0.7)
+    material('ShipCabin', base=(0.55, 0.57, 0.6), rough=0.45)
+    material('ShipSail', base=(0.6, 0.6, 0.62), rough=0.8)
+    material('ShipWindows', emit=(1.0, 0.78, 0.5), strength=5.0)
+    material('ShipLights', emit=(1.0, 0.9, 0.75), strength=6.0)
+    material('NavRed', emit=(1.0, 0.05, 0.03), strength=8.0)
+    material('NavGreen', emit=(0.1, 1.0, 0.3), strength=7.0)
+    material('StringRed', emit=(1.0, 0.15, 0.1), strength=6.0)
+    material('StringGold', emit=(1.0, 0.7, 0.2), strength=6.0)
+    material('StringBlue', emit=(0.3, 0.6, 1.0), strength=6.0)
     env = collection('Environment')
     build_stage(env)
+    build_ships(env)
     build_drone(collection('DroneModel'))
     # A camera matching the app's audience view makes the .blend immediately previewable.
     cam = bpy.data.objects.new('Audience camera', bpy.data.cameras.new('Audience camera'))

@@ -5,7 +5,7 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = path.join(root, 'dist');
 await mkdir(path.join(dist, 'vendor'), { recursive: true });
-const files=['index.html', 'style.css', 'editor-tools.css', 'editor.js', 'editor-look.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'show-camera.js', 'quality.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'sky-stage.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'show-editor.css', 'show-worker.js', 'show-recorder.js'];
+const files=['index.html', 'style.css', 'editor-tools.css', 'editor.js', 'editor-look.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'show-camera.js', 'quality.js', 'pyro.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'sky-stage.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'show-editor.css', 'show-worker.js', 'show-recorder.js', 'show-music.js'];
 const binaries=['assets/sky-stage.glb'];
 const sources=await Promise.all(files.map(file=>readFile(path.join(root,'src',file),'utf8')));
 const binaryData=await Promise.all(binaries.map(file=>readFile(path.join(root,'src',file))));

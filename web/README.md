@@ -1,4 +1,4 @@
-# Draw in 3D — browser studio 0.13.0
+# Draw in 3D — browser studio 0.14.0
 
 **Current: Show editor → Edit demo** lets you author formations, arrange a show, save/recover it and record a 720p video. [Start here](../docs/SHOW_EDITOR_GUIDE.md).
 
@@ -64,6 +64,6 @@ See [`../docs/WEB_INTEROP.md`](../docs/WEB_INTEROP.md) for contract details and 
 
 ## Studio 10 show authoring
 
-Use **Show editor → Edit demo** to edit source artwork, arrange formation cards, set timing/lights/placement, and save or open `.show.json` files. **Play my show → Record video** exports a silent real-time 720p recording. Show drafts are separate from drawing drafts. [Walkthrough](../docs/SHOW_EDITOR_GUIDE.md), [architecture and review](../docs/SHOW_AUTHORING_PLAN.md). Native Android does not import show documents; the Android browser can use this web workflow.
+Use **Show editor → Edit demo** to edit source artwork, arrange formation cards, set timing/lights/placement, and save or open `.show.json` files. **Play my show → Record video** exports a real-time 720p recording with the show music (silent when ♪ Music is off). Show drafts are separate from drawing drafts. [Walkthrough](../docs/SHOW_EDITOR_GUIDE.md), [architecture and review](../docs/SHOW_AUTHORING_PLAN.md). Native Android does not import show documents; the Android browser can use this web workflow.
 
 Studio 11 adds a 4,096-drone default fleet, larger LEDs, red/blue takeoff and landing flashes, editable ship/star/fire-row/Starship scenes, and motion presets. [Details](../docs/STUDIO11.md).

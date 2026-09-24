@@ -12,7 +12,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
 opt = lambda name, default: args[args.index(name) + 1] if name in args else default
 SAMPLES, FORMATION = int(opt('--samples', 160)), opt('--formation', 'Fish')
-OUT = ROOT / 'docs' / 'media' / 'sky-studio-hero.jpg'
+FIREWORKS = '--fireworks' in args
+OUT = ROOT / 'docs' / 'media' / opt('--out', 'sky-studio-hero.jpg')
 
 def formation(name):
     text = (ROOT / 'web/src/formation-assets.js').read_text()
@@ -50,6 +51,31 @@ lt.links.new(col.outputs['Color'], emit.inputs['Color']); lt.links.new(emit.outp
 setmat.inputs['Material'].default_value = led_mat
 links.new(gi.outputs['Geometry'], to_points.inputs['Mesh']); links.new(to_points.outputs['Points'], setmat.inputs['Geometry']); links.new(setmat.outputs['Geometry'], go.inputs['Geometry'])
 gn.node_group = tree
+
+# Ship fireworks: burst shells from the barges (same drag/gravity model as web/src/pyro.js).
+if FIREWORKS:
+    rng = np.random.default_rng(7)
+    shells = [((-267, 270), 205, 62, 'peony', (1, .45, .2)), ((288, 250), 190, 55, 'ring', (.3, .7, 1)), ((-206, 409), 235, 70, 'willow', (1, .7, .25)), ((288, 250), 250, 48, 'peony', (.6, 1, .5))]
+    pts, cols = [], []
+    for (x, y), h, radius, pattern, colour in shells:
+        n = 170
+        for i in range(n):
+            if pattern == 'ring':
+                a = i * 2 * np.pi / n; d = np.array([np.cos(a), .2 * np.sin(a), np.sin(a) * .98])
+            else:
+                z = 1 - 2 * (i + .5) / n; r = np.sqrt(1 - z * z); a = i * 2.3999; d = np.array([np.cos(a) * r, np.sin(a) * r, z])
+            d /= np.linalg.norm(d)
+            for k, ts in enumerate(np.linspace(1.15, .75, 6)):  # a star and its fading trail
+                spread = (1 - np.exp(-1.5 * ts)) / 1.5 * radius * 1.5
+                droop = .5 * 9.81 * (1 if pattern == 'willow' else .55) * ts * ts
+                pts.append((x + d[0] * spread, y - d[2] * spread, h + d[1] * spread - droop))
+                cols.append(tuple(c * (1 - k / 6) ** 1.5 for c in colour))
+    fme = bpy.data.meshes.new('Fireworks'); fme.from_pydata(pts, [], []); fme.update()
+    fa = fme.color_attributes.new('led', 'FLOAT_COLOR', 'POINT')
+    for i, c in enumerate(cols):
+        fa.data[i].color = (*c, 1)
+    fw = bpy.data.objects.new('Fireworks', fme); scene.collection.objects.link(fw)
+    fmod = fw.modifiers.new('points', 'NODES'); fmod.node_group = tree
 
 # Water: dark gloss with gentle ripples reflects the show and the skyline.
 bpy.ops.mesh.primitive_plane_add(size=40000, location=(0, 0, -1.1))

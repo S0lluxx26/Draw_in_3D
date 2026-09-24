@@ -356,9 +356,12 @@ $('sheet-depth').onchange=()=>finishDepth();$('sheet-depth').onpointerup=()=>fin
 $('sheet-depth').onpointercancel=()=>finishDepth(true);$('sheet-depth').onblur=()=>finishDepth();
 $('sheet-depth').onkeydown=event=>{if(event.key==='Escape'){event.preventDefault();event.stopPropagation();finishDepth(true);}};
 
+// A shared …/#demo link opens straight into the Demo; leaving it drops the hash so a reload opens the editor.
+const demoLink=()=>/^#demo$/i.test(location.hash);
 // The show uses a separate scene and camera; authored entities/history are untouched.
 dronePlayer=new DronePlayer(renderer,canvas,requestFrame,()=>{
   document.body.classList.remove('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=false;
+  if(demoLink())window.history.replaceState(null,'',location.pathname+location.search);// `history` here is the undo stack
   controls.enabled=true;updateUI();requestFrame();const back=showReturn;showReturn=null;if(back)back();else $('drone-demo').focus({preventScroll:true});
 });
 function startDroneShow(useDrawing=false,compiled=null,onReturn=null,atTime){
@@ -371,6 +374,8 @@ function startDroneShow(useDrawing=false,compiled=null,onReturn=null,atTime){
   }catch(error){if(dronePlayer.active)dronePlayer.stop();document.body.classList.remove('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=false;controls.enabled=true;notify(error.message,true);}
 }
 installDemoSettings({play:show=>startDroneShow(false,show),player:()=>dronePlayer,notify});$('drone-drawing').onclick=()=>startDroneShow(true);
+if(demoLink())requestAnimationFrame(()=>$('drone-demo').click());
+addEventListener('hashchange',()=>{if(demoLink()&&!dronePlayer.active)$('drone-demo').click();});
 
 function updateFormationDots(){
   formationDots.visible=!!formationSession&&$('formation-dots').checked;

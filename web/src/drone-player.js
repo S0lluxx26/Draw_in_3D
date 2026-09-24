@@ -9,14 +9,17 @@ import {directorView,framingAt} from './show-camera.js';
 import {SkyStage,loadStageAsset,stageScale} from './sky-stage.js';
 import {TIERS,QUALITY_LEVELS,resolveTier,browserEnvironment,FrameGovernor} from './quality.js';
 import {ShowRecorder} from './show-recorder.js';
+import {ShowMusic} from './show-music.js';
 import {hardenOrbit} from './editor-look.js';
+// The show waits at 00:00 for its scenery, but never longer than this on a stalled connection.
+const STAGE_WAIT_MS=15000;
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
 const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);},QUALITY_KEY='draw3d-graphics-v1';
 // LEDs: HDR point sprites sized in world metres (so previews and 720p recordings match),
 // with an energy-preserving minimum size so distant lights shimmer less.
-const LED_VERTEX=`attribute vec3 color;uniform float ledSize,viewport,minSize;varying vec3 vColor;varying float vEnergy;
+const LED_VERTEX=`attribute vec3 color;uniform float ledSize,ledNear,viewport,minSize;varying vec3 vColor;varying float vEnergy;
 void main(){vec4 mv=modelViewMatrix*vec4(position,1.);gl_Position=projectionMatrix*mv;
-  float px=ledSize*projectionMatrix[1][1]*viewport*.5/max(-mv.z,.001),size=clamp(px,minSize,110.);
+  float px=ledSize*clamp(-mv.z/ledNear,.16,1.)*projectionMatrix[1][1]*viewport*.5/max(-mv.z,.001),size=clamp(px,minSize,110.);// glow tightens up close so the drone shows
   vEnergy=px<minSize?px*px/(minSize*minSize):1.;vColor=pow(max(color,vec3(0.)),vec3(2.2));vColor*=min(1.,.55/max(dot(vColor,vec3(.2126,.7152,.0722)),1e-4));
   if(max(vColor.r,max(vColor.g,vColor.b))<1e-6)gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=size;}`;
 const LED_FRAGMENT=`uniform int lightShape;uniform float gain;varying vec3 vColor;varying float vEnergy;
@@ -32,23 +35,28 @@ export class DronePlayer{
   active=false;
   constructor(renderer,canvas,requestFrame,onExit){
     Object.assign(this,{renderer,canvas,requestFrame,onExit});
-    this.recorder=new ShowRecorder(this);this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.recorder=new ShowRecorder(this);this.music=new ShowMusic(()=>this.active?this.clock:null);this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
     try{this.quality=QUALITY_LEVELS.includes(localStorage.getItem(QUALITY_KEY))?localStorage.getItem(QUALITY_KEY):'auto';}catch{this.quality='auto';}
-    $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{this.clock.seek(0,performance.now());this.clock.play(performance.now());this.refresh();};
+    $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{const now=performance.now();this.clock.seek(0,now);if(this.waiting)this.autoplay=true;else this.clock.play(now);this.refresh();};
+    // A locked button asks for the tap browsers require before sound; otherwise it mutes and unmutes.
+    $('show-music').onclick=()=>{if(this.music.state==='locked')this.music.prime();else this.music.toggle();if(!this.recorder.active)this.recorder.reset();this.syncMusic();};
     $('show-exit').onclick=()=>this.stop();$('show-speed').onchange=()=>{this.clock.speed(Number($('show-speed').value),performance.now());this.refresh();};
     $('show-scrub').oninput=()=>this.seek(Number($('show-scrub').value));
     $('show-trails').onchange=()=>this.refresh();$('show-front').onclick=()=>{this.front(true);this.refresh();};
     window.addEventListener('keydown',event=>{if(!this.active||$('demo-settings')?.open)return;if(event.key==='Escape'){event.preventDefault();this.stop();return;}if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName))return;if(event.code==='Space'){event.preventDefault();this.toggle();}});
     // Fetch the harbour scenery as soon as the user shows interest in a show.
     for(const id of ['drone-demo','show-editor','drone-drawing'])$(id)?.addEventListener('pointerenter',()=>loadStageAsset(),{once:true});
+    // Unlock audio inside the gesture itself; Safari refuses once the Demo's assets have loaded.
+    for(const id of ['drone-demo','drone-drawing'])$(id)?.addEventListener('pointerdown',()=>this.music.prime());
   }
   setQuality(choice){
     if(!QUALITY_LEVELS.includes(choice)||choice===this.quality)return;this.quality=choice;try{localStorage.setItem(QUALITY_KEY,choice);}catch{}
-    if(!this.active||this.recorder.active)return;const time=this.clock.time,playing=this.clock.playing,rate=this.clock.rate;this.start(this.show);this.clock.seek(time,performance.now());this.clock.speed(rate,performance.now());if(!playing)this.clock.pause(performance.now());this.refresh();
+    if(!this.active||this.recorder.active)return;const time=this.clock.time,playing=this.clock.playing||this.waiting&&this.autoplay,rate=this.clock.rate;this.start(this.show);this.clock.seek(time,performance.now());this.clock.speed(rate,performance.now());this.autoplay=playing;this.refresh();
   }
+  syncMusic(){const b=$('show-music'),state=this.music.state,label={on:'Music on',off:'Music off',locked:'Tap for sound',unavailable:'No audio'}[state];if(b.dataset.state!==state){b.dataset.state=state;b.querySelector('.music-label').textContent=' '+label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(state==='on'));b.disabled=state==='unavailable';b.classList.toggle('locked',state==='locked');}}
   start(show){
     if(this.active)this.teardown();
-    this.show=show;$('show-demo-settings').hidden=!show.demo;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:2},()=>createFrame(show));
+    this.show=show;$('show-demo-settings').hidden=!show.demo;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:2},()=>createFrame(show));this.velocityFrame=createFrame(show);
     this.tierName=resolveTier(this.quality,browserEnvironment(this.renderer));this.tier=TIERS[this.tierName];
     const r=this.renderer;this.saved={toneMapping:r.toneMapping,exposure:r.toneMappingExposure,pixelRatio:r.getPixelRatio()};
     r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.05;this.basePixelRatio=Math.min(devicePixelRatio||1,this.tier.pixelRatio);r.setPixelRatio(this.basePixelRatio);
@@ -57,18 +65,27 @@ export class DronePlayer{
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(46,1,.25*s,20000*s);
     this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.orbit.minDistance=8*s;this.orbit.maxDistance=3200*s;this.orbit.maxPolarAngle=Math.PI*.64;this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
     this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
-    this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;
+    this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;this.waiting=true;this.autoplay=true;
     this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r});this.createDrones();this.precrowd(show);
     if(this.tier.bloom){
       this.composer=new EffectComposer(r,new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:this.tierName==='high'?4:0}));
       this.composer.addPass(new RenderPass(this.scene,this.camera));this.bloom=new UnrealBloomPass(new THREE.Vector2(256,256),.78,.55,1.05);this.composer.addPass(this.bloom);this.composer.addPass(new OutputPass());
     }
     const loading=$('show-loading');loading.hidden=false;
-    loadStageAsset().then(gltf=>{if(this.show!==show||!this.active)return;this.stage.attach(gltf);loading.hidden=true;if(!gltf)$('show-quality').textContent+=' · scenery unavailable';this.refresh();});
+    // The clock holds at 00:00 until the scenery is ready, so a first visit over the network still
+    // opens on the launch-pad close-up instead of joining the show part-way through.
+    // A quality change restarts the same show, so callbacks check the run rather than the show.
+    const run=this.run=(this.run||0)+1,current=()=>this.run===run&&this.active;
+    const ready=()=>{if(!current()||!this.waiting)return;this.waiting=false;if(this.autoplay)this.clock.play(performance.now());if(!this.recorder.active)this.recorder.reset();this.refresh();};
+    setTimeout(ready,STAGE_WAIT_MS);
+    // Compile every stage shader off the main path before hiding the loader, so the first close-up
+    // of detailed drones does not stall (D3D shader compiles can take seconds).
+    loadStageAsset().then(async gltf=>{if(!current())return;this.stage.attach(gltf);try{await this.renderer.compileAsync?.(this.scene,this.camera);}catch{}if(!current())return;loading.hidden=true;if(!gltf)$('show-quality').textContent+=' · scenery unavailable';ready();this.refresh();});
     $('show-fleet').textContent=show.count.toLocaleString();$('show-tagline').textContent=show.count.toLocaleString()+' lights. One canvas. An open sky.';$('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
     $('show-quality').textContent={high:'CINEMATIC',balanced:'BALANCED',battery:'BATTERY SAVER'}[this.tierName];
     $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
-    this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.clock.play(performance.now());this.refresh();
+    this.music.start(show);this.syncMusic();
+    this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.refresh();
   }
   // Automatic director camera. smooth=true eases from a manual orbit back to it.
   front(smooth=false){if(!this.active)return;if(smooth&&!this.frontMode)this.blend={position:this.camera.position.toArray(),target:this.orbit.target.toArray(),start:performance.now()};this.frontMode=true;this.updateCamera(this.clock.time,performance.now());}
@@ -80,16 +97,16 @@ export class DronePlayer{
     this.camera.position.fromArray(position);this.orbit.target.fromArray(target);this.orbit.update();
   }
   resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();if(this.frontMode)this.front();this.force=true;}
-  refresh(){this.force=true;this.requestFrame();}
-  seek(time){if(this.recorder.active)return;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
-  toggle(){if(!this.active||this.recorder.active)return;const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}
-  suspend(){if(this.active){this.recorder.finish(true);this.clock.pause(performance.now());this.refresh();}}
+  refresh(){this.force=true;this.requestFrame();this.music.tick();}
+  seek(time){if(this.recorder.active)return;this.autoplay=false;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
+  toggle(){if(!this.active||this.recorder.active)return;if(this.waiting){this.autoplay=!this.autoplay;this.refresh();return;}const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}
+  suspend(){if(this.active){this.recorder.finish(true);this.autoplay=false;this.clock.pause(performance.now());this.refresh();}}
   createDrones(){
     const show=this.show,n=show.count,geo=new THREE.BufferGeometry();
     geo.setAttribute('position',new THREE.BufferAttribute(this.frame.positions,3).setUsage(THREE.DynamicDrawUsage));geo.setAttribute('color',new THREE.BufferAttribute(this.frame.colors,3).setUsage(THREE.DynamicDrawUsage));
     const ledSize=.24*this.scale*6*Math.sqrt(4096/n)**.5;
     const material=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexShader:LED_VERTEX,fragmentShader:LED_FRAGMENT,
-      uniforms:{lightShape:{value:Math.max(0,['round','diamond','star'].indexOf(show.lightShape))},ledSize:{value:ledSize},viewport:{value:720},minSize:{value:2},gain:{value:this.tier.bloom?5:3}}});
+      uniforms:{lightShape:{value:Math.max(0,['round','diamond','star'].indexOf(show.lightShape))},ledSize:{value:ledSize},ledNear:{value:150*this.scale},viewport:{value:720},minSize:{value:2},gain:{value:this.tier.bloom?5:3}}});
     this.lights=new THREE.Points(geo,material);this.lights.frustumCulled=false;this.lights.renderOrder=2;this.scene.add(this.lights);
     // Sprite size follows the target being rendered: canvas, bloom buffer or water reflection.
     this.lights.onBeforeRender=renderer=>{const target=renderer.getRenderTarget(),h=target?target.height:this.drawHeight||720,u=material.uniforms;u.viewport.value=h;u.minSize.value=Math.max(1,1.8*renderer.getPixelRatio()*h/(this.drawHeight||h));material.uniformsNeedUpdate=true;};
@@ -140,17 +157,18 @@ export class DronePlayer{
         for(let k=0;k<3;k++){P[o+k]=a[j+k];P[o+3+k]=P[o+6+k]=b[j+k];P[o+9+k]=c[j+k];C[o+k]=C[o+3+k]=C[o+6+k]=C[o+9+k]=col[j+k];}}
       this.trails.geometry.attributes.position.needsUpdate=true;this.trails.geometry.attributes.color.needsUpdate=true;
     }
-    this.stage.update(time,frame,this.camera,now);
+    this.stage.update(time,frame,this.camera,now,this.stage.wantsVelocity?sampleShow(this.show,time-.15,this.velocityFrame):null);
     if(this.composer)this.composer.render();else this.renderer.render(this.scene,this.camera);
     this.recorder.frame();
     if(now-this.lastUI>100||!this.clock.playing||$('show-phase').textContent!==frame.phase){
       this.lastUI=now;$('show-phase').textContent=frame.phase;$('show-time').textContent=stamp(time)+' / '+stamp(this.show.duration);$('show-scrub').value=time;
-      $('show-pause').textContent=this.clock.playing?'Ⅱ Pause':time>=this.show.duration?'↻ Replay':'▶ Play';$('show-pause').setAttribute('aria-label',this.clock.playing?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
+      const running=this.clock.playing||this.waiting&&this.autoplay;
+      $('show-pause').textContent=running?'Ⅱ Pause':time>=this.show.duration?'↻ Replay':'▶ Play';$('show-pause').setAttribute('aria-label',running?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
       $('show-progress').style.width=(100*time/this.show.duration)+'%';
       const cue=[...this.show.cues].reverse().find(c=>time>=c.time-1);for(const button of $('show-cues').children){const active=Number(button.dataset.time)===cue?.time;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
       let lit=0,sum=[0,0,0];const colors=frame.colors;for(let i=0;i<colors.length;i+=3){const r=colors[i],g=colors[i+1],b=colors[i+2];if(Math.max(r,g,b)>.05){lit++;sum[0]+=r;sum[1]+=g;sum[2]+=b;}}
       const glow=new THREE.Color().setRGB(...sum.map(v=>lit?(v/lit)**2.2:0)),center=framingAt(this.show,time).center;this.stage.setGlow(center,glow,1.6*lit/this.show.count);
-      $('show-lit').textContent=lit+' / '+this.show.count;$('show-play-state').textContent=this.clock.playing?'LIVE PREVIEW':time>=this.show.duration?'SHOW COMPLETE':'PAUSED';
+      $('show-lit').textContent=lit+' / '+this.show.count;$('show-play-state').textContent=this.waiting?'GETTING READY':this.clock.playing?'LIVE PREVIEW':time>=this.show.duration?'SHOW COMPLETE':'PAUSED';this.syncMusic();
     }
     return this.clock.playing||!!this.blend;
   }
@@ -158,10 +176,10 @@ export class DronePlayer{
     this.orbit.dispose();this.stage.dispose();this.composer?.dispose();this.bloom?.dispose();this.composer?.passes.forEach(p=>p.dispose?.());
     for(const o of [this.lights,this.trails]){o.geometry.dispose();o.material.dispose();}
     const r=this.renderer;r.toneMapping=this.saved.toneMapping;r.toneMappingExposure=this.saved.exposure;r.setPixelRatio(this.saved.pixelRatio);
-    this.scene=null;this.lights=null;this.trails=null;this.stage=null;this.composer=null;this.bloom=null;this.frame=null;this.trailFrames=null;this.trailPositions=null;this.trailColors=null;
+    this.scene=null;this.lights=null;this.trails=null;this.stage=null;this.composer=null;this.bloom=null;this.frame=null;this.trailFrames=null;this.velocityFrame=null;this.trailPositions=null;this.trailColors=null;
   }
   stop(){
-    if(!this.active)return;this.recorder.finish(true);this.active=false;this.teardown();
+    if(!this.active)return;this.recorder.finish(true);this.music.stop();this.active=false;this.teardown();
     $('drone-show').hidden=true;$('show-loading').hidden=true;this.show=null;this.onExit();
   }
 }

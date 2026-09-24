@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import assets from '../src/formation-assets.js';
 import {demoSettings,compileDemo,FORMATIONS} from '../src/demo-settings.js';
-import {sampleShow,groundFocus} from '../src/drone-show.js';
+import {sampleShow,groundFocus,buildShow,demoPaths,samplePaths} from '../src/drone-show.js';
 import {byPad} from './pads.mjs';
 
 test('Demo settings bound untrusted saved values and preserve explicit fire choices',()=>{
@@ -39,7 +39,7 @@ test('Three firework types expand, then blink and fall to darkness with no telep
 test('Blender formations have depth, distinct well-spaced samples and exact fleet counts',()=>{
   for(const name of FORMATIONS){const {positions}=assets[name].body;assert.equal(positions.length,4096);assert.equal(new Set(positions.map(p=>p.join(','))).size,4096);assert.ok(positions.every(p=>p.every(Number.isFinite)));assert.ok(Math.max(...positions.map(p=>p[2]))-Math.min(...positions.map(p=>p[2]))>1);}
   const show=compileDemo(assets,{count:512,scale:4,shape:'star'});
-  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,229);
+  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,303);
   for(const s of show.stages){assert.equal(s.to.positions.length,512);assert.equal(s.to.colors.length,512);}
   assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);
 });
@@ -71,4 +71,18 @@ test('Demo formations are twice the previous dimensions for existing saved scale
   const show=compileDemo(assets,{count:512,scale:3,fire:{Fish:false}}),fish=show.stages.find(s=>s.name==='Fish');
   const extent=(points,k)=>Math.max(...points.map(p=>p[k]))-Math.min(...points.map(p=>p[k]));
   for(let k=0;k<3;k++)assert.ok(Math.abs(extent(fish.to.positions,k)-extent(assets.Fish.body.positions.slice(0,512),k)*6)<1e-8);
+});
+test('New stroke formations sample to full fleets; only Happy day carries the ship-fireworks flag, in both demos',()=>{
+  const drawn=demoPaths();assert.deepEqual(drawn.map(f=>f.name),FORMATIONS);
+  for(const name of ['Butterfly','Hot air balloon','Birthday cake','Happy day'])for(const count of [256,4096]){
+    const {positions,colors}=samplePaths(drawn.find(f=>f.name===name).paths,count);
+    assert.equal(positions.length,count);assert.equal(colors.length,count);assert.equal(new Set(positions.map(p=>p.join(','))).size,count,name+' samples are distinct');
+    assert.ok(positions.every(p=>p.length===3&&p.every(Number.isFinite)&&Math.abs(p[0])<=12&&p[1]>=9&&p[1]<=29),name+' stays in the drawing frame');
+    assert.ok(colors.every(c=>c.length===3&&c.every(v=>v>=0&&v<=1)));
+  }
+  assert.deepEqual(drawn.filter(f=>f.pyro).map(f=>[f.name,f.hold,f.effect]),[['Happy day',12,'sparkle']]);
+  for(const show of [buildShow(null,{count:256}),compileDemo(assets,{count:256})]){
+    const pyro=show.stages.filter(s=>s.pyro);assert.deepEqual(pyro.map(s=>[s.name,s.kind,s.effect,s.pyro,s.end-s.start]),[['Happy day','hold','sparkle',true,12]]);
+    assert.ok(show.cues.some(c=>c.label==='Happy day'&&c.time>=pyro[0].start&&c.time<pyro[0].end));
+  }
 });

@@ -10,7 +10,7 @@ try{
   await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173/');
   await page.locator('#drone-demo-settings').click();
   await page.locator('#demo-count').selectOption('1024');await page.locator('#demo-scale').selectOption('4');await page.locator('#demo-shape').selectOption('star');
-  await page.locator('#demo-fire-1').check();await page.locator('#demo-fire-6').uncheck();
+  await page.locator('#demo-fire-1').check();await page.locator('#demo-fire-9').uncheck();// Fish on; Starship launch (FORMATIONS[9]) off
   await page.getByRole('button',{name:'Apply & play Demo',exact:true}).click();
   await page.waitForFunction(()=>document.querySelector('#show-fleet').textContent==='1,024');
   await page.locator('#show-cues').getByRole('button',{name:'Fish',exact:true}).click();
@@ -18,7 +18,7 @@ try{
   await mkdir(out,{recursive:true});await page.screenshot({path:out+'demo-fish-detailed.png'});
   const fishTime=Number(await page.locator('#show-scrub').inputValue());await page.locator('#show-scrub').fill(String(fishTime-5));await page.locator('#show-scrub').dispatchEvent('input');
   await page.waitForFunction(()=>document.querySelector('#show-phase').textContent==='Forming Fish');await page.screenshot({path:out+'demo-red-blue-transition.png'});
-  await page.locator('#show-demo-settings').click();assert.equal(await page.locator('#demo-fire-1').isChecked(),true);assert.equal(await page.locator('#demo-fire-6').isChecked(),false);
+  await page.locator('#show-demo-settings').click();assert.equal(await page.locator('#demo-fire-1').isChecked(),true);assert.equal(await page.locator('#demo-fire-9').isChecked(),false);
   await page.locator('#demo-count').selectOption('256');await page.keyboard.press('Escape');assert.equal(await page.locator('#drone-show').isVisible(),true);assert.equal(await page.locator('#show-fleet').textContent(),'1,024');
   await page.locator('#show-pause').click();await page.locator('#show-demo-settings').click();await page.locator('#demo-cancel').click();await page.waitForFunction(()=>document.querySelector('#show-play-state').textContent==='LIVE PREVIEW');
   await page.locator('#show-demo-settings').click();await page.locator('#demo-shape').selectOption('diamond');await page.getByRole('button',{name:'Apply & play Demo',exact:true}).click();

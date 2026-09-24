@@ -20,7 +20,8 @@ export function samplePaths(paths,count=DRONE_COUNT){
   if(!prepared.length)throw new Error('Draw a line or shape with some length, then replay your drawing.');
   // Proportional arc-length sampling, with at least one drone per path when possible.
   const total=prepared.reduce((n,p)=>n+p.length,0),minimum=prepared.length<=count?1:0,remaining=count-minimum*prepared.length;
-  const allocations=prepared.map((p,i)=>({i,n:minimum+Math.floor(remaining*p.length/total),fraction:remaining*p.length/total%1}));
+  // Fractions are quantized so mirror-equal paths tie exactly (then by index) despite float noise from placement round trips.
+  const allocations=prepared.map((p,i)=>({i,n:minimum+Math.floor(remaining*p.length/total),fraction:Math.round(remaining*p.length/total%1*1e9)}));
   let spare=count-allocations.reduce((n,a)=>n+a.n,0);
   for(const a of [...allocations].sort((a,b)=>b.fraction-a.fraction||a.i-b.i))if(spare-->0)a.n++;
   const positions=[],colors=[];
@@ -60,7 +61,40 @@ function ship(){return [line([[-14,-3],[14,-3],[10,-8],[-10,-8],[-14,-3]],cyan),
 function star(){return [line(Array.from({length:11},(_,i)=>{const a=Math.PI/2+i*Math.PI/5,r=i%2?4.2:10;return [Math.cos(a)*r,Math.sin(a)*r];}),gold)];}
 function fireRow(){return Array.from({length:9},(_,i)=>{const x=(i-4)*3;return line([[x-1,-7],[x-.8,-2],[x+.2,5+(i%3)],[x+1.1,-1],[x+1,-7]],flame);});}
 function starship(){return [line([[-2,-5],[-2,5],[-1.6,8],[0,11],[1.6,8],[2,5],[2,-5],[-2,-5]],white),line([[-2,6],[-4,3],[-4,0],[-2,1]],cyan),line([[2,6],[4,3],[4,0],[2,1]],cyan),line([[-2,-1],[-5,-6],[-5,-8],[-2,-5]],blue),line([[2,-1],[5,-6],[5,-8],[2,-5]],blue),box(-1.3,-4,2.6,1,gold),ellipse(0,5,.65,1,cyan),...[-1.2,0,1.2].map(x=>line([[x,-5],[x-.35,-7],[x,-11],[x+.35,-7],[x,-5]],flame))];}
-export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:8},{name:'Fish',paths:fish(),hold:8},{name:'Eiffel Tower',paths:tower(),hold:9},{name:'Big ship',paths:ship(),hold:9},{name:'Firework star',paths:star(),hold:8,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:9,effect:'fire'},{name:'Starship launch',paths:starship(),hold:14,effect:'starship'}];
+const arc=(cx,cy,rx,ry,from,to,n=24)=>Array.from({length:n+1},(_,i)=>{const a=(from+(to-from)*i/n)*Math.PI/180;return [cx+rx*Math.cos(a),cy+ry*Math.sin(a)];});
+// Wing lobe: an ellipse whose long axis points away from the body at `angle`, scalloped on its outer half; s=-1 mirrors it.
+const lobe=(ax,ay,angle,d,rx,ry,color,s=1,scallop=0)=>{const a=angle*Math.PI/180,c=Math.cos(a),n=Math.sin(a);return line(Array.from({length:129},(_,i)=>{const t=i*Math.PI/64,r=1+scallop*Math.max(0,Math.cos(t))**2*Math.cos(9*t),u=d+rx*Math.cos(t)*r,v=ry*Math.sin(t)*r;return [s*(u*c-v*n)+ax,ay+u*n+v*c];}),color);};
+function butterfly(){return [ellipse(0,-.3,.55,4.1,white),ellipse(0,4.45,.62,.62,white),...[-1,1].flatMap(s=>{const at=(x,y,angle,d)=>[s*d*Math.cos(angle*Math.PI/180)+x,y+d*Math.sin(angle*Math.PI/180)];return [
+  lobe(0,1,152,6.05,5.6,3.9,pink,s,.07),lobe(0,1,152,6.5,3.5,2.25,gold,s),ellipse(...at(0,1,152,6.6),.95,.95,cyan),
+  lobe(0,-.6,230,4.7,3.9,2.1,blue,s,.06),lobe(0,-.6,230,4.9,2.2,1.15,cyan,s),ellipse(...at(0,-.6,230,5),.5,.5,gold),
+  line([[s*.25,4.9],[s*.8,6.5],[s*1.6,7.9],[s*2.6,9]],gold),ellipse(s*2.9,9.3,.42,.42,pink)];})];}
+function balloon(){
+  const cy=4.6,R=6,mx=1.8,my=-2.2,tilt=Math.atan2(my-cy,mx)+Math.acos(R/Math.hypot(mx,my-cy)),half=[[mx,my],...arc(0,cy,R,R,tilt*180/Math.PI,90,40)];
+  const gore=(k,color)=>line(half.map(([x,y])=>[k*x,y]),color),tx=R*Math.cos(tilt),ty=cy+R*Math.sin(tilt);
+  return [line([...half,...half.slice(0,-1).reverse().map(([x,y])=>[-x,y])],pink),gore(-.87,cyan),gore(-.5,gold),gore(0,white),gore(.5,gold),gore(.87,cyan),
+    line(arc(0,cy,R,.7,180,360,40),gold),line(arc(0,ty,tx,.45,180,360,24),blue),line([[-mx,my],[mx,my]],gold),
+    line([[-mx,my],[-1.5,-5.4]],white),line([[mx,my],[1.5,-5.4]],white),box(-1.5,-7.6,3,2.2,gold),line([[-1.5,-6.5],[1.5,-6.5]],gold),
+    line([[0,-5.2],[-.55,-4.5],[-.35,-3.7],[0,-2.8],[.35,-3.7],[.55,-4.5],[0,-5.2]],flame)];
+}
+function cake(){
+  const tier=(x,y,w,h,color)=>line([[x,y],[x,y+h],[x+w,y+h],[x+w,y]],color);
+  const drip=(x,y,w,phase)=>line(Array.from({length:Math.round(w*10)+1},(_,i)=>{const px=x+w*i/Math.round(w*10),bump=Math.max(0,Math.sin(px*2.3+phase))**4;return [px,y-.35-bump*(.7+.35*Math.cos(px*1.3+phase))];}),white);
+  const flameAt=x=>line([[x,7.3],[x-.42,7.9],[x-.3,8.7],[x,9.6],[x+.3,8.7],[x+.42,7.9],[x,7.3]],flame);
+  return [line([[-11.2,-8],[-10.5,-8.8],[10.5,-8.8],[11.2,-8]],blue),tier(-9,-8,18,4.8,pink),line([[-9,-8],[9,-8]],pink),tier(-6.5,-3.2,13,4,cyan),tier(-4,.8,8,3.6,blue),
+    drip(-9,-3.2,18,0),drip(-6.5,.8,13,1),drip(-4,4.4,8,2),...[-7.5,-5,-2.5,0,2.5,5,7.5].map(x=>ellipse(x,-6.3,.32,.32,gold)),
+    line(Array.from({length:111},(_,i)=>{const x=-5.5+i*.1;return [x,-1.6-.6*Math.abs(Math.sin(x*Math.PI/2.2))];}),gold),...[-2,0,2].map(x=>ellipse(x,1.9,.28,.28,pink)),
+    ...[-3,-1.5,0,1.5,3].flatMap((x,i)=>[tier(x-.3,4.4,.6,2.6,[gold,pink,cyan,pink,gold][i]),flameAt(x)])];
+}
+function happyDay(){
+  const h=6.4,w=3.6,gap=1.2,glyph={H:[[[0,0],[0,h]],[[w,0],[w,h]],[[0,h/2],[w,h/2]]],A:[[[0,0],[w/2,h],[w,0]],[[w*.24,h*.36],[w*.76,h*.36]]],
+    P:[[[0,0],[0,h],[w*.5,h],...arc(w*.5,h*.74,w*.5,h*.26,90,-90,16).slice(1),[0,h*.48]]],Y:[[[0,h],[w/2,h*.48],[w,h]],[[w/2,h*.48],[w/2,0]]],D:[[[0,0],[0,h],[w*.35,h],...arc(w*.35,h/2,w*.65,h/2,90,-90,24).slice(1),[0,0]]]};
+  const word=(text,y,colors)=>[...text].flatMap((ch,i)=>{const x=-(text.length*(w+gap)-gap)/2+i*(w+gap);return glyph[ch].map(p=>line(p.map(([px,py])=>[x+px,y+py]),colors[i]));});
+  const sparkle=(x,y,r,color)=>line(Array.from({length:9},(_,i)=>{const a=i*Math.PI/4,k=i%2?r*.28:r;return [x+k*Math.cos(a),y+k*Math.sin(a)];}),color);
+  return [...word('HAPPY',3.2,[pink,gold,cyan,blue,pink]),...word('DAY',-6.4,[gold,pink,cyan]),ellipse(9.3,-3.2,1.5,1.5,gold),
+    ...Array.from({length:8},(_,i)=>{const a=i*Math.PI/4+Math.PI/8;return line([[9.3+2*Math.cos(a),-3.2+2*Math.sin(a)],[9.3+2.7*Math.cos(a),-3.2+2.7*Math.sin(a)]],gold);}),
+    line(arc(9.3,-3.2,.85,.85,205,335,12),pink),ellipse(8.75,-2.7,.16,.16,pink),ellipse(9.85,-2.7,.16,.16,pink),sparkle(-9.3,-3.2,2.1,white),sparkle(-10.4,-6.9,.9,cyan),sparkle(-8.2,.4,.8,cyan)];
+}
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:8},{name:'Fish',paths:fish(),hold:8},{name:'Butterfly',paths:butterfly(),hold:8},{name:'Hot air balloon',paths:balloon(),hold:9},{name:'Eiffel Tower',paths:tower(),hold:9},{name:'Big ship',paths:ship(),hold:9},{name:'Firework star',paths:star(),hold:8,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:9,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:9},{name:'Starship launch',paths:starship(),hold:14,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:12,effect:'sparkle',pyro:true}];
 
 // Median-split partition, in place (O(n log n)). Each level splits on the axis where both clouds are widest, so a flat
 // launch grid never decides a vertical split by index. Quickselect with an (axis, index) tie-break is deterministic.
@@ -208,8 +242,9 @@ export function buildShow(custom,options={}){
   const add=(name,kind,duration,target,details={})=>{if(kind==='move'&&details.transitionLights&&stages.length)stages.at(-1).fadeBeforeMove=true;const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
   const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths,count)})));
-  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled} of sequence){
-    const target=matchFormation(previous.positions,formation);add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});cues.push({label:name,time:cursor+Math.min(hold/2,2)});if(effect==='starship'){const raised={...target,positions:target.positions.map(p=>[p[0],p[1]+10*(options.motionScale??1),p[2]])};add(name,'rise',hold,raised,{effect,fireEnabled,motionScale:options.motionScale});}else add(name,'hold',hold,target,{reveal:true,light,effect,fireEnabled,motionScale:options.motionScale});
+  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled,pyro} of sequence){
+    // `pyro` marks a formation that ship-launched fireworks accompany; the stage carries it for the renderer.
+    const target=matchFormation(previous.positions,formation),extra=pyro?{pyro:true}:{};add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});cues.push({label:name,time:cursor+Math.min(hold/2,2)});if(effect==='starship'){const raised={...target,positions:target.positions.map(p=>[p[0],p[1]+10*(options.motionScale??1),p[2]])};add(name,'rise',hold,raised,{effect,fireEnabled,motionScale:options.motionScale,...extra});}else add(name,'hold',hold,target,{reveal:true,light,effect,fireEnabled,motionScale:options.motionScale,...extra});
   }
   if(options.fireworks?.enabled!==false&&options.fireworks?.trilogy){
     for(const [kind,name] of [['heart','Growing heart'],['star','Five-point star'],['balls','Three firework balls']]){

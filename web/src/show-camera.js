@@ -16,17 +16,22 @@ export function showKeyframes(show){
   if(cache.has(show))return cache.get(show);
   const stages=show.stages,takeoff=stages.find(s=>s.kind==='takeoff'),hoverTop=takeoff?box(takeoff.to.positions).top:0;
   const frame=(b,ground)=>({center:b.center,half:b.half,ground});
-  const keyframes=[frame(box(stages[0].from.positions),1)];
+  // Opening and closing close-ups on the front row of drones sitting on their pads.
+  const xs=show.home.map(p=>p[0]),zs=show.home.map(p=>p[2]),side=Math.ceil(Math.sqrt(show.count)),gap=(Math.max(...xs)-Math.min(...xs))/Math.max(1,side-1)||1,front=Math.max(...zs);
+  const close={center:[(Math.max(...xs)+Math.min(...xs))/2,gap*.25,front],half:[gap*1.5,gap*.5,gap*.9],ground:.42,close:true};
+  const grounded=s=>s?.kind==='hold'&&s.to.positions.every(p=>p[1]<=.2);
+  const keyframes=[grounded(stages[0])?{...close}:frame(box(stages[0].from.positions),1)];
   stages.forEach((s,i)=>{
     const next=stages[i+1];let b;
     if(s.kind==='move'&&(next?.kind==='grow'||next?.kind==='burst'))b=box(next.to.positions);// frame where the firework will open
     else if(['fall','rise','burst'].includes(s.kind))b=box(s.from.positions,s.to.positions);
     else b=box(s.to.positions);
+    if(grounded(s)&&(i===0||i===stages.length-1)){keyframes.push({...close});return;}
     keyframes.push(frame(b,b.top<=hoverTop*1.05+1e-6?1:0));
   });
   // Never zoom in on tiny intermediate shapes more than the show's typical formation allows.
-  const reference=Math.max(...keyframes.filter(k=>!k.ground).map(k=>Math.max(k.half[0],k.half[1])),...keyframes.map(k=>k.half[0]*.5),1e-3);
-  for(const k of keyframes){const size=Math.max(k.half[0],k.half[1]);if(size<reference*.45){const f=reference*.45/Math.max(size,1e-6);k.half=k.half.map((v,j)=>j<2?v*f:v);}}
+  const reference=Math.max(...keyframes.filter(k=>!k.ground).map(k=>Math.max(k.half[0],k.half[1])),...keyframes.filter(k=>!k.close).map(k=>k.half[0]*.5),1e-3);
+  for(const k of keyframes){if(k.close)continue;const size=Math.max(k.half[0],k.half[1]);if(size<reference*.45){const f=reference*.45/Math.max(size,1e-6);k.half=k.half.map((v,j)=>j<2?v*f:v);}}
   cache.set(show,keyframes);return keyframes;
 }
 export function framingAt(show,time){

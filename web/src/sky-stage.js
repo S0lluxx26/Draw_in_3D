@@ -7,6 +7,8 @@ import * as THREE from 'three';
 import {GLTFLoader} from './vendor/addons/loaders/GLTFLoader.js';
 import {DRACOLoader} from './vendor/addons/loaders/DRACOLoader.js';
 import {Reflector} from './vendor/addons/objects/Reflector.js';
+import {mergeGeometries} from './vendor/addons/utils/BufferGeometryUtils.js';
+import {pyroSchedule,pyroParticles,PARTICLE_FLOATS,PYRO_VERTEX,PYRO_FRAGMENT,GRAVITY} from './pyro.js';
 
 const DEMO_SCALE=6;// demo motionScale that the Blender scenery is modelled for (metres)
 const MOON=new THREE.Vector3(.5,.3,-.81).normalize();
@@ -24,13 +26,20 @@ export function loadStageAsset(){
 }
 // Remap Blender materials by name: lights become unlit HDR emitters (bloom picks them up),
 // distant land becomes fogged vertex-colour silhouettes.
-const EMITTERS={DeckLights:[1,.62,.28,4],ShoreLights:[1,.78,.52,3.2],BridgeLights:[.75,.88,1,4.5],BridgeTowerLights:[1,.35,.12,6],BuoyLights:[1,.95,.85,4],BuoyRed:[1,.06,.04,6],BuoyGreen:[.1,1,.35,5],Beacons:[1,.05,.03,9]};
+const EMITTERS={ShipWindows:[1,.78,.5,1.8],ShipLights:[1,.9,.75,1.8],NavRed:[1,.05,.03,6],NavGreen:[.1,1,.3,5],StringRed:[1,.15,.1,1.3],StringGold:[1,.7,.2,1.3],StringBlue:[.3,.6,1,1.3],DeckLights:[1,.62,.28,4],ShoreLights:[1,.78,.52,3.2],BridgeLights:[.75,.88,1,4.5],BridgeTowerLights:[1,.35,.12,6],BuoyLights:[1,.95,.85,4],BuoyRed:[1,.06,.04,6],BuoyGreen:[.1,1,.35,5],Beacons:[1,.05,.03,9]};
 function prepareAsset(gltf){
   const root=gltf.scene,shared=new Map();
-  const drone=root.getObjectByName('Drone');
-  gltf.userData.drone={frame:drone?.getObjectByName('DroneFrame')?.geometry,led:drone?.getObjectByName('DroneLED')?.geometry};
-  for(const g of Object.values(gltf.userData.drone))if(g)g.userData.shared=true;
+  const drone=root.getObjectByName('Drone'),meshes=name=>{const list=[];drone?.getObjectByName(name)?.traverse(m=>{if(m.isMesh)list.push(m);});return list;};
+  const frame=meshes('DroneFrame'),props=meshes('DroneProps')[0]?.geometry;
+  gltf.userData.drone={frame:frame.length?mergeGeometries(frame.map(m=>m.geometry),true):null,frameMaterials:frame.map(m=>m.material),props,propMaterial:meshes('DroneProps')[0]?.material,led:meshes('DroneLED')[0]?.geometry,low:meshes('DroneLow')[0]?.geometry,lowMaterial:meshes('DroneLow')[0]?.material};
+  if(props){// hub (x,z) and spin direction per vertex: blades turn about their own motor in the vertex shader
+    const q=props.attributes.position,hub=new Float32Array(q.count*3);for(let i=0;i<q.count;i++){const x=Math.sign(q.getX(i))||1,z=Math.sign(q.getZ(i))||1;hub.set([x*.19,z*.19,x*-z],i*3);}
+    props.setAttribute('hub',new THREE.BufferAttribute(hub,3));}
+  for(const g of Object.values(gltf.userData.drone))if(g?.isBufferGeometry)g.userData.shared=true;
+  for(const m of [...gltf.userData.drone.frameMaterials,gltf.userData.drone.propMaterial,gltf.userData.drone.lowMaterial])if(m)m.userData.shared=true;
   drone?.removeFromParent();
+  gltf.userData.ships=[];gltf.userData.launchers=[];
+  root.traverse(o=>{if(o.name.startsWith('Ship_'))gltf.userData.ships.push(o);if(o.name.startsWith('Pyro_'))gltf.userData.launchers.push(o);});
   root.traverse(o=>{
     if(!o.isMesh)return;
     const name=o.material.name;
@@ -42,10 +51,28 @@ function prepareAsset(gltf){
       else{old.roughness=Math.max(.45,old.roughness);}
       m.name=name;m.userData.shared=true;if(m!==old)old.dispose();shared.set(name,m);
     }
-    o.material=shared.get(name);o.geometry.userData.shared=true;o.matrixAutoUpdate=false;o.updateMatrix();
+    o.material=shared.get(name);o.geometry.userData.shared=true;if(!o.name.startsWith('Ship_')){o.matrixAutoUpdate=false;o.updateMatrix();}
   });
   root.traverse(o=>{if(o.material?.map)o.material.map.anisotropy=4;});
   gltf.userData.materials=shared;
+}
+// Ship launch points at demo scale (matches build_environment.py; replaced by the Pyro_* nodes once loaded).
+const LAUNCHERS=[[-267,4.7,-270],[288,4.7,-249],[-206,5.4,-409]];
+// A dim night-sky environment map gives PBR metal and carbon (drones, ships, bridge) believable reflections.
+let nightEnvironment=null;
+function environment(renderer){
+  if(nightEnvironment)return nightEnvironment;
+  const pmrem=new THREE.PMREMGenerator(renderer),scene=new THREE.Scene(),sky=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.ShaderMaterial({...skyShader,uniforms:THREE.UniformsUtils.clone(skyShader.uniforms),side:THREE.BackSide,depthWrite:false}));
+  sky.scale.setScalar(50);scene.add(sky);nightEnvironment=pmrem.fromScene(scene,0,.1,200).texture;pmrem.dispose();sky.geometry.dispose();sky.material.dispose();
+  return nightEnvironment;
+}
+// Instance transform: position, tilt about a horizontal axis (ax,0,az) and uniform scale k.
+function writeInstance(e,o,x,y,z,ax,az,angle,k){
+  const c=Math.cos(angle),s=Math.sin(angle),t=1-c;
+  e[o]=(c+t*ax*ax)*k;e[o+1]=s*az*k;e[o+2]=t*ax*az*k;e[o+3]=0;
+  e[o+4]=-s*az*k;e[o+5]=c*k;e[o+6]=s*ax*k;e[o+7]=0;
+  e[o+8]=t*ax*az*k;e[o+9]=-s*ax*k;e[o+10]=(c+t*az*az)*k;e[o+11]=0;
+  e[o+12]=x;e[o+13]=y;e[o+14]=z;e[o+15]=1;
 }
 export function stageScale(show){
   const xs=show.home.map(p=>p[0]),span=Math.max(...xs)-Math.min(...xs),side=Math.ceil(Math.sqrt(show.count));
@@ -139,7 +166,25 @@ export class SkyStage{
     // Lighting for the physical scenery: moonlight, sky fill and the show's own glow.
     this.hemi=new THREE.HemisphereLight(0x5068a0,0x040608,.55);this.moon=new THREE.DirectionalLight(0xa9bcff,.55);this.moon.position.copy(MOON).multiplyScalar(100);
     this.glow=new THREE.PointLight(0xffffff,0,0,0);this.group.add(this.hemi,this.moon,this.glow);
+    // Soft key light travelling with the camera: reveals nearby drones in close-ups, fades out within ~40 m.
+    this.key=new THREE.PointLight(0xfff1dd,70*s*s,40*s,2);this.group.add(this.key);
     this.createPads();
+    scene.environment=environment(renderer);scene.environmentIntensity=3;
+    this.buildPyro(LAUNCHERS.map(p=>p.map(v=>v*s)));
+  }
+  // Ship fireworks: one static buffer; the vertex shader evaluates every particle from show time.
+  buildPyro(origins){
+    if(this.pyro){this.pyro.geometry.dispose();this.pyro.material.dispose();this.pyro.removeFromParent();this.pyro=null;}
+    const data=pyroParticles(pyroSchedule(this.show,origins,{scale:this.scale}));if(!data.length)return;
+    const buffer=new THREE.InterleavedBuffer(data,PARTICLE_FLOATS),geometry=new THREE.BufferGeometry(),n=data.length/PARTICLE_FLOATS;
+    for(const [name,size,offset] of [['shell',2,0],['origin',3,2],['launch',3,5],['star',3,8],['info',4,11],['look',4,15],['extra',2,19]])geometry.setAttribute(name,new THREE.InterleavedBufferAttribute(buffer,size,offset));
+    geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,2));geometry.setDrawRange(0,n);
+    const material=new THREE.ShaderMaterial({vertexShader:PYRO_VERTEX,fragmentShader:PYRO_FRAGMENT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
+      uniforms:{time:{value:0},gravity:{value:GRAVITY*this.scale},sizeWorld:{value:3.4*this.scale},viewport:{value:720},minSize:{value:1.5}}});
+    this.pyro=new THREE.Points(geometry,material);this.pyro.frustumCulled=false;this.pyro.renderOrder=3;
+    const size=new THREE.Vector2();
+    this.pyro.onBeforeRender=r=>{const target=r.getRenderTarget(),h=target?target.height:r.getDrawingBufferSize(size).y;material.uniforms.viewport.value=h;material.uniforms.minSize.value=Math.max(1,1.5*r.getPixelRatio()*(target?target.height/Math.max(1,r.getDrawingBufferSize(size).y):1));material.uniformsNeedUpdate=true;};
+    this.group.add(this.pyro);
   }
   createPads(){
     const s=this.scale,canvas=document.createElement('canvas');canvas.width=canvas.height=64;const g=canvas.getContext('2d');
@@ -159,30 +204,54 @@ export class SkyStage{
     if(!gltf||this.scenery)return;
     this.scenery=gltf.scene;this.scenery.scale.setScalar(this.scale);this.scenery.updateMatrixWorld(true);this.group.add(this.scenery);this.deck.visible=false;
     this.materials=gltf.userData.materials;
-    const {frame,led}=gltf.userData.drone||{};
-    if(this.tier.bodies&&frame&&led){
-      const n=this.show.count;
-      this.bodies=new THREE.InstancedMesh(frame,new THREE.MeshStandardMaterial({color:0x1a1d22,roughness:.4,metalness:.6}),n);
-      this.bulbs=new THREE.InstancedMesh(led,new THREE.MeshBasicMaterial({color:0xffffff}),n);
-      this.bulbs.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(n*3),3).setUsage(THREE.DynamicDrawUsage);
-      for(const mesh of [this.bodies,this.bulbs]){mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.visible=false;this.group.add(mesh);}
-      const m=new THREE.Matrix4().makeScale(this.scale*1.6,this.scale*1.6,this.scale*1.6);for(let i=0;i<n;i++){this.bodies.setMatrixAt(i,m);this.bulbs.setMatrixAt(i,m);}
+    this.ships=(gltf.userData.ships||[]).map((o,i)=>({o,y:o.position.y,q:o.quaternion.clone(),phase:i*1.7}));
+    const launchers=(gltf.userData.launchers||[]).map(o=>o.getWorldPosition(new THREE.Vector3()).toArray());
+    if(launchers.length)this.buildPyro(launchers);
+    const {frame,frameMaterials,props,propMaterial,led,low,lowMaterial}=gltf.userData.drone||{};
+    if(this.tier.bodies&&frame&&props&&led&&low){
+      // Close drones use the detailed model (spinning props, LED pod); the rest use a light LOD.
+      const n=this.show.count,near=Math.min(n,420),spin={value:0};
+      const blades=propMaterial.clone();blades.userData.spin=spin;
+      blades.onBeforeCompile=shader=>{shader.uniforms.propAngle=spin;shader.vertexShader='attribute vec3 hub;uniform float propAngle;\n'+shader.vertexShader
+        .replace('#include <beginnormal_vertex>','#include <beginnormal_vertex>\nfloat pa=propAngle*hub.z,pc=cos(pa),ps=sin(pa);objectNormal.xz=vec2(pc*objectNormal.x-ps*objectNormal.z,ps*objectNormal.x+pc*objectNormal.z);')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nvec2 pd=transformed.xz-hub.xy;transformed.xz=hub.xy+vec2(pc*pd.x-ps*pd.y,ps*pd.x+pc*pd.y);');};
+      blades.customProgramCacheKey=()=>'drone-props';
+      this.near={frame:new THREE.InstancedMesh(frame,frameMaterials,near),props:new THREE.InstancedMesh(props,blades,near),led:new THREE.InstancedMesh(led,new THREE.MeshBasicMaterial({color:0xffffff}),near),capacity:near};
+      this.near.led.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(near*3),3).setUsage(THREE.DynamicDrawUsage);
+      this.far=new THREE.InstancedMesh(low,lowMaterial,n);this.spin=spin;
+      for(const mesh of [this.near.frame,this.near.props,this.near.led,this.far]){mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;this.group.add(mesh);}
+      const flights=this.show.stages.filter(st=>st.kind!=='hold'||st.to!==this.show.stages[0].to);this.flight=[flights[0]?.start??0,flights.at(-1)?.end??this.show.duration];
     }
   }
+  get wantsVelocity(){return !!this.near;}
   setSize(width,height){if(this.water.getRenderTarget){const k=this.tier.reflection;this.water.getRenderTarget().setSize(Math.max(64,Math.round(width*k)),Math.max(64,Math.round(height*k)));}}
   // Per-frame animation. frame = sampled show (positions/colors), camera = main camera.
-  update(time,frame,camera,now){
-    const t=now/1000;this.sky.material.uniforms.time.value=t;this.stars.material.uniforms.time.value=t;this.water.material.uniforms.time.value=t;
+  // Per-frame animation. frame = sampled show, previous = the show 0.15 s earlier (for drone tilt).
+  update(time,frame,camera,now,previous){
+    const t=now/1000,s=this.scale;this.sky.material.uniforms.time.value=t;this.stars.material.uniforms.time.value=t;this.water.material.uniforms.time.value=t;
     const beacons=this.materials?.get('Beacons');if(beacons){const on=(t%1.7)<.22;beacons.color.setRGB(on?9:.25,on?.45:.01,on?.27:.01);}
-    if(this.bodies){
-      const near=camera.position.distanceTo(this.focus||camera.position)<260*this.scale;
-      this.bodies.visible=this.bulbs.visible=near;
-      if(near){
-        const a=this.bodies.instanceMatrix.array,b=this.bulbs.instanceMatrix.array,c=this.bulbs.instanceColor.array,p=frame.positions,col=frame.colors;
-        for(let i=0;i<this.show.count;i++){const o=i*16+12,j=i*3;a[o]=b[o]=p[j];a[o+1]=b[o+1]=p[j+1];a[o+2]=b[o+2]=p[j+2];c[j]=.03+col[j]*col[j]*4;c[j+1]=.03+col[j+1]*col[j+1]*4;c[j+2]=.03+col[j+2]*col[j+2]*4;}
-        this.bodies.instanceMatrix.needsUpdate=this.bulbs.instanceMatrix.needsUpdate=this.bulbs.instanceColor.needsUpdate=true;
-      }
+    if(this.pyro)this.pyro.material.uniforms.time.value=time;
+    this.key.position.copy(camera.position).addScaledVector(camera.up,2*s);
+    for(const ship of this.ships||[]){// gentle swell
+      ship.o.position.y=ship.y+Math.sin(t*.7+ship.phase)*.22;ship.o.quaternion.copy(ship.q);ship.o.rotateX(Math.sin(t*.9+ship.phase)*.012);ship.o.rotateZ(Math.sin(t*.55+ship.phase*2)*.008);}
+    if(!this.near)return;
+    const n=this.show.count,p=frame.positions,prev=previous?.positions,col=frame.colors,cam=camera.position,k=1.6*s,nearR2=(70*s)**2,farR2=(380*s)**2;
+    const F=this.near.frame.instanceMatrix.array,P=this.near.props.instanceMatrix.array,L=this.near.led.instanceMatrix.array,C=this.near.led.instanceColor.array,W=this.far.instanceMatrix.array;
+    let h=0,l=0,limit=nearR2;
+    const D=this.distances||(this.distances=new Float32Array(n)),scratch=this.scratch||(this.scratch=new Float32Array(n));
+    const visible=!this.focus||cam.distanceTo(this.focus)<1400*s;
+    if(visible){let inside=0;for(let i=0;i<n;i++){const j=i*3,dx=p[j]-cam.x,dy=p[j+1]-cam.y,dz=p[j+2]-cam.z;D[i]=dx*dx+dy*dy+dz*dz;if(D[i]<nearR2)inside++;}
+      if(inside>this.near.capacity){scratch.set(D);scratch.sort();limit=scratch[this.near.capacity-1];}}// detailed model goes to the nearest drones
+    if(visible)for(let i=0;i<n;i++){
+      const j=i*3,x=p[j],y=p[j+1],z=p[j+2],d2=D[i];if(d2>farR2)continue;
+      let ax=1,az=0,angle=0;
+      if(prev){const vx=(x-prev[j])/.15,vz=(z-prev[j+2])/.15,speed=Math.hypot(vx,vz);if(speed>.05*s){angle=Math.min(.4,speed/s*.03);ax=vz/speed;az=-vx/speed;}}// lean into the flight direction
+      if(d2<=limit&&d2<nearR2&&h<this.near.capacity){const o=h*16;writeInstance(F,o,x,y,z,ax,az,angle,k);P.set(F.subarray(o,o+16),o);L.set(F.subarray(o,o+16),o);C[h*3]=.03+col[j]*col[j]*4;C[h*3+1]=.03+col[j+1]*col[j+1]*4;C[h*3+2]=.03+col[j+2]*col[j+2]*4;h++;}
+      else writeInstance(W,(l++)*16,x,y,z,ax,az,angle,k);
     }
+    this.near.frame.count=this.near.props.count=this.near.led.count=h;this.far.count=l;
+    for(const mesh of [this.near.frame,this.near.props,this.near.led,this.far])mesh.instanceMatrix.needsUpdate=true;this.near.led.instanceColor.needsUpdate=true;
+    this.spin.value=(Math.min(Math.max(time,this.flight[0]),this.flight[1])-this.flight[0])*42;// props turn only while flying
   }
   // The formation lights the scenery: average LED colour at the framing centre.
   setGlow(center,color,amount){this.focus=this.focus||new THREE.Vector3();this.focus.fromArray(center);this.glow.position.copy(this.focus);this.glow.color.copy(color);this.glow.intensity=amount;}

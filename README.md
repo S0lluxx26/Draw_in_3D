@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 14: realistic drones, HAPPY DAY and ship fireworks
+
+![HAPPY DAY formation with ship fireworks](docs/media/happy-day-hero.jpg)
+
+Drones are now **detailed Blender quadcopters** with prop guards, spinning props, battery, landing gear and an LED pod. They lean into their flight, and the Demo opens and ends on a close-up of the launch pads. **Four new formations** were added (Butterfly, Hot air balloon, Birthday cake and **HAPPY DAY** in 3D letters), bringing the Demo to 5:03. **Ships on the river** (firework barges, a party yacht, a tug and sailboats) bob on the swell and **launch real fireworks** during HAPPY DAY, the drone fireworks and the finale. The fireworks come in six patterns, computed on the GPU so seeking and recording stay exact. The Demo now has an **exciting soundtrack generated live in the browser**: build-ups and snare rolls while each formation forms, a drop with crash when it appears, a key change for the drone fireworks, booms synced to every ship-firework burst and a calm landing. It follows pause, seek, speed and cues, is included in recorded videos, and **♪ Music** mutes it. The show now **waits at 00:00 until the harbour scenery has loaded**, so a first visit to the website opens on the launch pads instead of part-way in, and **[…/Draw_in_3D/#demo](https://s0lluxx26.github.io/Draw_in_3D/#demo)** opens straight into the Demo. [Details, Blender pipeline and checks](docs/STUDIO14.md).
+
 ## Studio 13: cinematic sky stage
 
 ![Fish formation over the Blender-built harbour stage](docs/media/sky-studio-hero.jpg)
