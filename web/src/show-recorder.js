@@ -6,6 +6,27 @@ const note=(idle=false)=>{const s=$('show-record-status');s.toggleAttribute?.('d
 // The music track shares that budget.
 const BUDGET=160*1024*1024,MAX_BITS=4e6,MIN_BITS=8e5,AUDIO_BITS=128000;
 export const recordingBitrate=duration=>Math.min(MAX_BITS,.8*BUDGET*8/duration);
+// Chrome's MediaRecorder writes WebM without a duration, so players show no length and may not seek. Insert
+// Segment > Info > Duration before the download. Only the small header is read; the video data is reused as
+// Blob slices. Anything unexpected (SeekHead offsets that would shift, an existing duration) keeps the original.
+const vint=(b,o)=>{let len=1;while(len<=8&&!(b[o]&(0x80>>(len-1))))len++;if(len>8)throw new Error('bad EBML');let v=b[o]&(0xff>>len),ones=v===(0xff>>len);for(let i=1;i<len;i++){v=v*256+b[o+i];ones&&=b[o+i]===255;}return {v,len,unknown:ones};};
+const vintBytes=(v,len)=>{if(v>=2**(7*len)-1)throw new Error('size too large');const out=new Uint8Array(len);for(let i=len-1;i>=0;i--){out[i]=v%256;v=Math.floor(v/256);}out[0]|=1<<(8-len);return out;};
+function ebml(b,o){const first=b[o];let idLen=1;while(idLen<=4&&!(first&(0x80>>(idLen-1))))idLen++;if(idLen>4)throw new Error('bad EBML id');let id=0;for(let i=0;i<idLen;i++)id=id*256+b[o+i];
+  const size=vint(b,o+idLen),data=o+idLen+size.len;return {id,start:o,idLen,size:size.v,sizeLen:size.len,unknown:size.unknown,data,end:size.unknown?Infinity:data+size.v};}
+export async function withWebmDuration(blob,ms){
+  try{
+    const head=new Uint8Array(await blob.slice(0,65536).arrayBuffer()),header=ebml(head,0);if(header.id!==0x1A45DFA3)return blob;
+    const segment=ebml(head,header.end);if(segment.id!==0x18538067)return blob;
+    let info=null;for(let o=segment.data;o<head.length-12;){const e=ebml(head,o);if(e.id===0x114D9B74)return blob;if(e.id===0x1549A966){info=e;break;}if(e.id===0x1F43B675||e.unknown)break;o=e.end;}
+    if(!info||info.end>head.length)return blob;
+    let scale=1e6;for(let o=info.data;o<info.end;){const e=ebml(head,o);if(e.id===0x4489)return blob;if(e.id===0x2AD7B1){scale=0;for(let i=e.data;i<e.end;i++)scale=scale*256+head[i];}o=e.end;}
+    const duration=new Uint8Array(11);duration.set([0x44,0x89,0x88]);new DataView(duration.buffer).setFloat64(3,ms*1e6/scale);// timecode units
+    const grow=duration.length,need=v=>{let l=1;while(v>=2**(7*l)-1)l++;return l;},infoSize=vintBytes(info.size+grow,Math.max(info.sizeLen,need(info.size+grow)));
+    const prefix=head.slice(0,info.start);
+    if(!segment.unknown){const bytes=vintBytes(segment.size+grow+infoSize.length-info.sizeLen,segment.sizeLen);prefix.set(bytes,segment.start+segment.idLen);}
+    return new Blob([prefix,head.slice(info.start,info.start+info.idLen),infoSize,blob.slice(info.data,info.end),duration,blob.slice(info.end)],{type:blob.type});
+  }catch{return blob;}
+}
 export class ShowRecorder{
   active=false;
   constructor(player){this.player=player;$('show-record').onclick=()=>this.active?this.finish(true,'Recording cancelled.'):this.start();}
@@ -30,10 +51,11 @@ export class ShowRecorder{
       recorder.onstop=()=>{
         if(this.active)this.finish(true,'Recording stopped early. No incomplete video was saved.');
         const cancelled=this.cancelled,chunks=this.chunks;this.recorder=null;this.chunks=[];
-        if(!cancelled&&chunks.length){const blob=new Blob(chunks,{type:recorder.mimeType}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='draw-in-3d-show.'+(recorder.mimeType.includes('mp4')?'mp4':'webm');a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);note().textContent='Video downloaded · '+Math.round(blob.size/1024/1024)+' MiB';}
+        if(!cancelled&&chunks.length){const webm=!recorder.mimeType.includes('mp4'),raw=new Blob(chunks,{type:recorder.mimeType});note().textContent='Finishing video…';
+          (webm?withWebmDuration(raw,this.elapsed):Promise.resolve(raw)).then(blob=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='draw-in-3d-show.'+(webm?'webm':'mp4');a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);note().textContent='Video downloaded · '+Math.round(blob.size/1024/1024)+' MiB';});}
         else if(!cancelled)note().textContent='No video frames were recorded. Try another browser.';
       };
-      this.lock(true);recorder.start(1000);p.clock.play(performance.now());$('show-record').textContent='Cancel recording';note().textContent=`Recording from takeoff${audio?' with music':''}… keep this tab visible.`;p.refresh();
+      this.lock(true);recorder.start(1000);this.started=performance.now();p.clock.play(performance.now());$('show-record').textContent='Cancel recording';note().textContent=`Recording from takeoff${audio?' with music':''}… keep this tab visible.`;p.refresh();
     }catch(error){this.finish(true,error.message);if(this.recorder?.state==='inactive')this.recorder=null;note().textContent=error.message;}
   }
   lock(locked){
@@ -43,7 +65,7 @@ export class ShowRecorder{
   fail(message){this.cancelled=true;this.chunks=[];if(this.active)this.finish(true,message);else note().textContent=message;}
   frame(){if(!this.active)return;const p=this.player;note().textContent=`Recording ${Math.round(100*p.clock.time/p.show.duration)}% · 720p · keep this tab visible`;if(p.clock.time>=p.show.duration&&!this.endTimer)this.endTimer=setTimeout(()=>this.finish(false),150);}
   finish(cancel=true,message='Recording interrupted; no incomplete video was saved.'){
-    if(!this.active)return;this.active=false;this.cancelled=cancel;clearTimeout(this.endTimer);this.endTimer=null;
+    if(!this.active)return;this.active=false;this.cancelled=cancel;this.elapsed=performance.now()-(this.started??performance.now());clearTimeout(this.endTimer);this.endTimer=null;
     const p=this.player;p.clock.pause(performance.now());this.lock(false);
     if(this.recorder&&this.recorder.state!=='inactive')this.recorder.stop();
     this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;p.music?.release?.();

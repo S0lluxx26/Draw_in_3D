@@ -4,12 +4,29 @@ Open [Draw in 3D](https://s0lluxx26.github.io/Draw_in_3D/) and choose **Show edi
 
 ## Detailed Demo settings
 
-Choose **Demo settings** in the drawing inspector or the Demo player to set the drone count, light shape, 4×–8× formation size and per-formation yellow fire. Apply restarts the Demo. The detailed 3D formations are Blender assets; **Show editor → Edit demo** opens the stroke-based version described below. [Blender source and export instructions](STUDIO12.md).
+Choose **Demo settings** in the drawing inspector or the Demo player to set the drone count, light shape, 4×–8× formation size and per-formation yellow fire. Apply restarts the Demo. The detailed 3D formations are Blender assets; [Blender source and export instructions](STUDIO12.md).
 
-## Recreate and change the stroke-based demo
+## Edit the Demo, save it, play it later
 
-1. Click **Edit demo**. You get Robot, Fish, Eiffel Tower, Big ship, Firework star, Row of fire and Starship launch as editable drawings, with the original timing and a fireworks finale.
-2. Select the Robot card and click **Edit drawing**. Its original strokes open on a hidden drawing guide. Use Select or Box select to change colours or move parts; use Line, Curve, Rectangle, Ellipse or freehand Draw to add details. Undo and Redo work here. **Drone dots** previews the 4,096 samples over committed strokes.
+**Edit demo** opens the Demo itself, set up as in **Demo settings** on this device:
+- the 12 Blender-built 3D formations (cards marked **3D**), with their built-in motion: the swimming fish and whale, the flapping butterfly, the rising balloons;
+- the Demo's look: lights, size, ship fireworks and lasers (under **Look**);
+- the Demo finale: the heart with the family, the star and the firework balls (under **Finale**).
+
+Now make it yours:
+- **Remove** or **reorder** formations, and change their **display** and **transition** times;
+- switch **Falling fire** on or off for a Demo formation;
+- add your own drawings (**＋ Draw a formation**, **＋ Current drawing**, **＋ Selected ink**) or more Demo formations (**＋ Demo formation…**);
+- change the **Look** (light shape, size, ship fireworks, lasers) or choose the classic fireworks finale.
+
+**Save show** downloads a small `.show.json` (version 3) that stores your choices, not drone positions. Later, **Open show** loads it to keep editing, and **Play my show** performs it just like the Demo, with your changes.
+
+To change a Demo formation's *shape*, choose **✎ Convert to drawing**. It becomes the formation's editable line art (keeping its timing and motion); **Undo** restores the 3D formation. Your drawings play on the same stage as the Demo formations, at the same scale.
+
+## Change a formation's drawing
+
+1. Click **Edit demo**, select the Robot card and click **Convert to drawing**. (Older shows, or a card you already converted, show **Edit drawing**.)
+2. The Robot's strokes open on a hidden drawing guide. Use Select or Box select to change colours or move parts; use Line, Curve, Rectangle, Ellipse or freehand Draw to add details. Undo and Redo work here. **Drone dots** previews the 4,096 samples over committed strokes.
 3. Click **Save formation & return**. The app restores the drawing you had before entering formation editing, including its undo history. **Cancel** returns without changing the formation. The show itself has a separate Undo/Redo history.
 4. Select Fish, edit its drawing and colour it. For a different third scene, select Eiffel Tower, edit it, select its strokes and delete them, then draw a heart, star or your own symbol. Keep the guide if you want to draw on the same sheet. Rename the card when finished.
 5. Drag the cards to reorder them on desktop, or use **Earlier / Later** on any device. **Display** is the time a completed shape remains visible. **Transition** is the travel interval before that shape. The timeline below shows the complete sequence, including generated takeoff and landing.
@@ -40,7 +57,7 @@ Keep the tab visible until landing. The video downloads automatically on complet
 
 New shows use 4,096 drones. The fleet selector can retain 256 drones for older projects or a lighter preview. Motion / effect offers Still, Firework sparkle, Falling fire and Starship rise. Starship rises 10 stage units during its display interval. Paint exhaust with bright yellow (#ffdf12); that ink falls and flickers, returning while dark. These effects are independent of pen thickness.
 
-Show files now save as version 2; version 1 files load with their original 256-drone count and still formations.
+Shows edited from the Demo save as version 3 (Demo formations, look and finale). Older version 2 and version 1 files still open and play on their original small stage; **Look → Use the Demo's look** upgrades them, and adding a Demo formation does this automatically.
 
 ## Current scope
 

@@ -68,7 +68,7 @@ function butterfly(){return [ellipse(0,-.3,.55,4.1,white),ellipse(0,4.45,.62,.62
   lobe(0,1,152,6.05,5.6,3.9,pink,s,.07),lobe(0,1,152,6.5,3.5,2.25,gold,s),ellipse(...at(0,1,152,6.6),.95,.95,cyan),
   lobe(0,-.6,230,4.7,3.9,2.1,blue,s,.06),lobe(0,-.6,230,4.9,2.2,1.15,cyan,s),ellipse(...at(0,-.6,230,5),.5,.5,gold),
   line([[s*.25,4.9],[s*.8,6.5],[s*1.6,7.9],[s*2.6,9]],gold),ellipse(s*2.9,9.3,.42,.42,pink)];})];}
-function balloon(){
+function balloonShape(){
   const cy=4.6,R=6,mx=1.8,my=-2.2,tilt=Math.atan2(my-cy,mx)+Math.acos(R/Math.hypot(mx,my-cy)),half=[[mx,my],...arc(0,cy,R,R,tilt*180/Math.PI,90,40)];
   const gore=(k,color)=>line(half.map(([x,y])=>[k*x,y]),color),tx=R*Math.cos(tilt),ty=cy+R*Math.sin(tilt);
   return [line([...half,...half.slice(0,-1).reverse().map(([x,y])=>[-x,y])],pink),gore(-.87,cyan),gore(-.5,gold),gore(0,white),gore(.5,gold),gore(.87,cyan),
@@ -76,6 +76,9 @@ function balloon(){
     line([[-mx,my],[-1.5,-5.4]],white),line([[mx,my],[1.5,-5.4]],white),box(-1.5,-7.6,3,2.2,gold),line([[-1.5,-6.5],[1.5,-6.5]],gold),
     line([[0,-5.2],[-.55,-4.5],[-.35,-3.7],[0,-2.8],[.35,-3.7],[.55,-4.5],[0,-5.2]],flame)];
 }
+// The line art uses the layout of tools/blender/build_formations.py BALLOONS, scaled by .82 to fit the drawing frame.
+const shifted=(paths,dx,dy,k)=>paths.map(p=>({...p,points:p.points.map(([x,y,z])=>[dx+x*k,18+dy+(y-18)*k,z*k])}));
+function balloon(){return [...shifted(balloonShape(),0,0,.75),...shifted(balloonShape(),-8.7,2.6,.45),...shifted(balloonShape(),8.7,-2,.45)];}
 function cake(){
   const tier=(x,y,w,h,color)=>line([[x,y],[x,y+h],[x+w,y+h],[x+w,y]],color);
   const drip=(x,y,w,phase)=>line(Array.from({length:Math.round(w*10)+1},(_,i)=>{const px=x+w*i/Math.round(w*10),bump=Math.max(0,Math.sin(px*2.3+phase))**4;return [px,y-.35-bump*(.7+.35*Math.cos(px*1.3+phase))];}),white);
@@ -104,12 +107,26 @@ function whale(){return [
 ];}
 // Water spout from the Blender whale's blowhole (tools/blender/build_formations.py whale_blowhole), in formation units.
 export const WHALE_SPOUT={hole:[7.4,1.538,0],height:9,spread:3.1};
-// Formation motions: the butterfly flaps, the whale swims and blows (see sampleShow).
-export const MOTIONS=['flap','swim'];
+// The sea surface above the swimming fish: three rolling swells, clear of its bubbles, in formation units
+// (waves travel toward the tail). Swells below it would sit on the skyline, since the camera looks up at formations.
+export const FISH_WAVES={lines:[{y:8.6,x0:-12.5,x1:5.5,z:.6,amp:.42,phase:3.1},{y:10.6,x0:-11,x1:11,z:0,amp:.5,phase:0},{y:12.4,x0:-7,x1:7,z:-.6,amp:.34,phase:1.7}],wavelength:7,speed:.45};
+// One wave drone: where along which swell, plus a little thickness, spread evenly by length.
+export function waveDrop(j,n,waves){
+  const lengths=waves.lines.map(l=>l.x1-l.x0),total=lengths.reduce((a,b)=>a+b,0);let at=(j+.5)/n*total,line=0;
+  while(line<lengths.length-1&&at>lengths[line]){at-=lengths[line];line++;}
+  const f=x=>x-Math.floor(x);return {kind:'wave',line,x:at/lengths[line],jitter:(f(j*.7548776662)-.5)*.3};
+}
+const swell=(waves,d,t)=>{const l=waves.lines[d.line],x=l.x0+(l.x1-l.x0)*d.x;return {l,x,a:2*Math.PI*(x/waves.wavelength+waves.speed*t)+l.phase};};
+export function wavePoint(waves,d,t=0){const {l,x,a}=swell(waves,d,t);return [x,l.y+l.amp*Math.sin(a)+d.jitter*(waves.unit??1),l.z];}
+// Crests catch the light as foam; troughs stay deep blue.
+export function waveGlow(waves,d,t){return .3+.7*Math.max(0,Math.sin(swell(waves,d,t).a))**2;}
+// Formation motions: the fish swims in its waves, the butterfly flaps, the balloons drift up with flickering
+// burners, and the whale swims and blows (see sampleShow).
+export const MOTIONS=['flap','swim','fish','balloons'];
 // Displays last about 12 s so each formation has time to be admired; the finale lingers longer.
-export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:12},{name:'Fish',paths:fish(),hold:12},{name:'Butterfly',paths:butterfly(),hold:12,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:12},{name:'Eiffel Tower',paths:tower(),hold:12},{name:'Big ship',paths:ship(),hold:12},{name:'Whale',paths:whale(),hold:15,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:12,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:12,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:12},{name:'Starship launch',paths:starship(),hold:17,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:16,effect:'sparkle',pyro:true}];
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:12},{name:'Fish',paths:fish(),hold:12,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:12,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:12,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:12},{name:'Big ship',paths:ship(),hold:12},{name:'Whale',paths:whale(),hold:15,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:12,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:12,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:12},{name:'Starship launch',paths:starship(),hold:17,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:16,effect:'sparkle',pyro:true}];
 // One spout droplet: position along the jet u, jet side, and a spray offset (angle, radius), all from its index.
-export function spoutDrop(j){const f=x=>x-Math.floor(x);return {u:f(j*.6180339887+.13),side:j%2?1:-1,angle:f(j*.7548776662)*Math.PI*2,radius:Math.sqrt(f(j*.5698402910+.37))};}
+export function spoutDrop(j){const f=x=>x-Math.floor(x);return {kind:'spout',u:f(j*.6180339887+.13),side:j%2?1:-1,angle:f(j*.7548776662)*Math.PI*2,radius:Math.sqrt(f(j*.5698402910+.37))};}
 // The spout rises from the blowhole and splits into two jets that fan out and droop (formation units).
 export function spoutPoint(spout,d,u=d.u){
   const rise=spout.height*(1-(1-u)**2)-.9*Math.max(0,u-.72)**2*spout.height,fan=d.side*spout.spread*u**1.25,spray=(.12+.85*u)*d.radius*spout.spread*.38;
@@ -178,7 +195,7 @@ function uncross(previous,targets,permutation){
 export function matchFormation(previous,target){
   const n=previous.length;if(target.positions.length!==n)throw new Error('Formation must match the fleet size.');
   const permutation=new Int32Array(n),pick=values=>Array.from(permutation,i=>values[i]);
-  const result=()=>({positions:pick(target.positions),colors:pick(target.colors),order:Array.from(permutation,i=>target.order?.[i]??i/Math.max(1,n-1)),...(target.fire?{fire:pick(target.fire)}:{}),...(target.spray?{spray:pick(target.spray)}:{}),...(target.pad?{pad:pick(target.pad)}:{})});
+  const result=()=>({positions:pick(target.positions),colors:pick(target.colors),order:Array.from(permutation,i=>target.order?.[i]??i/Math.max(1,n-1)),...(target.fire?{fire:pick(target.fire)}:{}),...(target.extra?{extra:pick(target.extra)}:{}),...(target.pad?{pad:pick(target.pad)}:{})});
   if(n>256){partitionAssign(previous,target.positions,permutation);uncross(previous,target.positions,permutation);return result();}
   const costs=previous.map(a=>Float64Array.from(target.positions,b=>a.reduce((s,v,k)=>s+(v-b[k])**2,0)));
   const u=new Float64Array(n+1),v=new Float64Array(n+1),p=new Int32Array(n+1),way=new Int32Array(n+1);
@@ -234,9 +251,30 @@ function fireworksSeeds(count){
   return {positions,colors};
 }
 // Full-size targets plus compact launch seeds. Reuse the fleet; no extra particles.
+// A family inside the growing heart: man, boy, woman and girl holding hands (heart-local units, all inside its
+// innermost contour). The little girl waves.
+function familyPaths(){
+  const circle=(x,y,r,n=20)=>Array.from({length:n+1},(_,i)=>[x+r*Math.cos(i*2*Math.PI/n),y+r*Math.sin(i*2*Math.PI/n),0]),rose=[1,.72,.88];
+  const base=-3.1,people=[{x:-4,h:6.7,c:cyan},{x:-1.3,h:4.1,c:gold},{x:1.55,h:6.2,c:pink,dress:true,hair:true},{x:4.15,h:3.7,c:rose,dress:true,hair:true,wave:true}];
+  const paths=[],hand=(a,b)=>[(a.x+b.x)/2,base+Math.min(a.h,b.h)*.46,0];
+  people.forEach((p,i)=>{
+    const {x,h,c}=p,head=h*.105,sh=base+h*.7,hip=base+h*.44,left=people[i-1],right=people[i+1];
+    paths.push({points:circle(x,base+h*.88,head),color:c});
+    if(p.dress){paths.push({points:[[x-h*.07,sh,0],[x-h*.2,base+h*.3,0],[x+h*.2,base+h*.3,0],[x+h*.07,sh,0],[x-h*.07,sh,0]],color:c});
+      for(const s of [-1,1])paths.push({points:[[x+s*h*.07,base+h*.3,0],[x+s*h*.07,base,0]],color:c});}
+    else{paths.push({points:[[x,base+h*.78,0],[x,hip,0]],color:c});for(const s of [-1,1])paths.push({points:[[x,hip,0],[x+s*h*.1,base,0]],color:c});}
+    if(p.hair)paths.push({points:Array.from({length:13},(_,k)=>{const a=Math.PI*(.05+.9*k/12);return [x+head*1.25*Math.cos(a),base+h*.88+head*1.1*Math.sin(a)-(k<3||k>9?head*.9:0),0];}),color:c});
+    paths.push({points:[[x,sh,0],left?hand(left,p):[x-h*.24,base+h*.4,0]],color:c});
+    paths.push({points:[[x,sh,0],right?hand(p,right):p.wave?[x+h*.22,base+h*.98,0]:[x+h*.24,base+h*.4,0]],color:c});
+  });
+  return paths;
+}
 function shapedFirework(kind,count,scale){
   const positions=[],colors=[],centres=[];
+  // The heart keeps ~72% of the fleet for its contours; the rest draw the family inside it.
+  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?samplePaths(familyPaths(),count-outline):null;
   for(let i=0;i<count;i++){
+    if(i>=outline){const p=family.positions[i-outline],centre=[0,24,0];colors.push([...family.colors[i-outline]]);centres.push(centre.map(v=>v*scale));positions.push(p.map((v,k)=>(centre[k]+v)*scale));continue;}
     let p,centre=[0,24,0];
     if(kind==='balls'){
       const cluster=i%3,j=Math.floor(i/3),n=Math.floor((count+2-cluster)/3),y=1-2*(j+.5)/n,a=j*2.399963229728653,r=Math.sqrt(Math.max(0,1-y*y));
@@ -244,7 +282,7 @@ function shapedFirework(kind,count,scale){
       colors.push([...[gold,pink,cyan][cluster]]);
     }else{
       // Several nested contours give the growing silhouettes depth and texture.
-      const ring=i%8,t=(Math.floor(i/8)+.5)/Math.ceil(count/8),a=t*Math.PI*2,r=.76+ring*.034;
+      const ring=i%8,t=(Math.floor(i/8)+.5)/Math.ceil(outline/8),a=t*Math.PI*2,r=.76+ring*.034;
       if(kind==='heart')p=[16*Math.sin(a)**3*r*.7,(13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a))*r*.7,Math.sin(ring*2.4)*.7];
       else{const edge=t*10,k=Math.floor(edge),f=edge-k,vertex=j=>{const angle=Math.PI/2+j*Math.PI/5,radius=j%2?4.8:11;return [Math.cos(angle)*radius,Math.sin(angle)*radius];},v=vertex(k),w=vertex(k+1);p=[(v[0]+(w[0]-v[0])*f)*r,(v[1]+(w[1]-v[1])*f)*r,Math.sin(ring*2.4)*.7];}
       colors.push([...(kind==='heart'?[pink,gold][ring%2]:[gold,white][ring%2])]);
@@ -262,9 +300,13 @@ export function buildShow(custom,options={}){
   const add=(name,kind,duration,target,details={})=>{if(kind==='move'&&details.transitionLights&&stages.length)stages.at(-1).fadeBeforeMove=true;const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
   const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths,count)})));
-  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled,pyro,motion=MOTIONS.includes(effect)?effect:undefined,spout} of sequence){
-    // `pyro` marks a formation that ship-launched fireworks accompany; the stage carries it for the renderer.
-    const target=matchFormation(previous.positions,formation),extra=pyro?{pyro:true}:{};add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});cues.push({label:name,time:cursor+Math.min(hold/2,2)});if(effect==='starship'){const raised={...target,positions:target.positions.map(p=>[p[0],p[1]+10*(options.motionScale??1),p[2]])};add(name,'rise',hold,raised,{effect,fireEnabled,motionScale:options.motionScale,...extra});}else add(name,'hold',hold,target,{reveal:true,light,effect,fireEnabled,motionScale:options.motionScale,...(motion?{motion}:{}),...(spout&&target.spray?{spout}:{}),...extra});
+  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled,pyro,motion=MOTIONS.includes(effect)?effect:undefined,spout,waves} of sequence){
+    // `pyro` marks a formation that ship-launched fireworks accompany; motion, spout and waves animate the display.
+    const target=matchFormation(previous.positions,formation),details={...(pyro?{pyro:true}:{}),...(motion?{motion}:{}),...(spout&&target.extra?{spout}:{}),...(waves&&target.extra?{waves}:{})};
+    add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});cues.push({label:name,time:cursor+Math.min(hold/2,2)});
+    const lift=effect==='starship'?10:motion==='balloons'?3.5:0;// the Starship launches; balloons drift gently up
+    if(lift){const raised={...target,positions:target.positions.map(p=>[p[0],p[1]+lift*(options.motionScale??1),p[2]])};add(name,'rise',hold,raised,{effect,fireEnabled,motionScale:options.motionScale,...details});}
+    else add(name,'hold',hold,target,{reveal:true,light,effect,fireEnabled,motionScale:options.motionScale,...details});
   }
   if(options.fireworks?.enabled!==false&&options.fireworks?.trilogy){
     for(const [kind,name] of [['heart','Growing heart'],['star','Five-point star'],['balls','Three firework balls']]){
@@ -292,7 +334,7 @@ export function buildShow(custom,options={}){
 
 export function stageAt(show,time){const t=clamp(Number.isFinite(time)?time:0,0,show.duration);return show.stages.find(s=>t<s.end)||show.stages.at(-1);}
 export function groundFocus(show,time){
-  if(!show.demo)return 0;
+  if(!show.demo&&!show.cinematic)return 0;
   const takeoff=show.stages.find(s=>s.kind==='takeoff'),departure=show.stages[show.stages.indexOf(takeoff)+1],arrival=show.stages.find(s=>s.name==='Returning home');
   if(time<=takeoff.end)return 1;
   if(time<departure.end)return 1-ease((time-departure.start)/(departure.end-departure.start));
@@ -312,10 +354,10 @@ export function frontView(show,aspect,fov=46,verticalOffset=0){
 const motionCache=new WeakMap();
 function motionFrame(s){
   let m=motionCache.get(s);if(m)return m;
-  const P=s.to.positions,spray=s.to.spray;let min=Infinity,max=-Infinity,z=0,n=0;
-  for(let i=0;i<P.length;i++)if(!spray?.[i]){min=Math.min(min,P[i][0]);max=Math.max(max,P[i][0]);}
+  const P=s.to.positions,extra=s.to.extra;let min=Infinity,max=-Infinity,z=0,n=0;
+  for(let i=0;i<P.length;i++)if(!extra?.[i]){min=Math.min(min,P[i][0]);max=Math.max(max,P[i][0]);}
   const cx=(min+max)/2,L=Math.max(1e-6,max-min),hinge=.035*L;
-  for(let i=0;i<P.length;i++)if(!spray?.[i]&&Math.abs(P[i][0]-cx)<hinge){z+=P[i][2];n++;}
+  for(let i=0;i<P.length;i++)if(!extra?.[i]&&Math.abs(P[i][0]-cx)<hinge){z+=P[i][2];n++;}
   m={max,cx,L,hinge,cz:n?z/n:0};motionCache.set(s,m);return m;
 }
 // Whale blows: the spout shoots up, sprays for a couple of seconds, fades, rests, and blows again.
@@ -327,7 +369,7 @@ function moveDrone(s,m,i,elapsed,envelope,out){
     const angle=envelope*.4*Math.sin(elapsed*Math.PI*2*.55),c=Math.cos(angle),sn=Math.sin(angle),dz=P[o+2]-m.cz;
     P[o]=m.cx+side*(m.hinge+wing*c-dz*sn);P[o+2]=m.cz+wing*sn+dz*c;
   }else if(s.motion==='swim'){
-    const d=s.to.spray?.[i];
+    const d=s.to.extra?.[i];
     if(d&&s.spout){// a droplet flows up its jet; the lights follow each blow
       const u=(d.u+elapsed*.55)%1,p=spoutPoint(s.spout,d,u),b=.06+.94*blowGlow(elapsed,u);
       for(let k=0;k<3;k++){P[o+k]+=envelope*(p[k]-P[o+k]);out.colors[o+k]*=1-envelope*(1-b);}
@@ -335,6 +377,20 @@ function moveDrone(s,m,i,elapsed,envelope,out){
       const w=clamp((m.max-P[o])/m.L),phase=elapsed*Math.PI*2*.3;
       P[o+1]+=envelope*m.L*(.045*w**1.8*Math.sin(phase-2.2*w)+.012*Math.sin(phase+1.3));
     }
+  }else if(s.motion==='fish'){
+    const d=s.to.extra?.[i];
+    if(d&&s.waves){// a wave drone rides its swell; crests glow like foam
+      const p=wavePoint(s.waves,d,elapsed),b=waveGlow(s.waves,d,elapsed);
+      for(let k=0;k<3;k++){P[o+k]+=envelope*(p[k]-P[o+k]);out.colors[o+k]*=1-envelope*(1-b);}
+    }else{// the body swings side to side from head to tail while the fish rises and dips a little, nose first
+      const w=clamp((m.max-P[o])/m.L),phase=elapsed*Math.PI*2*.8,bob=elapsed*Math.PI*2*.28;
+      P[o+2]+=envelope*m.L*.06*w**1.6*Math.sin(phase-2.4*w);
+      P[o+1]+=envelope*m.L*(.02*Math.sin(bob)+.014*(P[o]-m.cx)/m.L*Math.cos(bob));
+    }
+  }else if(s.motion==='balloons'){// each balloon sways on its own; the burner flames flicker
+    const dx=P[o]-m.cx,group=dx<-.235*m.L?0:dx>.235*m.L?2:1,c=s.to.colors[i];
+    P[o+1]+=envelope*m.L*.007*Math.sin(elapsed*1.25+group*2.1);P[o]+=envelope*m.L*.004*Math.sin(elapsed*.8+group*1.3);
+    if(c[0]>.3&&c[1]/c[0]>.75&&c[2]/c[0]<.25){const f=1-envelope*(.45-.45*Math.sin(elapsed*13+i*2.7)**2*(.6+.4*Math.sin(elapsed*3.1+group)));for(let k=0;k<3;k++)out.colors[o+k]*=f;}
   }
 }
 export function createFrame(show){return {positions:new Float32Array(show.count*3),colors:new Float32Array(show.count*3),phase:'',time:0};}
@@ -342,7 +398,7 @@ export function sampleShow(show,time,out=createFrame(show)){
   const t=clamp(Number.isFinite(time)?time:0,0,show.duration),s=stageAt(show,t),elapsed=t-s.start,duration=s.end-s.start;
   out.time=t;out.phase=s.name;
   const window=Math.sin(Math.PI*elapsed/duration)**2,animated=['sparkle','fire','starship'].includes(s.effect),travel=ease((elapsed-.65)/(duration-1.3)),progress=ease(elapsed/duration),fadeOut=1-ease(elapsed/.6),fadeIn=ease(elapsed/.65),navigation=ease(elapsed/.35)*ease((duration-elapsed)/.35);
-  const side=Math.ceil(Math.sqrt(show.count)),motion=s.kind==='hold'&&s.motion?motionFrame(s):null,envelope=motion?ease(elapsed/1.2)*ease((duration-elapsed)/1.2):0;
+  const side=Math.ceil(Math.sqrt(show.count)),motion=(s.kind==='hold'||s.kind==='rise')&&s.motion?motionFrame(s):null,envelope=motion?ease(elapsed/1.2)*ease((duration-elapsed)/1.2):0;
   for(let i=0;i<show.count;i++){
     let q=0,light=0,navLight=0,color=s.to.colors[i];
     if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}

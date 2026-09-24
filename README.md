@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 16: edit the Demo, swimming fish, three balloons, a family in the heart
+
+![The fish swims under rolling waves, three balloons drift up, and a family stands inside the growing heart](docs/media/studio16-formations.jpg)
+
+**Show editor → Edit demo** now opens the Demo itself: its Blender 3D formations, their motion, its look and its finale. Remove, reorder or retime formations, switch falling fire, add your own drawings or more Demo formations, then **Save show**. **Open show** later to keep editing, and **Play my show** performs it just like the Demo. **Convert to drawing** turns a Demo formation into editable line art. The **fish swims** under three rolling waves. **Three hot air balloons** (one big, two small) drift up with flickering burner flames. The **growing heart** holds a family: a man, a boy, a woman and a waving girl holding hands. **Record video** saves a WebM (or MP4) with music, and now writes its length, so players can show it and seek. [Details and checks](docs/STUDIO16.md).
+
 ## Studio 15: phone-friendly show, whale, flapping butterfly and lasers
 
 ![The whale blows a split spout while the stage lasers sweep](docs/media/whale-lasers.jpg)

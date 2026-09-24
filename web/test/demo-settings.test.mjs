@@ -45,7 +45,7 @@ test('Blender formations have depth, distinct well-spaced samples and exact flee
 });
 test('Demo fire selection is explicit; Starship still rises when its fire is disabled',()=>{
   const fire=Object.fromEntries(FORMATIONS.map(n=>[n,n==='Fish']));
-  const show=compileDemo(assets,{count:256,scale:2,fire}),fish=show.stages.find(s=>s.name==='Fish'),rise=show.stages.find(s=>s.kind==='rise');
+  const show=compileDemo(assets,{count:256,scale:2,fire}),fish=show.stages.find(s=>s.name==='Fish'),rise=show.stages.find(s=>s.name==='Starship launch');
   assert.equal(fish.to.fire.filter(Boolean).length,32);assert.equal(rise.to.fire.filter(Boolean).length,0);
   assert.ok(rise.to.positions.every((p,i)=>Math.abs(p[1]-rise.from.positions[i][1]-40)<1e-8));
   assert.equal(fish.effect,'fire');assert.equal(rise.fireEnabled,false);
@@ -68,9 +68,9 @@ test('Dim transition LEDs alternate, remain bounded, and fade continuously at ev
   }
 });
 test('Demo formations are twice the previous dimensions for existing saved scale choices',()=>{
-  const show=compileDemo(assets,{count:512,scale:3,fire:{Fish:false}}),fish=show.stages.find(s=>s.name==='Fish');
+  const show=compileDemo(assets,{count:512,scale:3,fire:{Robot:false}}),fish=show.stages.find(s=>s.name==='Robot');
   const extent=(points,k)=>Math.max(...points.map(p=>p[k]))-Math.min(...points.map(p=>p[k]));
-  for(let k=0;k<3;k++)assert.ok(Math.abs(extent(fish.to.positions,k)-extent(assets.Fish.body.positions.slice(0,512),k)*6)<1e-8);
+  for(let k=0;k<3;k++)assert.ok(Math.abs(extent(fish.to.positions,k)-extent(assets.Robot.body.positions.slice(0,512),k)*6)<1e-8);
 });
 test('New stroke formations sample to full fleets; only Happy day carries the ship-fireworks flag, in both demos',()=>{
   const drawn=demoPaths();assert.deepEqual(drawn.map(f=>f.name),FORMATIONS);

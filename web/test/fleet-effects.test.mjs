@@ -19,7 +19,7 @@ test('takeoff and landing alternate red and blue and end dark at exact home posi
   assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);assert.ok(sampleShow(show,show.duration).colors.every(v=>v===0));
 });
 test('editable effects survive save/open, Starship rises with a yellow exhaust subset, legacy fleets load',()=>{
-  const doc=decodeShow(encodeShow(editableDemo())),show=compileShow(doc),rise=show.stages.find(s=>s.kind==='rise');
+  const doc=decodeShow(encodeShow(editableDemo())),show=compileShow(doc),rise=show.stages.find(s=>s.name==='Starship launch');
   assert.ok(rise);assert.ok(show.cues.some(c=>c.label==='Big ship'));assert.ok(show.cues.some(c=>c.label==='Firework star'));assert.ok(show.cues.some(c=>c.label==='Row of fire'));
   const flames=rise.to.colors.map((c,i)=>c[0]>.9&&c[1]>.7&&c[2]<.2?i:-1).filter(i=>i>=0);assert.ok(flames.length>0&&flames.length<4096);
   const mid=sampleShow(show,(rise.start+rise.end)/2);assert.ok(flames.some(i=>mid.positions[i*3+1]<(rise.from.positions[i][1]+rise.to.positions[i][1])/2-.1));

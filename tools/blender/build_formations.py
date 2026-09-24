@@ -516,30 +516,39 @@ def whale():
     print('Whale blowhole (app units):', tuple(round(v, 3) for v in hole), flush=True)
     exhaust([-5, -1, 3], -4.6, .3, 2.8, .45)
 
+BALLOONS = [  # (x, y, z, scale, gore colours): one big balloon between two smaller ones
+    (0.0, 0.0, 0.0, .92, [(1, .15, .35), (1, .72, .1), (.1, .8, 1), (1, 1, 1), (1, .38, .08), (.25, .35, 1)]),
+    (-10.6, 3.2, -2.0, .55, [(1, .2, .55), (1, 1, 1), (1, .5, .8), (1, .85, .3), (.95, .3, .6), (1, 1, 1)]),
+    (10.6, -2.4, -1.5, .55, [(.2, .5, 1), (1, .8, .2), (.1, .85, .8), (1, 1, 1), (.3, .35, 1), (1, .6, .1)])]
+
 def balloon():
-    """Striped hot air balloon with load tapes, basket, ropes and burner flame."""
+    """Three striped hot air balloons (one big, two small), each with load tapes, basket, ropes and a burner flame.
+    The web app lifts them gently during their display and flickers the flames."""
     profile = [(-3.2, 1.1), (-2, 2.6), (0, 4.6), (2, 6.0), (4, 6.6), (6, 6.3), (7.5, 5.4), (8.7, 4.0), (9.6, 2.2), (10, .02)]
-    gores = [(1, .15, .35), (1, .72, .1), (.1, .8, 1), (1, 1, 1), (1, .38, .08), (.25, .35, 1)]
-    def envelope(p):
-        if -1.2 < p.y < -.4:
-            return (1, .85, .3)
-        return gores[int((math.atan2(p.z, p.x) + math.pi) / (2 * math.pi) * 12) % 6]
-    env = Part(envelope)
-    env.lathe([(0, y, 0) for y, r in profile], [r for y, r in profile], 48)
-    env.finish('Envelope', 'pink')
-    tapes = Part((1, .9, .6))
-    for k in range(12):
-        a = k * 2 * math.pi / 12 - math.pi
-        tapes.path([(math.cos(a) * (r + .06), y, math.sin(a) * (r + .06)) for y, r in profile[:-1]], .05, 5)
-    tapes.finish('Load tapes', 'gold')
-    basket = Part(lambda p: ramp([(-8, (1, .45, .1)), (-6.4, (1, .7, .3))], p.y)); basket.box((0, -7.2, 0), (2.2, 1.6, 2.2), .12); basket.finish('Basket', 'orange')
-    ropes = Part((.85, .9, 1))
-    for sx in (-1, 1):
-        for sz in (-1, 1):
-            ropes.tube((sx * 1.0, -6.4, sz * 1.0), (sx * .8, -3.2, sz * .8), .05, .05, 5)
-    ropes.finish('Ropes', 'silver')
-    flame('Burner flame', (0, -5.6, 0), 2.2, .55, twist=.6, fire=False)
-    exhaust([-1.1, 1.1], -8.2, 0, 2.6, .4)
+    for n, (ox, oy, oz, k, gores) in enumerate(BALLOONS):
+        at = lambda x, y, z, ox=ox, oy=oy, oz=oz, k=k: (ox + x * k, oy + y * k, oz + z * k)
+        def envelope(p, ox=ox, oy=oy, oz=oz, k=k, gores=gores):
+            if -1.2 < (p.y - oy) / k < -.4:
+                return (1, .85, .3)
+            return gores[int((math.atan2(p.z - oz, p.x - ox) + math.pi) / (2 * math.pi) * 12) % 6]
+        tag = ' %d' % (n + 1)
+        env = Part(envelope)
+        env.lathe([at(0, y, 0) for y, r in profile], [r * k for y, r in profile], 48)
+        env.finish('Envelope' + tag, 'pink')
+        tapes = Part((1, .9, .6))
+        for j in range(12):
+            a = j * 2 * math.pi / 12 - math.pi
+            tapes.path([at(math.cos(a) * (r + .06), y, math.sin(a) * (r + .06)) for y, r in profile[:-1]], .05 * k + .01, 5)
+        tapes.finish('Load tapes' + tag, 'gold')
+        basket = Part(lambda p, oy=oy, k=k: ramp([(-8, (1, .45, .1)), (-6.4, (1, .7, .3))], (p.y - oy) / k))
+        basket.box(at(0, -7.2, 0), (2.2 * k, 1.6 * k, 2.2 * k), .12 * k); basket.finish('Basket' + tag, 'orange')
+        ropes = Part((.85, .9, 1))
+        for sx in (-1, 1):
+            for sz in (-1, 1):
+                ropes.tube(at(sx * 1.0, -6.4, sz * 1.0), at(sx * .8, -3.2, sz * .8), .05 * k + .01, .05 * k + .01, 5)
+        ropes.finish('Ropes' + tag, 'silver')
+        flame('Burner flame' + tag, at(0, -5.6, 0), 2.2 * k, .55 * k + .08, twist=.6 + n, fire=False)
+        exhaust([ox - 1.1 * k, ox + 1.1 * k], oy - 8.2 * k, oz, 2.6 * k, .4 * k)
 
 def cake():
     """Three-tier birthday cake: frosting drips, sprinkles, candles with flames."""

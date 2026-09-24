@@ -1,33 +1,6 @@
-import {buildShow,demoPaths,spoutDrop,spoutPoint,MOTIONS} from './drone-show.js';
+import {demoSettings,compileDemo,FLEET_SIZES,FORMATIONS} from './demo-library.js';
 import {QUALITY_LEVELS} from './quality.js';
-
-export const FLEET_SIZES=[256,512,1024,2048,4096];
-export const LIGHT_SHAPES=['round','diamond','star'];
-export const FORMATIONS=['Robot','Fish','Butterfly','Hot air balloon','Eiffel Tower','Big ship','Whale','Firework star','Row of fire','Birthday cake','Starship launch','Happy day'];
-export function demoSettings(value={}){
-  return {count:FLEET_SIZES.includes(value?.count)?value.count:4096,
-    shape:LIGHT_SHAPES.includes(value?.shape)?value.shape:'round',
-    scale:[2,3,4].includes(value?.scale)?value.scale:3,
-    pyro:typeof value?.pyro==='boolean'?value.pyro:true,
-    lasers:typeof value?.lasers==='boolean'?value.lasers:true,
-    fire:Object.fromEntries(FORMATIONS.map(name=>[name,typeof value?.fire?.[name]==='boolean'?value.fire[name]:['Row of fire','Starship launch'].includes(name)]))};
-}
-export function compileDemo(assets,value){
-  const settings=demoSettings(value),{count}=settings,scale=settings.scale*2;
-  const sequence=demoPaths().map(cue=>{
-    // A tenth of the fleet becomes the whale's water spout; the body keeps an evenly spread prefix of its lights.
-    const asset=assets[cue.name],fireCount=settings.fire[cue.name]?Math.floor(count/8):0,sprayCount=cue.spout?Math.floor(count/10):0,bodyCount=count-fireCount-sprayCount;
-    const drops=Array.from({length:sprayCount},(_,j)=>spoutDrop(j)),world=p=>[p[0]*scale,(p[1]+18)*scale,p[2]*scale];
-    const raw=[...asset.body.positions.slice(0,bodyCount),...asset.fire.positions.slice(0,fireCount),...drops.map(d=>spoutPoint(cue.spout,d))];
-    const formation={positions:raw.map(world),
-      colors:[...asset.body.colors.slice(0,bodyCount),...asset.fire.colors.slice(0,fireCount),...drops.map(d=>[.46+.16*d.radius,.68,.9])],
-      fire:Array.from({length:count},(_,i)=>i>=bodyCount&&i<bodyCount+fireCount),...sprayCount?{spray:Array.from({length:count},(_,i)=>drops[i-bodyCount-fireCount]??0)}:{}};
-    const spout=cue.spout&&{hole:world(cue.spout.hole),height:cue.spout.height*scale,spread:cue.spout.spread*scale};
-    return {...cue,transfer:9,formation,fireEnabled:fireCount>0,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none',motion:MOTIONS.includes(cue.effect)?cue.effect:undefined,spout};
-  });
-  const show=buildShow(null,{count,sequence,transitionLights:true,motionScale:scale,reverseLanding:true,fireworks:{trilogy:true}});
-  show.lightShape=settings.shape;show.demo=true;show.pyro=settings.pyro;show.lasers=settings.lasers;return show;
-}
+export {FLEET_SIZES,LIGHT_SHAPES,FORMATIONS,demoSettings,compileDemo} from './demo-library.js';
 
 export function installDemoSettings({play,player,notify}){
   const key='draw3d-demo-settings-v1';let settings=demoSettings(),assets,cached,wasPlaying=false,opener,generation=0;
