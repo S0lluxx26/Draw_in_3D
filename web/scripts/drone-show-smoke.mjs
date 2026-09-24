@@ -8,6 +8,7 @@ const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,he
 try{
   const page=await browser.newPage({viewport:{width:1440,height:1040},acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('dialog',d=>d.accept());
   await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173/');await page.locator('#undo:disabled').waitFor();
+  await page.locator('#welcome-demo').click();await page.locator('#drone-show').waitFor({state:'visible'});await page.locator('#show-exit').click();await page.locator('#drone-show').waitFor({state:'hidden'});
   await page.locator('#drone-drawing').click();await page.locator('#toast').waitFor();assert.ok((await page.locator('#toast').textContent()).includes('Draw'));assert.equal(await page.locator('#drone-show').isVisible(),false);
   await page.locator('#add-paper').click();await page.locator('[data-paper-bend="90"]').click();await page.locator('[data-tool="line"]').click();const canvas=await page.locator('#canvas').boundingBox();await page.mouse.move(canvas.x+canvas.width*.44,canvas.y+canvas.height*.44);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.58,canvas.y+canvas.height*.55,{steps:10});await page.mouse.up();
   const save=async name=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const file=path.join(out,name);await(await waiting).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};

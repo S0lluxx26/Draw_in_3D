@@ -375,6 +375,7 @@ function startDroneShow(useDrawing=false,compiled=null,onReturn=null,atTime){
 }
 installDemoSettings({play:show=>startDroneShow(false,show),player:()=>dronePlayer,notify});$('drone-drawing').onclick=()=>startDroneShow(true);
 if(demoLink())requestAnimationFrame(()=>$('drone-demo').click());
+$('welcome-demo').onclick=()=>$('drone-demo').click();// same launch path; this click unlocks the music
 addEventListener('hashchange',()=>{if(demoLink()&&!dronePlayer.active)$('drone-demo').click();});
 
 function updateFormationDots(){

@@ -124,6 +124,8 @@ export class ShowMusic{
   }
   build(){
     const c=this.ctx,rate=c.sampleRate;
+    // Unlocked by a tap, or suspended by the browser (e.g. an iOS interruption): update at once.
+    c.onstatechange=()=>{this.onchange?.();this.tick();};
     this.noise=c.createBuffer(1,rate*2,rate);const white=this.noise.getChannelData(0);let seed=1;for(let i=0;i<white.length;i++){seed=Math.imul(seed,1664525)+1013904223|0;white[i]=seed/2147483648;}
     // A limiter keeps kicks, booms and chords from clipping when they coincide.
     const l=this.limiter=c.createDynamicsCompressor();l.threshold.value=-10;l.knee.value=6;l.ratio.value=12;l.attack.value=.003;l.release.value=.25;l.connect(c.destination);

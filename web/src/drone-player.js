@@ -35,7 +35,7 @@ export class DronePlayer{
   active=false;
   constructor(renderer,canvas,requestFrame,onExit){
     Object.assign(this,{renderer,canvas,requestFrame,onExit});
-    this.recorder=new ShowRecorder(this);this.music=new ShowMusic(()=>this.active?this.clock:null);this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.recorder=new ShowRecorder(this);this.music=new ShowMusic(()=>this.active?this.clock:null);this.music.onchange=()=>{if(this.active)this.syncMusic();};this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
     try{this.quality=QUALITY_LEVELS.includes(localStorage.getItem(QUALITY_KEY))?localStorage.getItem(QUALITY_KEY):'auto';}catch{this.quality='auto';}
     $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{const now=performance.now();this.clock.seek(0,now);if(this.waiting)this.autoplay=true;else this.clock.play(now);this.refresh();};
     // A locked button asks for the tap browsers require before sound; otherwise it mutes and unmutes.
@@ -45,9 +45,9 @@ export class DronePlayer{
     $('show-trails').onchange=()=>this.refresh();$('show-front').onclick=()=>{this.front(true);this.refresh();};
     window.addEventListener('keydown',event=>{if(!this.active||$('demo-settings')?.open)return;if(event.key==='Escape'){event.preventDefault();this.stop();return;}if(['INPUT','SELECT','BUTTON'].includes(event.target.tagName))return;if(event.code==='Space'){event.preventDefault();this.toggle();}});
     // Fetch the harbour scenery as soon as the user shows interest in a show.
-    for(const id of ['drone-demo','show-editor','drone-drawing'])$(id)?.addEventListener('pointerenter',()=>loadStageAsset(),{once:true});
+    for(const id of ['drone-demo','welcome-demo','show-editor','drone-drawing'])$(id)?.addEventListener('pointerenter',()=>loadStageAsset(),{once:true});
     // Unlock audio inside the gesture itself; Safari refuses once the Demo's assets have loaded.
-    for(const id of ['drone-demo','drone-drawing'])$(id)?.addEventListener('pointerdown',()=>this.music.prime());
+    for(const id of ['drone-demo','welcome-demo','drone-drawing'])$(id)?.addEventListener('pointerdown',()=>this.music.prime());
   }
   setQuality(choice){
     if(!QUALITY_LEVELS.includes(choice)||choice===this.quality)return;this.quality=choice;try{localStorage.setItem(QUALITY_KEY,choice);}catch{}

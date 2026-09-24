@@ -63,7 +63,9 @@ Turn them off with **Demo settings → Ship fireworks**. Authored shows fire dur
 - keeps **Record video** disabled until then, so every video starts on the same opening shot;
 - still accepts pause, restart and speed while it waits.
 
-**Open straight into the Demo.** [s0lluxx26.github.io/Draw_in_3D/#demo](https://s0lluxx26.github.io/Draw_in_3D/#demo) opens the Demo as the page loads. Leaving the Demo removes `#demo`, so a reload opens the editor.
+**One click to the Demo.** The website still opens in the editor, which keeps the first load at about 0.6 MB instead of 1.4 MB. The welcome card that every new visitor sees now leads with **▶ Watch the drone show**. Because the visitor clicks, the music starts on the first beat, which a page that plays by itself cannot do.
+
+**Open straight into the Demo.** [s0lluxx26.github.io/Draw_in_3D/#demo](https://s0lluxx26.github.io/Draw_in_3D/#demo) opens the Demo as the page loads, which is handy for sharing. Browsers block sound until the viewer taps, so **♪ Tap for sound** pulses until they do. Leaving the Demo removes `#demo`, so a reload opens the editor.
 
 ## How it works
 
@@ -111,7 +113,7 @@ Other runtime details:
   - pyro flags in both demos;
   - the music score (`show-music.test.mjs`): sections on stage boundaries and beats, a drop on every formation arrival, exact once-only scheduling across any window split, booms at burst times, pause, seek, speed, resume and end behaviour, and a valid Web Audio graph for every voice.
 - All browser smoke scripts pass. `drone-show-smoke` covers every cue of the 11-formation demo.
-- With the scenery download delayed by 5 s, the show holds at 00:00 (**GETTING READY**, Record disabled) and starts from 0 once it arrives. `#demo` opens the Demo, and leaving it restores the editor and the plain URL.
+- With the scenery download delayed by 5 s, the show holds at 00:00 (**GETTING READY**, Record disabled) and starts from 0 once it arrives. `#demo` opens the Demo, and leaving it restores the editor and the plain URL. With Chrome's autoplay rule emulated (headless Chrome does not enforce it), `#demo` shows **♪ Tap for sound** and one tap starts the music. The welcome-card button starts it straight away.
 - `show-editor-smoke` downloads a recording that contains both VP8 video and an Opus music track.
 - In Chrome on the RTX 4080 the show held about 50–60 fps across tiers. This machine's GPU was shared with other work, so individual runs varied.
 
