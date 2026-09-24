@@ -1,7 +1,7 @@
-// Stage lasers: beams from the back of the launch deck, cued by the show's music sections. Build-ups sweep and
-// brighten, formation drops fan / crisscross / wave on the beat, drone fireworks crisscross in rainbow colours,
-// and the beams rest for the launch-pad close-ups and the landing. Timing is pure (laserBeam), so seeking and
-// recording agree; LaserRig billboards each beam toward the camera as an additive HDR ribbon for the bloom pass.
+// Stage lasers for takeoff and landing: beams from the back of the launch deck light the fleet's climb and its
+// return, and stay dark while formations and fireworks are in the sky. Cued by the show's music sections; timing
+// is pure (laserBeam), so seeking and recording agree. LaserRig billboards each beam toward the camera as an
+// additive HDR ribbon for the bloom pass.
 import * as THREE from 'three';
 import {musicPlan,BEAT,BAR} from './show-music.js';
 
@@ -15,22 +15,20 @@ export function laserBeam(sections,t,e,n){
   const beat=(lt%BEAT)/BEAT,bar=Math.floor(lt/BAR),edge=clamp(Math.min(lt,sec.end-t)/.4),pick=k=>PALETTE[(k%PALETTE.length+PALETTE.length)%PALETTE.length];
   let tilt=across*1.2,lean=.3,power=0,color=PALETTE[0];
   switch(sec.mood){
-    case 'lift':tilt=across*.55*p;lean=.12;power=.3*p;color=PALETTE[4];break;// a rising light tunnel as the drones take off
-    case 'build':tilt=across*1.1+.28*Math.sin(lt*1.6+e*.6);lean=.25+.2*p;power=.15+.6*p;color=pick(Math.round(sec.start));break;
-    case 'drop':case 'peak':{
-      const peak=sec.mood==='peak',speed=Math.PI*2*(peak?2:1)/BAR,pattern=(bar+(sec.index||0))%3;
-      tilt=pattern===0?across*1.5+.22*Math.sin(lt*speed)// fan, swaying
-        :pattern===1?(e%2?1:-1)*(.35+.4*Math.sin(lt*speed))+across*.4// crisscross
-        :.75*Math.sin(lt*speed+e*.8);// wave
-      lean=.28+.12*Math.sin(lt*.9+e);power=.55+.45*Math.exp(-beat*5);color=peak?pick(e+bar):pick(bar+(sec.index||0));break;
-    }
-    case 'spark':tilt=across*1.6;lean=.2+.5*p;power=.35*(1-p);color=PALETTE[3];break;// beams sink with the falling sparks
-  }
+    case 'lift':{// takeoff: a vertical tunnel that fans open and pulses on the beat as the fleet climbs
+      const pattern=bar%2;tilt=pattern?(e%2?1:-1)*(.2+.3*p)+across*.3:across*(.2+1.1*p)+.08*Math.sin(lt*Math.PI*2/BAR);
+      lean=.1+.15*p;power=(.35+.5*p)*(.7+.3*Math.exp(-beat*5));color=pick(bar+(e%2));break;}
+    case 'outro':{// returning home and landing: slow sweeps that settle back to vertical and fade as the drones touch down
+      const settle=clamp(1-p*1.15);tilt=across*1.3*settle+.3*settle*Math.sin(lt*.9+e*.7);lean=.12+.25*settle;
+      power=.75*clamp(lt/2)*clamp((1-p)*3);color=[PALETTE[4],PALETTE[0]][e%2];break;}
+  }// formations, fireworks and the close-ups keep the sky for the drones
   return {tilt,lean,power:power*edge,color};// blanked around each cue change, like a real laser show
 }
 
 const VERTEX='attribute vec2 beam;attribute vec3 color;varying vec2 vBeam;varying vec3 vColor;void main(){vBeam=beam;vColor=color;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}';
-const FRAGMENT=`varying vec2 vBeam;varying vec3 vColor;void main(){float a=1.-abs(vBeam.y),core=pow(a,5.)+.3*pow(a,1.5),along=pow(1.-vBeam.x,1.4)*smoothstep(0.,.015,vBeam.x+.004);
+// Clamped: interpolation can push these a hair outside [0,1], and pow() of a negative is NaN on Direct3D,
+// which the bloom blur would spread over the whole frame.
+const FRAGMENT=`varying vec2 vBeam;varying vec3 vColor;void main(){float a=clamp(1.-abs(vBeam.y),0.,1.),core=pow(a,5.)+.3*pow(a,1.5),along=pow(clamp(1.-vBeam.x,0.,1.),1.4)*smoothstep(0.,.015,vBeam.x+.004);
   gl_FragColor=vec4(vColor*core*along,1.);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -58,7 +56,7 @@ export class LaserRig{
     for(let e=0;e<n;e++){
       const b=laserBeam(this.sections,time,e,n),o=this.origins[e];
       this.dir.set(Math.sin(b.tilt),Math.cos(b.tilt),-b.lean).normalize();this.end.copy(o).addScaledVector(this.dir,this.length);
-      this.side.crossVectors(this.dir,this.view.subVectors(camera.position,o)).normalize();// the ribbon faces the camera
+      this.side.crossVectors(this.dir,this.view.subVectors(camera.position,o));if(this.side.lengthSq()<1e-12)this.side.set(1,0,0);this.side.normalize();// the ribbon faces the camera
       const s=this.side,w0=Math.max(this.near,o.distanceTo(camera.position)*pixel),w1=Math.max(this.far,this.end.distanceTo(camera.position)*pixel),k=e*12;
       P.set([o.x-s.x*w0,o.y-s.y*w0,o.z-s.z*w0,o.x+s.x*w0,o.y+s.y*w0,o.z+s.z*w0,this.end.x+s.x*w1,this.end.y+s.y*w1,this.end.z+s.z*w1,this.end.x-s.x*w1,this.end.y-s.y*w1,this.end.z-s.z*w1],k);
       for(let v=0;v<4;v++){const g=b.power*this.gain*(v<2?this.near/w0:this.far/w1);C.set([b.color[0]*g,b.color[1]*g,b.color[2]*g],k+v*3);}

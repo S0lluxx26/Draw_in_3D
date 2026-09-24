@@ -8,7 +8,7 @@ Android AR drawing and small game-map editor prototype, with a **PC browser edit
 
 ![The whale blows a split spout while the stage lasers sweep](docs/media/whale-lasers.jpg)
 
-On phones the **show now gets the screen**. The title, status, Record and Back share one slim top bar. Playback sits in one compact panel with icon buttons and a swipeable cue strip, and **landscape works**. Dragging keeps the camera **around the show**: it follows each formation within angle and zoom limits, so a stray swipe can't lose it. **Demo settings** can switch to free orbit. Each formation now **holds for about 12 s**. The **butterfly flaps its wings**. A Blender-modelled **whale** swims with a travelling wave and **blows a split water spout** from its blowhole. **Stage lasers** sweep behind the formations in time with the music. The Demo runs 6:05 with 12 formations. [Details and checks](docs/STUDIO15.md).
+On phones the **show now gets the screen**. The title, status, Record and Back share one slim top bar. Playback sits in one compact panel with icon buttons and a swipeable cue strip, and **landscape works**. Dragging keeps the camera **around the show**: it follows each formation within angle and zoom limits, so a stray swipe can't lose it. **Demo settings** can switch to free orbit. Each formation now **holds for about 12 s**. The **butterfly flaps its wings**. A Blender-modelled **whale** swims with a travelling wave and **blows a split water spout** from its blowhole. **Stage lasers** light up the takeoff and the landing. The Demo runs 6:05 with 12 formations. [Details and checks](docs/STUDIO15.md).
 
 ## Studio 14: realistic drones, HAPPY DAY and ship fireworks
 

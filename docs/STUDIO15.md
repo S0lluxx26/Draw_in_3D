@@ -36,16 +36,13 @@ To orbit freely as before, set **Demo settings → Camera when you drag → Free
 
 In the Show editor this is the **Swim** effect; the editor version has no simulated spout.
 
-**Stage lasers.** Ten beams rise from the back of the launch deck, behind the formations, and follow the music sections:
+**Stage lasers for takeoff and landing.** Ten beams rise from the back of the launch deck, behind the drones:
 
-- **Takeoff:** a soft tunnel as the drones take off.
-- **Build-ups:** slow sweeps that brighten.
-- **Formation drops:** fans, crisscrosses or waves that pulse on every beat and change colour every bar.
-- **Drone fireworks:** fast rainbow crisscrosses.
-- **Falling sparks:** sinking beams.
-- **Close-ups and landing:** the lasers rest.
+- **Takeoff:** a tunnel that fans open and pulses on the beat as the fleet climbs.
+- **Returning home and landing:** slow sweeps that settle back to vertical and fade as the drones touch down.
+- **Formations and fireworks:** the lasers stay dark, so the sky belongs to the drones.
 
-The beams blank around each cue change like a real laser show, and the water reflects them. Turn them off with **Demo settings → Stage lasers**.
+The beams blank at cue changes like a real laser show, and the water reflects them. Turn them off with **Demo settings → Stage lasers**.
 
 ## How it works
 
@@ -71,7 +68,8 @@ The beams blank around each cue change like a real laser show, and the water ref
 **Lasers** live in `web/src/lasers.js`:
 
 - **Cues:** `laserBeam()` is pure and cued by `musicPlan()`, so beams and music change together.
-- **Rendering:** `LaserRig` draws each beam as a camera-facing additive HDR ribbon. It is wide enough never to break into sub-pixel dots under bloom.
+- **Rendering:** `LaserRig` draws each beam as a camera-facing additive HDR ribbon. It is at least ~1.4 px wide, so it never breaks into dots.
+- **Shader clamping:** the fragment shader clamps its falloff terms. `pow()` of a value a hair below zero is NaN on Direct3D, and the bloom blur spread that NaN over the whole frame. That blanked the Demo on real Windows GPUs in the first Studio 15 build.
 - **Wiring:** `show.lasers === false` turns the rig off.
 
 **The follow camera.** `DronePlayer.follow()` moves the orbit target (and the camera with it) to the director's target every frame, then sets the OrbitControls azimuth, polar and distance limits around the director's pose. `CAMERA_MODES` are `follow` (the default) and `free`, stored as `draw3d-camera-v1`.
@@ -85,7 +83,7 @@ The beams blank around each cue change like a real laser show, and the water ref
   - flukes beat far more than the head, and the blow cycle rises, sprays and rests;
   - the whale's fire excludes the spout;
   - editor round-trips keep `flap` and `swim`;
-  - lasers are dark for close-ups and landing, blank at every cue, pulse on drop beats, never aim below the horizon, and are deterministic.
+  - lasers light only takeoff and landing, blank at every cue, pulse with the takeoff beat, never aim below the horizon, and are deterministic.
 - All 14 browser smoke scripts pass; `drone-show-smoke` now visits the Whale cue.
 - **Phone layout** (412×915 and 915×412): no scrolling, and the top bar ends at 50 px. The bottom panel starts at 757 px in portrait and 294 px in landscape.
 - **Camera limits:** after a wild drag and 12 zoom-outs, "Stay around the show" still frames the Robot and then the Whale. Free orbit loses them to the horizon, as before.

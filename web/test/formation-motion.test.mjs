@@ -49,7 +49,7 @@ test('the Show editor keeps wing-flap and swim effects through a file round trip
   assert.throws(()=>decodeShow(encodeShow({...doc,cues:[{...doc.cues[0],effect:'teleport'}]})),/Unknown formation effect/);
 });
 
-test('lasers follow the music: dark for close-ups and landing, blanked at every cue, pulsing on drop beats, always pointing up',()=>{
+test('lasers light only takeoff and landing, blank at every cue, pulse with the takeoff beat and always point up',()=>{
   const sections=musicPlan(demo).sections;
   for(let t=0;t<demo.duration;t+=.25)for(let e=0;e<LASER_COUNT;e++){
     const b=laserBeam(sections,t,e,LASER_COUNT);assert.ok([b.tilt,b.lean,b.power,...b.color].every(Number.isFinite));
@@ -58,8 +58,9 @@ test('lasers follow the music: dark for close-ups and landing, blanked at every 
   for(const sec of sections){
     const power=t=>Math.max(...Array.from({length:LASER_COUNT},(_,e)=>laserBeam(sections,t,e,LASER_COUNT).power));
     assert.equal(power(sec.start),0,'blank at the cue change');
-    if(['intro','outro','end'].includes(sec.mood))assert.equal(power((sec.start+sec.end)/2),0,sec.mood+' is dark');
-    if(sec.mood==='drop')assert.ok(power(sec.start+2)>power(sec.start+2.4),'beat pulse');
+    const mid=power((sec.start+sec.end)/2);
+    if(sec.mood==='lift'||sec.mood==='outro')assert.ok(mid>.2,sec.name+' is lit');else assert.equal(mid,0,sec.name+' keeps the sky for the drones');
+    if(sec.mood==='lift')assert.ok(power(sec.start+4)>power(sec.start+4.4),'takeoff beat pulse');
   }
   assert.deepEqual(laserBeam(sections,100,3,LASER_COUNT),laserBeam(sections,100,3,LASER_COUNT));
 });

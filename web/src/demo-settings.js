@@ -39,7 +39,7 @@ export function installDemoSettings({play,player,notify}){
     <label>Graphics quality<select id="demo-quality"><option value="auto">Auto (recommended)</option><option value="high">Cinematic · bloom, reflections, drone bodies</option><option value="balanced">Balanced · bloom, lighter reflections</option><option value="battery">Battery saver · no post effects</option></select></label>
     <label>Formation size / spacing<select id="demo-scale"><option value="2">4× original size</option><option value="3">6× original size (default)</option><option value="4">8× original size</option></select></label>
     <label class="switch-row"><span>Ship fireworks<small>Barges and the yacht launch real fireworks during Happy day, the drone fireworks and the finale</small></span><input type="checkbox" id="demo-pyro"></label>
-    <label class="switch-row"><span>Stage lasers<small>Beams from the launch deck sweep with the music: build-ups, drops and fireworks</small></span><input type="checkbox" id="demo-lasers"></label>
+    <label class="switch-row"><span>Stage lasers<small>Beams from the launch deck light up the takeoff and the landing</small></span><input type="checkbox" id="demo-lasers"></label>
     <label>Camera when you drag<select id="demo-camera"><option value="follow">Stay around the show (recommended)</option><option value="free">Free orbit</option></select></label>
     <fieldset><legend>Add falling yellow fire to</legend>${FORMATIONS.map((name,i)=>`<label><input type="checkbox" id="demo-fire-${i}">${name}</label>`).join('')}</fieldset>
     <p>Lower drone counts leave more space between lights and reduce phone workload. Drag to orbit and see the depth. Scale increases world-space spacing; it is not a flight-separation guarantee.</p>
