@@ -14,7 +14,8 @@ import {hardenOrbit} from './editor-look.js';
 // The show waits at 00:00 for its scenery, but never longer than this on a stalled connection.
 const STAGE_WAIT_MS=15000;
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
-const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);},QUALITY_KEY='draw3d-graphics-v1';
+const smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t);},QUALITY_KEY='draw3d-graphics-v1',CAMERA_KEY='draw3d-camera-v1';
+export const CAMERA_MODES=['follow','free'];
 // LEDs: HDR point sprites sized in world metres (so previews and 720p recordings match),
 // with an energy-preserving minimum size so distant lights shimmer less.
 const LED_VERTEX=`attribute vec3 color;uniform float ledSize,ledNear,viewport,minSize;varying vec3 vColor;varying float vEnergy;
@@ -37,6 +38,7 @@ export class DronePlayer{
     Object.assign(this,{renderer,canvas,requestFrame,onExit});
     this.recorder=new ShowRecorder(this);this.music=new ShowMusic(()=>this.active?this.clock:null);this.music.onchange=()=>{if(this.active)this.syncMusic();};this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
     try{this.quality=QUALITY_LEVELS.includes(localStorage.getItem(QUALITY_KEY))?localStorage.getItem(QUALITY_KEY):'auto';}catch{this.quality='auto';}
+    try{this.cameraMode=CAMERA_MODES.includes(localStorage.getItem(CAMERA_KEY))?localStorage.getItem(CAMERA_KEY):'follow';}catch{this.cameraMode='follow';}
     $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{const now=performance.now();this.clock.seek(0,now);if(this.waiting)this.autoplay=true;else this.clock.play(now);this.refresh();};
     // A locked button asks for the tap browsers require before sound; otherwise it mutes and unmutes.
     $('show-music').onclick=()=>{if(this.music.state==='locked')this.music.prime();else this.music.toggle();if(!this.recorder.active)this.recorder.reset();this.syncMusic();};
@@ -53,6 +55,18 @@ export class DronePlayer{
     if(!QUALITY_LEVELS.includes(choice)||choice===this.quality)return;this.quality=choice;try{localStorage.setItem(QUALITY_KEY,choice);}catch{}
     if(!this.active||this.recorder.active)return;const time=this.clock.time,playing=this.clock.playing||this.waiting&&this.autoplay,rate=this.clock.rate;this.start(this.show);this.clock.seek(time,performance.now());this.clock.speed(rate,performance.now());this.autoplay=playing;this.refresh();
   }
+  setCameraMode(mode){if(!CAMERA_MODES.includes(mode))return;this.cameraMode=mode;try{localStorage.setItem(CAMERA_KEY,mode);}catch{}if(this.active){this.freeLimits();this.refresh();}}
+  // Free orbit keeps the wide original limits; "Stay around the show" narrows them every frame (see follow()).
+  freeLimits(){const o=this.orbit,s=this.scale;Object.assign(o,{minAzimuthAngle:-Infinity,maxAzimuthAngle:Infinity,minPolarAngle:0,maxPolarAngle:Math.PI*.64,minDistance:8*s,maxDistance:3200*s});}
+  // Stay around the show: dragging and zooming set an angle and distance relative to the automatic camera,
+  // which keeps following each formation; the limits stop the view from drifting off the show by accident.
+  follow(time){
+    const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0,pose=directorView(this.show,time,this.camera.aspect,this.camera.fov,offset,{drift:0});
+    const t=this.followTarget||(this.followTarget=new THREE.Vector3()),d=this.followDelta||(this.followDelta=new THREE.Vector3());
+    t.fromArray(pose.target);d.subVectors(t,this.orbit.target);this.orbit.target.add(d);this.camera.position.add(d);
+    const [x,y,z]=pose.position.map((v,k)=>v-pose.target[k]),dist=Math.hypot(x,y,z),az=Math.atan2(x,z),polar=Math.acos(Math.max(-1,Math.min(1,y/dist)));
+    Object.assign(this.orbit,{minAzimuthAngle:az-.95,maxAzimuthAngle:az+.95,minPolarAngle:Math.max(.2,polar-.8),maxPolarAngle:Math.min(Math.PI*.56,polar+.28),minDistance:dist*.4,maxDistance:dist*1.8});
+  }
   syncMusic(){const b=$('show-music'),state=this.music.state,label={on:'Music on',off:'Music off',locked:'Tap for sound',unavailable:'No audio'}[state];if(b.dataset.state!==state){b.dataset.state=state;b.querySelector('.music-label').textContent=' '+label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(state==='on'));b.disabled=state==='unavailable';b.classList.toggle('locked',state==='locked');}}
   start(show){
     if(this.active)this.teardown();
@@ -63,7 +77,7 @@ export class DronePlayer{
     this.governor=new FrameGovernor(1,.6);this.cw=0;
     const s=this.scale=stageScale(show);
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(46,1,.25*s,20000*s);
-    this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.orbit.minDistance=8*s;this.orbit.maxDistance=3200*s;this.orbit.maxPolarAngle=Math.PI*.64;this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
+    this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.freeLimits();this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
     this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;this.waiting=true;this.autoplay=true;
     this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r});this.createDrones();this.precrowd(show);
@@ -90,13 +104,13 @@ export class DronePlayer{
   // Automatic director camera. smooth=true eases from a manual orbit back to it.
   front(smooth=false){if(!this.active)return;if(smooth&&!this.frontMode)this.blend={position:this.camera.position.toArray(),target:this.orbit.target.toArray(),start:performance.now()};this.frontMode=true;this.updateCamera(this.clock.time,performance.now());}
   updateCamera(time,now){
-    if(!this.frontMode){this.orbit.update();const floor=1.5*this.scale;if(this.camera.position.y<floor){this.camera.position.y=floor;this.camera.lookAt(this.orbit.target);}return;}
+    if(!this.frontMode){if(this.cameraMode==='follow')this.follow(time);this.orbit.update();const floor=1.5*this.scale;if(this.camera.position.y<floor){this.camera.position.y=floor;this.camera.lookAt(this.orbit.target);}return;}
     const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0;
     const pose=directorView(this.show,time,this.camera.aspect,this.camera.fov,offset,{drift:this.reducedMotion?0:1});let {position,target}=pose;
     if(this.blend){const k=smooth((now-this.blend.start)/1400),mix=(a,b)=>a.map((v,i)=>v+(b[i]-v)*k);position=mix(this.blend.position,position);target=mix(this.blend.target,target);if(k>=1)this.blend=null;}
     this.camera.position.fromArray(position);this.orbit.target.fromArray(target);this.orbit.update();
   }
-  resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,offset=Math.max(0,document.querySelector('.show-bottom').clientHeight-160)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();if(this.frontMode)this.front();this.force=true;}
+  resize(aspect){if(!this.active)return;const factor=Math.max(1,.65/aspect)/Math.max(1,.65/this.camera.aspect);this.camera.position.sub(this.orbit.target).multiplyScalar(factor).add(this.orbit.target);this.camera.aspect=aspect;const width=this.canvas.clientWidth,height=this.canvas.clientHeight,box=this.canvas.getBoundingClientRect(),top=Math.max(0,document.querySelector('.show-heading').getBoundingClientRect().bottom-box.top),bottom=Math.max(0,box.bottom-document.querySelector('.show-phase-row').getBoundingClientRect().top),offset=Math.max(0,bottom-top)/2;this.camera.setViewOffset(width,height,0,offset,width,height);this.camera.updateProjectionMatrix();if(this.frontMode)this.front();this.force=true;}
   refresh(){this.force=true;this.requestFrame();this.music.tick();}
   seek(time){if(this.recorder.active)return;this.autoplay=false;this.clock.pause(performance.now());this.clock.seek(time,performance.now());this.refresh();}
   toggle(){if(!this.active||this.recorder.active)return;if(this.waiting){this.autoplay=!this.autoplay;this.refresh();return;}const now=performance.now();if(this.clock.playing)this.clock.pause(now);else this.clock.play(now);this.refresh();}
@@ -163,7 +177,7 @@ export class DronePlayer{
     if(now-this.lastUI>100||!this.clock.playing||$('show-phase').textContent!==frame.phase){
       this.lastUI=now;$('show-phase').textContent=frame.phase;$('show-time').textContent=stamp(time)+' / '+stamp(this.show.duration);$('show-scrub').value=time;
       const running=this.clock.playing||this.waiting&&this.autoplay;
-      $('show-pause').textContent=running?'Ⅱ Pause':time>=this.show.duration?'↻ Replay':'▶ Play';$('show-pause').setAttribute('aria-label',running?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
+      const [icon,word]=running?['Ⅱ','Pause']:time>=this.show.duration?['↻','Replay']:['▶','Play'],pause=$('show-pause');if(pause.dataset.word!==word){pause.dataset.word=word;pause.firstElementChild.textContent=icon;pause.lastElementChild.textContent=' '+word;}$('show-pause').setAttribute('aria-label',running?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
       $('show-progress').style.width=(100*time/this.show.duration)+'%';
       const cue=[...this.show.cues].reverse().find(c=>time>=c.time-1);for(const button of $('show-cues').children){const active=Number(button.dataset.time)===cue?.time;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
       let lit=0,sum=[0,0,0];const colors=frame.colors;for(let i=0;i<colors.length;i+=3){const r=colors[i],g=colors[i+1],b=colors[i+2];if(Math.max(r,g,b)>.05){lit++;sum[0]+=r;sum[1]+=g;sum[2]+=b;}}

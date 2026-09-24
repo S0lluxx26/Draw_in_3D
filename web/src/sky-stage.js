@@ -9,6 +9,7 @@ import {DRACOLoader} from './vendor/addons/loaders/DRACOLoader.js';
 import {Reflector} from './vendor/addons/objects/Reflector.js';
 import {mergeGeometries} from './vendor/addons/utils/BufferGeometryUtils.js';
 import {pyroSchedule,pyroParticles,PARTICLE_FLOATS,PYRO_VERTEX,PYRO_FRAGMENT,GRAVITY} from './pyro.js';
+import {LaserRig} from './lasers.js';
 
 const DEMO_SCALE=6;// demo motionScale that the Blender scenery is modelled for (metres)
 const MOON=new THREE.Vector3(.5,.3,-.81).normalize();
@@ -171,6 +172,7 @@ export class SkyStage{
     this.createPads();
     scene.environment=environment(renderer);scene.environmentIntensity=3;
     this.buildPyro(LAUNCHERS.map(p=>p.map(v=>v*s)));
+    if(show.lasers!==false){this.lasers=new LaserRig(show,s,{bloom:tier.bloom});this.group.add(this.lasers.mesh);}
   }
   // Ship fireworks: one static buffer; the vertex shader evaluates every particle from show time.
   buildPyro(origins){
@@ -224,13 +226,14 @@ export class SkyStage{
     }
   }
   get wantsVelocity(){return !!this.near;}
-  setSize(width,height){if(this.water.getRenderTarget){const k=this.tier.reflection;this.water.getRenderTarget().setSize(Math.max(64,Math.round(width*k)),Math.max(64,Math.round(height*k)));}}
+  setSize(width,height){this.viewHeight=height;if(this.water.getRenderTarget){const k=this.tier.reflection;this.water.getRenderTarget().setSize(Math.max(64,Math.round(width*k)),Math.max(64,Math.round(height*k)));}}
   // Per-frame animation. frame = sampled show (positions/colors), camera = main camera.
   // Per-frame animation. frame = sampled show, previous = the show 0.15 s earlier (for drone tilt).
   update(time,frame,camera,now,previous){
     const t=now/1000,s=this.scale;this.sky.material.uniforms.time.value=t;this.stars.material.uniforms.time.value=t;this.water.material.uniforms.time.value=t;
     const beacons=this.materials?.get('Beacons');if(beacons){const on=(t%1.7)<.22;beacons.color.setRGB(on?9:.25,on?.45:.01,on?.27:.01);}
     if(this.pyro)this.pyro.material.uniforms.time.value=time;
+    this.lasers?.update(time,camera,this.viewHeight);
     this.key.position.copy(camera.position).addScaledVector(camera.up,2*s);
     for(const ship of this.ships||[]){// gentle swell
       ship.o.position.y=ship.y+Math.sin(t*.7+ship.phase)*.22;ship.o.quaternion.copy(ship.q);ship.o.rotateX(Math.sin(t*.9+ship.phase)*.012);ship.o.rotateZ(Math.sin(t*.55+ship.phase*2)*.008);}

@@ -34,9 +34,9 @@ from mathutils.bvhtree import BVHTree
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 EXPORT_ONLY = '--export-only' in sys.argv
 BODY, FIRE = 4096, 512
-NAMES = ['Robot', 'Fish', 'Butterfly', 'Hot air balloon', 'Eiffel Tower', 'Big ship', 'Firework star', 'Row of fire', 'Birthday cake', 'Starship launch', 'Happy day']
+NAMES = ['Robot', 'Fish', 'Butterfly', 'Hot air balloon', 'Eiffel Tower', 'Big ship', 'Whale', 'Firework star', 'Row of fire', 'Birthday cake', 'Starship launch', 'Happy day']
 # Stable per-formation seeds: adding formations never reshuffles existing ones.
-SEEDS = {'Robot': 0, 'Fish': 1, 'Eiffel Tower': 2, 'Big ship': 3, 'Firework star': 4, 'Row of fire': 5, 'Starship launch': 6, 'Butterfly': 7, 'Hot air balloon': 8, 'Birthday cake': 9, 'Happy day': 10}
+SEEDS = {'Robot': 0, 'Fish': 1, 'Eiffel Tower': 2, 'Big ship': 3, 'Firework star': 4, 'Row of fire': 5, 'Starship launch': 6, 'Butterfly': 7, 'Hot air balloon': 8, 'Birthday cake': 9, 'Happy day': 10, 'Whale': 11}
 AUDIENCE_LIGHT = np.array(Vector((-0.3, 0.42, 0.86)).normalized())  # app coordinates
 APP_TO_BLENDER = Matrix.Rotation(math.radians(90), 4, 'X')  # modelled in app axes, stored Z-up
 to_app = lambda a: np.stack([a[..., 0], a[..., 2], -a[..., 1]], axis=-1)
@@ -433,6 +433,89 @@ def butterfly():
     antennae.finish('Antennae', 'gold')
     exhaust([-2, 2], -9.2, .3, 2.8, .45)
 
+WHALE_X = (-10.5, 12.0)  # tail stock to snout
+def whale_profile(x):
+    """Centre height, vertical and horizontal radius of the whale body at x (app units)."""
+    t = max(0.0, min(1.0, (x - WHALE_X[0]) / (WHALE_X[1] - WHALE_X[0])))
+    # Slim tail stock, girth at 60%, then a massive blunt head with a rounded snout.
+    ry = .42 + 2.8 * math.sin(math.pi * t / 1.2) ** .7 if t < .6 else 3.22 - 1.1 * ((t - .6) / .4) ** 1.8
+    if t > .9:
+        ry *= math.sqrt(max(0.0, 1 - ((t - .9) / .1) ** 2))
+    tail_rise = 1.6 * max(0.0, (.28 - t) / .28) ** 2  # the tail stock curves up toward the flukes
+    return -1.3 + .55 * math.sin(math.pi * t) + tail_rise, max(ry, .02), max(ry, .02) * .8
+
+WHALE_BLOWHOLE_X = 7.4
+def whale_blowhole():
+    """Top of the head at the blowhole; drone-show.js WHALE.hole uses these coordinates."""
+    yc, ry, _ = whale_profile(WHALE_BLOWHOLE_X)
+    return (WHALE_BLOWHOLE_X, yc + ry * .86, 0.0)
+
+def whale():
+    """Humpback whale: deep-blue back, white grooved belly, long pectoral fins, raised flukes and a blowhole.
+    The water spout is simulated by the web app from the blowhole, so it can rise and split in real time."""
+    rings, sides = 52, 44
+    def skin(p):
+        yc, ry, _ = whale_profile(p.x)
+        rel = (p.y - yc) / ry
+        if rel < -.3:
+            groove = p.x > -1.5 and int(-rel * 16) % 3 == 0  # ventral pleats from chin to navel
+            return (.12, .42, 1) if groove else ramp([(-1.15, (.95, .98, 1)), (-.3, (.62, .88, 1))], rel)
+        return ramp([(-.3, (.1, .72, 1)), (.2, (.08, .42, 1)), (1, (.05, .16, .85))], rel)
+    body = Part(skin)
+    loops = []
+    for i in range(rings + 1):
+        x = WHALE_X[0] + (WHALE_X[1] - WHALE_X[0]) * i / rings
+        yc, ry, rz = whale_profile(x)
+        t = i / rings
+        ring = []
+        for j in range(sides):
+            a = j * 2 * math.pi / sides
+            up = math.sin(a)
+            k = (.86 if t > .72 else 1.0) if up > 0 else (1.12 if t > .3 else 1.0)  # flatter head, deeper throat
+            ring.append((x, yc + ry * up * k, rz * math.cos(a)))
+        loops.append(ring)
+    body.loft(loops)
+    body.finish('Whale body', 'blue')
+    # Flukes: horizontal like a real whale's, tilted toward the audience so the crescent reads from the front.
+    # (u back from the tail stock, v across); the near fluke rises toward the audience, the far one dips away.
+    half = [(0, .6), (.4, 1.8), (1.0, 3.0), (1.8, 4.2), (2.6, 5.0), (2.8, 4.4), (2.9, 3.2), (3.0, 2.0), (3.1, .9), (3.4, 0)]
+    crescent = half + [(u, -v) for u, v in reversed(half[:-1])]
+    yc, _, _ = whale_profile(WHALE_X[0])
+    tilt = math.radians(38)
+    at = lambda u, v: (WHALE_X[0] - .1 - u, yc + v * math.sin(tilt) + .18 * u, v * math.cos(tilt))
+    flukes = Part(lambda p: ramp([(0, (.06, .3, 1)), (.6, (.12, .6, 1)), (1, (.88, .96, 1))], min(1, abs(p.z) / (5 * math.cos(tilt)) + (WHALE_X[0] - p.x) / 12)))
+    centre = at(1.5, 0)
+    for a, b in zip(crescent, crescent[1:]):
+        flukes.face([centre, at(*a), at(*b)])
+    flukes.finish('Flukes', 'blue', smooth=False)
+    # Long humpback pectoral fins, white with a blue root; the far fin shows below the belly.
+    fins = Part(lambda p: ramp([(-1.9, (.3, .65, 1)), (-3.2, (.92, .97, 1))], p.y))
+    for s in (1, -1):
+        pts = [(4.6 - 6.8 * t, -1.9 - 4.4 * t ** 1.1, s * (1.9 + 1.4 * t)) for t in np.linspace(0, 1, 12)]
+        fins.lathe(pts, [.78 * (1 - t) ** .5 + .14 for t in np.linspace(0, 1, 12)], 14, squash=(1, .32))
+    fins.finish('Pectoral fins', 'white')
+    dorsal = Part((.08, .3, 1))
+    yc, ry, _ = whale_profile(-4.8)
+    dorsal.face([(-6.8, yc + ry * .9, 0), (-3.9, yc + ry * .95, 0), (-5.6, yc + ry + 1.35, 0)])
+    dorsal.finish('Dorsal fin', 'blue', smooth=False)
+    for s in (-1, 1):
+        yc, ry, rz = whale_profile(8.6)
+        eye = Part((1, 1, 1)); eye.sphere((8.6, yc - .15 * ry, s * rz * .96), (.55, .44, .3)); eye.finish('Eye', 'white')
+        pupil = Part(palette['dark']); pupil.sphere((8.7, yc - .15 * ry, s * (rz * .96 + .16)), (.26, .24, .14)); pupil.finish('Pupil', 'dark', emit=False)
+        mouth = Part((1, .85, .5))
+        pts = []
+        for x in np.linspace(6.6, 11.8, 16):
+            yc, ry, rz = whale_profile(x)
+            pts.append((x, yc - .38 * ry, s * rz * .93))
+        mouth.path(pts, .07, 6); mouth.finish('Mouth line', 'gold')
+    hole = whale_blowhole()
+    blow = Part((.85, .97, 1))
+    for dz in (-.28, .28):
+        blow.path([(hole[0] + .32 * math.cos(a), hole[1] + .04, dz + .14 * math.sin(a)) for a in np.linspace(0, 2 * math.pi, 14, endpoint=False)], .05, 5, closed=True)
+    blow.finish('Blowholes', 'white')
+    print('Whale blowhole (app units):', tuple(round(v, 3) for v in hole), flush=True)
+    exhaust([-5, -1, 3], -4.6, .3, 2.8, .45)
+
 def balloon():
     """Striped hot air balloon with load tapes, basket, ropes and burner flame."""
     profile = [(-3.2, 1.1), (-2, 2.6), (0, 4.6), (2, 6.0), (4, 6.6), (6, 6.3), (7.5, 5.4), (8.7, 4.0), (9.6, 2.2), (10, .02)]
@@ -517,7 +600,7 @@ def happy_day():
     sparkles.finish('Sparkles', 'white', smooth=False)
     exhaust([-8, -3, 3, 8], -9.4, 0, 2.6, .4)
 
-BUILDERS = {'Robot': robot, 'Fish': fish, 'Butterfly': butterfly, 'Hot air balloon': balloon, 'Eiffel Tower': tower, 'Big ship': ship,
+BUILDERS = {'Robot': robot, 'Fish': fish, 'Butterfly': butterfly, 'Hot air balloon': balloon, 'Eiffel Tower': tower, 'Big ship': ship, 'Whale': whale,
             'Firework star': star, 'Row of fire': fire_row, 'Birthday cake': cake, 'Starship launch': starship, 'Happy day': happy_day}
 
 # ---------------------------------------------------------------- sampling

@@ -2,7 +2,7 @@
 import {entity,clone,validate,documentOf,decode} from './model.js';
 import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT} from './drone-show.js';
 
-export const SHOW_LIMITS=Object.freeze({cues:12,bytes:16*1024*1024,history:24});
+export const SHOW_LIMITS=Object.freeze({cues:14,bytes:16*1024*1024,history:24});
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
 const num=(v,min,max,label)=>need(typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max,`${label} must be between ${min} and ${max}.`);
 const name=(v,label)=>need(typeof v==='string'&&v.trim().length>0&&v.length<=64&&!/[\u0000-\u001f\u007f]/.test(v),`${label} needs 1–64 characters without control characters.`);
@@ -33,12 +33,12 @@ export function editableDemo(){
 export function validateShow(doc){
   need(doc?.format==='draw-in-3d-show'&&[1,2].includes(doc.version),'Open a Draw in 3D show file (version 1 or 2). Drawing files use Open project.');
   name(doc.name,'Show name');need([256,DRONE_COUNT].includes(doc.count),'Supported fleets are 256 and 4096 drones.');
-  need(Array.isArray(doc.cues)&&doc.cues.length<=SHOW_LIMITS.cues,'A show can contain up to 12 formations.');
+  need(Array.isArray(doc.cues)&&doc.cues.length<=SHOW_LIMITS.cues,`A show can contain up to ${SHOW_LIMITS.cues} formations.`);
   need(doc.cues.every(c=>c&&typeof c==='object'&&!Array.isArray(c)),'Each formation must be an object with a name, artwork and timing.');
   need(doc.version===2||doc.count===256&&doc.cues.every(c=>!c.effect||c.effect==='none'),'Large fleets and animated effects require show version 2.');
   const ids=new Set();
   for(const c of doc.cues){
-    need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship'].includes(c.effect??'none'),'Unknown formation effect.');
+    need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship','flap','swim'].includes(c.effect??'none'),'Unknown formation effect.');
     need(Array.isArray(c.artwork)&&c.artwork.every(e=>e&&typeof e==='object'&&!Array.isArray(e)),`${c.name}: formation artwork must be a list of strokes and paper guides.`);
     validate(documentOf(c.artwork));need(c.artwork.every(e=>['paper','stroke'].includes(e.type)),'Formations contain strokes and their paper guides only.');
     num(c.hold,2,60,'Display duration');num(c.transfer,2,30,'Transition duration');num(c.brightness,.1,1,'Brightness');

@@ -22,10 +22,10 @@ test('Demo music follows every stage on the beat: build-ups into each formation,
   for(let i=1;i<s.length;i++)assert.equal(s[i].start,s[i-1].end,'sections are contiguous');
   // Whole-second stages at 120 BPM: every section boundary is a real stage boundary and sits on a beat.
   const bounds=new Set(demo.stages.map(st=>st.start));for(const sec of s){assert.ok(bounds.has(sec.start),sec.name);assert.equal(Math.abs(sec.start/BEAT-Math.round(sec.start/BEAT))<1e-9,true);}
-  const drops=s.filter(x=>x.mood==='drop');assert.equal(drops.length,11);assert.deepEqual(drops.map(d=>d.name),demo.stages.filter(st=>st.reveal||st.kind==='rise').map(st=>st.name));
+  const drops=s.filter(x=>x.mood==='drop');assert.equal(drops.length,12);assert.deepEqual(drops.map(d=>d.name),demo.stages.filter(st=>st.reveal||st.kind==='rise').map(st=>st.name));
   for(const d of drops){assert.equal(s[s.indexOf(d)-1].mood,'build','a build-up leads into '+d.name);
     assert.ok(musicEvents(plan,d.start,d.start+.01).some(e=>e.voice==='impact'&&e.t===d.start),'impact exactly on arrival of '+d.name);}
-  assert.deepEqual(drops.map(d=>d.shift),[0,0,0,0,0,0,2,2,2,2,2]);
+  assert.deepEqual(drops.map(d=>d.shift),[0,0,0,0,0,0,2,2,2,2,2,2]);
   assert.deepEqual(s.filter(x=>x.mood==='peak').map(x=>x.name),['Growing heart','Five-point star','Three firework balls']);
   assert.equal(s.filter(x=>x.mood==='outro').length,1,'returning home and landing share one outro phrase');
   // A small custom drawing show still gets a complete score.

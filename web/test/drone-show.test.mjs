@@ -5,7 +5,7 @@ import {entity} from '../src/model.js';
 import {landingPads,byPad} from './pads.mjs';
 const show=buildShow();
 test('show maintains its fleet, finite continuous trajectories, exact home landing and independent LEDs',()=>{
-  assert.equal(show.count,4096);assert.deepEqual(show.cues.map(c=>c.label),['Takeoff','Robot','Fish','Butterfly','Hot air balloon','Eiffel Tower','Big ship','Firework star','Row of fire','Birthday cake','Starship launch','Happy day','Fireworks','Landing']);
+  assert.equal(show.count,4096);assert.deepEqual(show.cues.map(c=>c.label),['Takeoff','Robot','Fish','Butterfly','Hot air balloon','Eiffel Tower','Big ship','Whale','Firework star','Row of fire','Birthday cake','Starship launch','Happy day','Fireworks','Landing']);
   for(let t=0;t<=show.duration;t+=.5){const f=sampleShow(show,t);assert.equal(f.positions.length,DRONE_COUNT*3);assert.ok(f.positions.every(Number.isFinite));assert.ok(f.colors.every(c=>c>=0&&c<=1));for(let i=1;i<f.positions.length;i+=3)assert.ok(f.positions[i]>=.119);}
   for(const stage of show.stages.slice(1)){
     const a=sampleShow(show,stage.start-1e-5),b=sampleShow(show,stage.start+1e-5);

@@ -39,7 +39,7 @@ test('Three firework types expand, then blink and fall to darkness with no telep
 test('Blender formations have depth, distinct well-spaced samples and exact fleet counts',()=>{
   for(const name of FORMATIONS){const {positions}=assets[name].body;assert.equal(positions.length,4096);assert.equal(new Set(positions.map(p=>p.join(','))).size,4096);assert.ok(positions.every(p=>p.every(Number.isFinite)));assert.ok(Math.max(...positions.map(p=>p[2]))-Math.min(...positions.map(p=>p[2]))>1);}
   const show=compileDemo(assets,{count:512,scale:4,shape:'star'});
-  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,303);
+  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,365);
   for(const s of show.stages){assert.equal(s.to.positions.length,512);assert.equal(s.to.colors.length,512);}
   assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);
 });
@@ -80,9 +80,9 @@ test('New stroke formations sample to full fleets; only Happy day carries the sh
     assert.ok(positions.every(p=>p.length===3&&p.every(Number.isFinite)&&Math.abs(p[0])<=12&&p[1]>=9&&p[1]<=29),name+' stays in the drawing frame');
     assert.ok(colors.every(c=>c.length===3&&c.every(v=>v>=0&&v<=1)));
   }
-  assert.deepEqual(drawn.filter(f=>f.pyro).map(f=>[f.name,f.hold,f.effect]),[['Happy day',12,'sparkle']]);
+  assert.deepEqual(drawn.filter(f=>f.pyro).map(f=>[f.name,f.hold,f.effect]),[['Happy day',16,'sparkle']]);
   for(const show of [buildShow(null,{count:256}),compileDemo(assets,{count:256})]){
-    const pyro=show.stages.filter(s=>s.pyro);assert.deepEqual(pyro.map(s=>[s.name,s.kind,s.effect,s.pyro,s.end-s.start]),[['Happy day','hold','sparkle',true,12]]);
+    const pyro=show.stages.filter(s=>s.pyro);assert.deepEqual(pyro.map(s=>[s.name,s.kind,s.effect,s.pyro,s.end-s.start]),[['Happy day','hold','sparkle',true,16]]);
     assert.ok(show.cues.some(c=>c.label==='Happy day'&&c.time>=pyro[0].start&&c.time<pyro[0].end));
   }
 });

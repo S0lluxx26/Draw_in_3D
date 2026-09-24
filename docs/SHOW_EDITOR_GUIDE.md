@@ -44,6 +44,6 @@ Show files now save as version 2; version 1 files load with their original 256-d
 
 ## Current scope
 
-The editor supports up to 12 formations, with up to 80 source objects and 4,000 source points per formation. Matching runs in a cancellable worker when requesting a preview. Animated limbs, Bézier control-point editing, moving formation paths, music synchronization, camera tracks and frame-exact offline video encoding remain future work.
+The editor supports up to 14 formations, with up to 80 source objects and 4,000 source points per formation. Matching runs in a cancellable worker when requesting a preview. Animated limbs, Bézier control-point editing, moving formation paths, music synchronization, camera tracks and frame-exact offline video encoding remain future work.
 
 This is visual choreography, not a real flight mission. Collision avoidance, separation and aircraft speed/acceleration validation have not been implemented. Physical Galaxy S9+/S22 Ultra performance and battery measurements remain pending.

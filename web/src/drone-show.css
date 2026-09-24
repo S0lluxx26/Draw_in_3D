@@ -22,3 +22,41 @@
 #show-music[aria-pressed="false"]{color:#7d95a6}#show-music.locked{color:#ffe3a1;border-color:#c99a3c;animation:music-hint 1.6s ease-in-out infinite}@keyframes music-hint{50%{border-color:#ffd36b;box-shadow:0 0 12px #ffd36b55}}
 @media(prefers-reduced-motion:reduce){#show-music.locked{animation:none}}
 @media(max-width:560px){#show-music:not(.locked) .music-label{display:none}#show-music{min-width:44px;font-size:14px}#show-music.locked{font-size:10px}}
+/* Studio 15: phones, portrait and landscape. The show gets the screen: title, status and actions share one slim
+   top bar, playback sits in one compact bottom panel, and the editor's header is hidden while the show plays. */
+@media (max-width:560px),(max-height:500px){
+  .drone-mode .topbar{display:none}
+  .drone-mode .workspace{height:100dvh}
+  #drone-show .show-heading{top:8px;left:12px;right:12px;align-items:center;gap:8px}
+  #drone-show .show-heading>div:first-child{min-width:0}
+  #drone-show .show-heading .show-eyebrow,#drone-show .show-heading p,#drone-show .show-telemetry,#drone-show .show-simulation,#drone-show .show-quality,#drone-show .show-footnote,#drone-show .show-phase-row .show-eyebrow{display:none}
+  #drone-show .show-heading h1{font-size:13px;letter-spacing:1.8px;margin:0;max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #drone-show .show-heading-actions{display:flex;flex-wrap:nowrap;gap:6px;align-items:center;position:relative;max-width:none;width:auto}
+  #drone-show .show-heading button{min-height:36px;min-width:0;max-width:none;padding:6px 10px;font-size:10px;white-space:nowrap}
+  #drone-show .show-record-status{position:absolute;top:40px;right:0;width:max-content;max-width:min(240px,70vw);text-align:right;font-size:9px}
+  #drone-show .show-record-status[data-idle]{display:none}
+  #drone-show .show-status{top:40px;left:12px;font-size:7px;gap:5px;letter-spacing:.8px}
+  #drone-show .show-bottom{padding:26px 12px 8px;background:linear-gradient(transparent,#02060dc4 30%,#03080fe8 100%)}
+  #drone-show .show-phase-row{align-items:baseline}
+  #drone-show .show-phase-row h2{font-size:16px;margin:0}
+  #drone-show .show-phase-row #show-time{font-size:10px}
+  #drone-show #show-cues{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:4px;margin:6px -12px 0;padding:0 12px;mask-image:linear-gradient(90deg,transparent,#000 12px,#000 calc(100% - 12px),transparent)}
+  #drone-show #show-cues::-webkit-scrollbar{display:none}
+  #drone-show #show-cues button{flex:none;min-height:32px;padding:6px 9px;font-size:9px}
+  #drone-show .show-seek{margin:12px 0 10px}
+  #drone-show .show-seek #show-scrub{height:28px;top:-13px}
+  #drone-show .show-controls,#drone-show .show-controls>div{flex-wrap:nowrap;gap:5px}
+  #drone-show .show-controls button,#drone-show .show-controls select{min-height:40px;padding:6px 10px;font-size:12px}
+  #drone-show .show-controls #show-pause{min-width:48px}
+  #drone-show .show-controls .label{display:none}
+  #drone-show .show-controls label{font-size:9px;gap:4px}
+}
+/* Landscape phones: the formation name sits beside the cue strip, so the sky keeps about two thirds of the height. */
+@media (max-height:500px) and (min-width:561px){
+  #drone-show .show-bottom{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:14px;align-items:center;padding:20px 16px 6px}
+  #drone-show .show-phase-row{grid-column:1;flex-direction:column;align-items:flex-start;gap:2px}
+  #drone-show #show-cues{grid-column:2;margin:0;padding:0 12px}
+  #drone-show .show-seek,#drone-show .show-controls{grid-column:1/-1}
+  #drone-show .show-seek{margin:10px 0 8px}
+  #drone-show .show-controls button,#drone-show .show-controls select{min-height:36px}
+}
