@@ -8,7 +8,9 @@ Choose **Demo settings** in the drawing inspector or the Demo player to set the 
 
 ## Edit the Demo, save it, play it later
 
-**Edit demo** opens the Demo itself, set up as in **Demo settings** on this device:
+**Edit demo** opens the Demo itself, set up as in **Demo settings** on this device. While the Demo plays, **Demo settings → ✎ Edit in Show editor** does the same, and selects the formation you were watching. Until you edit it, the editor's Demo follows any later change to Demo settings.
+
+It includes:
 - the 12 Blender-built 3D formations (cards marked **3D**), with their built-in motion: the swimming fish and whale, the flapping butterfly, the rising balloons;
 - the Demo's look: lights, size, ship fireworks and lasers (under **Look**);
 - the Demo finale: the heart with the family, the star and the firework balls (under **Finale**).
@@ -16,12 +18,21 @@ Choose **Demo settings** in the drawing inspector or the Demo player to set the 
 Now make it yours:
 - **Remove** or **reorder** formations, and change their **display** and **transition** times;
 - switch **Falling fire** on or off for a Demo formation;
-- add your own drawings (**＋ Draw a formation**, **＋ Current drawing**, **＋ Selected ink**) or more Demo formations (**＋ Demo formation…**);
+- add your own drawings (**＋ Draw a formation**, **＋ Current drawing**, **＋ Selected ink**), which get the Demo's 15 s display and 7 s transition, or more Demo formations (**＋ Demo formation…**);
 - change the **Look** (light shape, size, ship fireworks, lasers) or choose the classic fireworks finale.
 
 **Save show** downloads a small `.show.json` (version 3) that stores your choices, not drone positions. Later, **Open show** loads it to keep editing, and **Play my show** performs it just like the Demo, with your changes.
 
-To change a Demo formation's *shape*, choose **✎ Convert to drawing**. It becomes the formation's editable line art (keeping its timing and motion); **Undo** restores the 3D formation. Your drawings play on the same stage as the Demo formations, at the same scale.
+To change a Demo formation's *shape*, choose **✎ Convert to drawing**. It becomes the formation's editable line art (keeping its timing and motion); **Undo** restores the 3D formation. Your drawings play on the same stage as the Demo formations, at the same scale. Set any drawing's **Motion / effect** to **Swim (fish)** for rolling waves above it, or **Swim (whale)** for a water spout from the top of its head (a converted Fish or Whale keeps them).
+
+While your show plays, **Settings** offers the viewing options: graphics quality, camera mode and **Background** (Dark night or Late afternoon). The show's formations and look stay as set here.
+
+## Check it in Run, then come back
+
+- **▶ Run from here** plays the show from the selected formation's transition. **Play my show** plays it from takeoff.
+- **← Back to show** returns to the editor with the formation that was on screen selected, ready for the next edit.
+- The preview shows the formation as Run plays it, including the whale's spout, the fish's waves and falling fire. Card times use the player's clock.
+- A card marked **⚠** cannot play yet: it has nothing drawn, or its ink is outside the sky stage. **Play my show** selects it and says why.
 
 ## Change a formation's drawing
 
@@ -51,7 +62,7 @@ The sky uses stroke centre lines and stroke colours. Brush width, paint spread, 
 
 In the player, click **Record video**. Recording resets the show to takeoff at 1× and uses the front audience view at 1280 × 720. It captures the canvas with the show music, without editor panels or HTML labels. Turn **♪ Music** off first for a silent video. Record video becomes available once the harbour scenery has loaded. Playback controls and orbit are locked for a consistent camera; **Cancel recording** or leaving the player cancels the recording.
 
-Keep the tab visible until landing. The video downloads automatically on completion. This is real-time recording: a 90-second show takes 90 seconds to record, and a slow device can drop frames. The app chooses a supported format, preferring WebM/VP8; MP4 is only used where supported. Recording is unavailable when the browser cannot capture/encode the canvas. Tab hiding, graphics loss, capture interruption or the 160 MiB memory limit cancels the recording rather than downloading an incomplete result. For long or complex shows, record on a PC.
+Keep the tab visible until landing. The video downloads automatically on completion, named after the show (for example `sky-stories.webm`). This is real-time recording: a 90-second show takes 90 seconds to record, and a slow device can drop frames. The app chooses a supported format, preferring WebM/VP8; MP4 is only used where supported. Recording is unavailable when the browser cannot capture/encode the canvas. Tab hiding, graphics loss, capture interruption or the 160 MiB memory limit cancels the recording rather than downloading an incomplete result. For long or complex shows, record on a PC.
 
 ## Motion and fleet size
 

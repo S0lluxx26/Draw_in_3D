@@ -26,22 +26,25 @@ const hash=(a,b)=>{let h=Math.imul(a+1,2654435761)^Math.imul(b+7,1597334677);h=M
 
 // Sections follow the show's stages: moves build up, formations drop, drone fireworks peak in a lifted key.
 export function musicPlan(show){
-  const q=t=>Math.round(t/BEAT)*BEAT,sections=[];
+  // With ship fireworks, the cinematic landing is the finale: a build on the way home, then a peak under the fireworks.
+  const q=t=>Math.round(t/BEAT)*BEAT,sections=[],grand=show.pyro!==false&&show.stages.some(s=>s.kind==='landing'&&s.reverse);
   show.stages.forEach((s,i)=>{
     const next=show.stages[i+1],start=q(s.start),end=q(s.end),last=sections.at(-1);
-    const mood=s.kind==='takeoff'?'lift':s.kind==='landing'||s.kind==='move'&&next?.kind==='landing'?'outro':s.kind==='move'?'build':s.kind==='grow'||s.kind==='burst'?'peak':s.kind==='fall'?'spark':s.kind==='rise'||s.reveal?'drop':i?'end':'intro';
+    const mood=s.kind==='takeoff'?'lift':s.kind==='landing'?(grand?'finale':'outro'):s.kind==='move'&&next?.kind==='landing'?(grand?'homebound':'outro'):s.kind==='move'?'build':s.kind==='grow'||s.kind==='burst'?'peak':s.kind==='fall'?'spark':s.kind==='rise'||s.reveal?'drop':i?'end':'intro';
     if(end<=start)return;
     if(last?.mood===mood&&(mood==='outro'||mood==='end'))last.end=end;else sections.push({mood,start,end,name:s.name});
   });
   const drops=sections.filter(s=>s.mood==='drop').length,lifted=drops>=4?Math.ceil(drops/2):Infinity;let d=0,p=0;
-  for(const s of sections){if(s.mood==='drop')s.index=d++;if(s.mood==='peak')s.index=p++;s.shift=(s.mood==='drop'?s.index>=lifted:(s.mood==='peak'||s.mood==='spark')&&d>=lifted)?2:0;}
-  for(let i=sections.length-2;i>=0;i--)if(sections[i].mood==='build')sections[i].shift=sections[i+1].shift;
+  for(const s of sections){if(s.mood==='drop')s.index=d++;if(s.mood==='peak')s.index=p++;s.shift=(s.mood==='drop'?s.index>=lifted:['peak','spark','finale'].includes(s.mood)&&d>=lifted)?2:0;}
+  for(let i=sections.length-2;i>=0;i--)if(sections[i].mood==='build'||sections[i].mood==='homebound')sections[i].shift=sections[i+1].shift;
   // Only timing matters here, and shell timing does not depend on where the launchers are.
   const booms=[];for(const sh of pyroSchedule(show,[[0,0,0]])){
     booms.push({t:sh.t0,voice:'launch',g:.09,dur:.1});
     booms.push({t:sh.t0+sh.delay,voice:'boom',g:.42*Math.min(1.3,sh.radius/75),dur:.1,crackle:['crossette','strobe','willow'].includes(sh.pattern),seed:sh.seed%100000});
   }
-  return {sections,booms:booms.sort((a,b)=>a.t-b.t),duration:show.duration};
+  // Shells fired together (the finale's wall) share one fuller hit instead of stacking a dozen.
+  const merged=[];for(const b of booms.sort((a,b)=>a.t-b.t)){const same=merged.findLast(m=>m.voice===b.voice&&b.t-m.t<.06);if(same){same.g=Math.min(b.voice==='boom'?.8:.16,same.g+b.g*.3);same.crackle||=b.crackle;}else merged.push({...b});}
+  return {sections,booms:merged,duration:show.duration};
 }
 
 function stepEvents(sec,k,out,seed){
@@ -60,7 +63,7 @@ function stepEvents(sec,k,out,seed){
       if(s===0)pad(Math.min(BAR,left),.4);
       if(sub===0)hit('kick',.85,{pump:true});if(sub===2){hit('hat',.18,{open:true});tone('bass',ch.bass,STEP*1.7,.3,{cut:300+1500*p});}if(s%2)hit('hat',.06);
       arp(ARPS[0],.07,.3+.5*p);if(left<=BEAT+EPS)hit('snare',.15+.25*(1-left/BEAT));break;
-    case 'build':{// filter sweeps, a riser and a snare roll into the next formation; the last beat drops out
+    case 'build':case 'homebound':{// filter sweeps, a riser and a snare roll into the next formation; the last beat drops out
       const gap=left<=BEAT+EPS;
       if(k===0)hit('riser',.2,{dur:len});
       if(s===0)pad(Math.min(BAR,left),.34);
@@ -69,8 +72,8 @@ function stepEvents(sec,k,out,seed){
       if(left<=2*BAR+EPS&&(left<=BAR+EPS||sub%2===0))hit('snare',.12+.38*(1-left/(2*BAR)));
       if(Math.abs(left-BAR)<EPS)tone('sweep',ch.tones[0],BAR,.06);
       break;}
-    case 'drop':case 'peak':{// formation reveal: four-on-the-floor, offbeat bass, arpeggio and lead
-      const peak=m==='peak',idx=sec.index||0;
+    case 'drop':case 'peak':case 'finale':{// formation reveal: four-on-the-floor, offbeat bass, arpeggio and lead
+      const peak=m==='peak'||m==='finale',idx=sec.index||0;
       if(k===0){hit('crash',peak?.45:.38);hit('impact',peak?.9:.75);}else if(s===0&&(peak||bar%4===0))hit('crash',.2);
       if(s===0)pad(Math.min(BAR,left),.28);
       if(sub===0)hit('kick',1,{pump:true});if(s===4||s===12)hit('clap',.4);

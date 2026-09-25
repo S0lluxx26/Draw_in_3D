@@ -10,11 +10,21 @@ import {Reflector} from './vendor/addons/objects/Reflector.js';
 import {mergeGeometries} from './vendor/addons/utils/BufferGeometryUtils.js';
 import {pyroSchedule,pyroParticles,PARTICLE_FLOATS,PYRO_VERTEX,PYRO_FRAGMENT,GRAVITY} from './pyro.js';
 import {LaserRig} from './lasers.js';
+import {stageUnit} from './drone-show.js';
 
 const DEMO_SCALE=6;// demo motionScale that the Blender scenery is modelled for (metres)
 const MOON=new THREE.Vector3(.5,.3,-.81).normalize();
 const linear=(r,g,b)=>new THREE.Color(r,g,b);
 export const SKY={zenith:linear(.0012,.0024,.0078),horizon:linear(.016,.028,.058),glow:linear(.05,.028,.016),fog:linear(.014,.024,.05)};
+// Late afternoon: the sun low in the west behind the harbour, a golden hazy horizon under a deepening blue sky.
+const SUN=new THREE.Vector3(-.55,.07,-.83).normalize();
+// Everything a background changes. night reproduces the original harbour exactly.
+const BACKGROUNDS={
+  night:{zenith:SKY.zenith,horizon:SKY.horizon,glow:SKY.glow,fog:SKY.fog,haze:1,deep:linear(.0015,.003,.007),night:1,sun:linear(0,0,0),clouds:0,
+    hemi:[0x5068a0,0x040608,.55],key:[0xa9bcff,.55,MOON],windows:.55,hills:1,environment:3},
+  afternoon:{zenith:linear(.016,.036,.1),horizon:linear(.25,.13,.068),glow:linear(.2,.075,.022),fog:linear(.13,.085,.066),haze:.9,deep:linear(.006,.014,.026),night:0,sun:linear(6,3.4,1.5),clouds:.8,
+    hemi:[0xb4c4f0,0x2a1e18,.95],key:[0xffbd80,2,SUN],windows:.22,hills:3,environment:1.3}
+};
 
 let assetPromise=null;
 // Cached lazy load. Resolves to the parsed glTF, or null (the show then plays without scenery).
@@ -59,13 +69,15 @@ function prepareAsset(gltf){
 }
 // Ship launch points at demo scale (matches build_environment.py; replaced by the Pyro_* nodes once loaded).
 const LAUNCHERS=[[-267,4.7,-270],[288,4.7,-249],[-206,5.4,-409]];
-// A dim night-sky environment map gives PBR metal and carbon (drones, ships, bridge) believable reflections.
-let nightEnvironment=null;
-function environment(renderer){
-  if(nightEnvironment)return nightEnvironment;
+// An environment map of the sky gives PBR metal and carbon (drones, ships, bridge) believable reflections.
+const environments=new Map();
+function skyUniforms(uniforms,b){for(const [key,value] of [['zenith',b.zenith],['horizon',b.horizon],['glow',b.glow],['sunColor',b.sun]])uniforms[key].value=value.clone();uniforms.night.value=b.night;uniforms.clouds.value=b.clouds;}
+function environment(renderer,mode){
+  if(environments.has(mode))return environments.get(mode);
   const pmrem=new THREE.PMREMGenerator(renderer),scene=new THREE.Scene(),sky=new THREE.Mesh(new THREE.SphereGeometry(1,32,16),new THREE.ShaderMaterial({...skyShader,uniforms:THREE.UniformsUtils.clone(skyShader.uniforms),side:THREE.BackSide,depthWrite:false}));
-  sky.scale.setScalar(50);scene.add(sky);nightEnvironment=pmrem.fromScene(scene,0,.1,200).texture;pmrem.dispose();sky.geometry.dispose();sky.material.dispose();
-  return nightEnvironment;
+  skyUniforms(sky.material.uniforms,BACKGROUNDS[mode]);
+  sky.scale.setScalar(50);scene.add(sky);const texture=pmrem.fromScene(scene,0,.1,200).texture;pmrem.dispose();sky.geometry.dispose();sky.material.dispose();
+  environments.set(mode,texture);return texture;
 }
 // Instance transform: position, tilt about a horizontal axis (ax,0,az) and uniform scale k.
 function writeInstance(e,o,x,y,z,ax,az,angle,k){
@@ -75,26 +87,28 @@ function writeInstance(e,o,x,y,z,ax,az,angle,k){
   e[o+8]=t*ax*az*k;e[o+9]=-s*ax*k;e[o+10]=(c+t*az*az)*k;e[o+11]=0;
   e[o+12]=x;e[o+13]=y;e[o+14]=z;e[o+15]=1;
 }
-export function stageScale(show){
-  const xs=show.home.map(p=>p[0]),span=Math.max(...xs)-Math.min(...xs),side=Math.ceil(Math.sqrt(show.count));
-  const motion=side>1&&span>0?span*side/(15*(side-1)):1;
-  return motion/DEMO_SCALE;
-}
+export const stageScale=stageUnit;
 
 const skyShader={
-  uniforms:{zenith:{value:SKY.zenith},horizon:{value:SKY.horizon},glow:{value:SKY.glow},moon:{value:MOON},time:{value:0}},
+  uniforms:{zenith:{value:SKY.zenith},horizon:{value:SKY.horizon},glow:{value:SKY.glow},moon:{value:MOON},time:{value:0},sun:{value:SUN},sunColor:{value:linear(0,0,0)},night:{value:1},clouds:{value:0}},
   vertexShader:'varying vec3 vDir;void main(){vDir=normalize(position);vec4 p=projectionMatrix*modelViewMatrix*vec4(position,1.);gl_Position=p.xyww;}',
-  fragmentShader:`uniform vec3 zenith,horizon,glow,moon;uniform float time;varying vec3 vDir;
+  fragmentShader:`uniform vec3 zenith,horizon,glow,moon,sun,sunColor;uniform float time,night,clouds;varying vec3 vDir;
     float hash(vec3 p){p=fract(p*.3183099+.1);p*=17.;return fract(p.x*p.y*p.z*(p.x+p.y+p.z));}
     float noise(vec3 x){vec3 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(mix(hash(i),hash(i+vec3(1,0,0)),f.x),mix(hash(i+vec3(0,1,0)),hash(i+vec3(1,1,0)),f.x),f.y),mix(mix(hash(i+vec3(0,0,1)),hash(i+vec3(1,0,1)),f.x),mix(hash(i+vec3(0,1,1)),hash(i+vec3(1,1,1)),f.x),f.y),f.z);}
     void main(){vec3 d=normalize(vDir);float h=d.y;
       vec3 c=mix(horizon,zenith,pow(clamp(h,0.,1.),.42));
       c+=glow*exp(-max(h,0.)*7.)*(.45+.55*max(0.,-d.z));// city light pollution behind the show
       float band=exp(-pow(dot(d,normalize(vec3(.35,.55,-.76)))*3.2,2.));// faint Milky Way
-      c+=vec3(.012,.013,.02)*band*(.4+.6*noise(d*9.))*smoothstep(0.,.35,h);
+      c+=vec3(.012,.013,.02)*band*(.4+.6*noise(d*9.))*smoothstep(0.,.35,h)*night;
       float m=dot(d,moon),edge=fwidth(m)*1.5;
-      c+=vec3(1.,.95,.86)*.62*smoothstep(.99994-edge,.99994+edge,m)*(.8+.2*noise(d*520.));
-      c+=vec3(.45,.5,.65)*(pow(max(m,0.),3000.)*.12+pow(max(m,0.),90.)*.012);
+      c+=vec3(1.,.95,.86)*.62*smoothstep(.99994-edge,.99994+edge,m)*(.8+.2*noise(d*520.))*night;
+      c+=vec3(.45,.5,.65)*(pow(max(m,0.),3000.)*.12+pow(max(m,0.),90.)*.012)*night;
+      float sd=max(dot(d,sun),0.);// low sun: disc, corona and a wide warm haze
+      c+=sunColor*(smoothstep(.99965-fwidth(sd),.99965+fwidth(sd),sd)*1.4+pow(sd,700.)*.3+pow(sd,30.)*.05+pow(sd,5.)*.02);
+      if(clouds>0.){// thin evening clouds on a layer above the harbour, lit from the sun side
+        vec2 uv=d.xz/(max(h,0.)+.12);float n=noise(vec3(uv*1.3,1.7))*.62+noise(vec3(uv*4.1,5.3))*.28+noise(vec3(uv*11.,9.1))*.1;
+        float cl=smoothstep(.52,.78,n)*smoothstep(.015,.1,h)*(1.-smoothstep(.3,.65,h))*clouds;
+        c=mix(c,vec3(.5,.26,.18)*(.3+1.2*pow(sd,2.))+vec3(.03,.035,.06),cl*.7);}
       if(h<0.)c=mix(c,horizon*.35,clamp(-h*6.,0.,1.));
       gl_FragColor=vec4(c,1.);
       #include <tonemapping_fragment>
@@ -136,7 +150,7 @@ const waterShader={
 };
 
 export class SkyStage{
-  constructor(scene,show,{tier,renderer}){
+  constructor(scene,show,{tier,renderer,sky='night'}){
     Object.assign(this,{scene,show,tier,renderer});
     this.scale=stageScale(show);this.group=new THREE.Group();scene.add(this.group);
     const s=this.scale;
@@ -170,9 +184,27 @@ export class SkyStage{
     // Soft key light travelling with the camera: reveals nearby drones in close-ups, fades out within ~40 m.
     this.key=new THREE.PointLight(0xfff1dd,70*s*s,40*s,2);this.group.add(this.key);
     this.createPads();
-    scene.environment=environment(renderer);scene.environmentIntensity=3;
     this.buildPyro(LAUNCHERS.map(p=>p.map(v=>v*s)));
     if(show.lasers!==false){this.lasers=new LaserRig(show,s,{bloom:tier.bloom});this.group.add(this.lasers.mesh);}
+    this.setSky(sky);
+  }
+  // Switch background live: sky, fog, water, lights, reflections and the scenery's lit windows.
+  setSky(mode){
+    const b=BACKGROUNDS[mode]||BACKGROUNDS.night;this.sky.userData.mode=BACKGROUNDS[mode]?mode:'night';
+    skyUniforms(this.sky.material.uniforms,b);this.stars.visible=b.night>0;
+    this.scene.background=b.zenith.clone();this.scene.fog.color.copy(b.fog);this.scene.fog.density=2.6e-4*b.haze/this.scale;
+    const u=this.water.material.uniforms;u.fogColor.value=b.fog.clone();u.fogDensity.value=this.scene.fog.density;u.deep.value=b.deep.clone();u.sky.value=b.horizon.clone();
+    this.hemi.color.set(b.hemi[0]);this.hemi.groundColor.set(b.hemi[1]);this.hemi.intensity=b.hemi[2];
+    this.moon.color.set(b.key[0]);this.moon.intensity=b.key[1];this.moon.position.copy(b.key[2]).multiplyScalar(100);
+    this.scene.environment=environment(this.renderer,this.sky.userData.mode);this.scene.environmentIntensity=b.environment;
+    this.background=b;this.applyScenery();
+  }
+  get skyMode(){return this.sky.userData.mode;}
+  // Shared Blender materials follow the background: windows glow at night, hills catch the afternoon light.
+  applyScenery(){
+    const b=this.background,m=this.materials;if(!m||!b)return;
+    const buildings=m.get('Buildings');if(buildings)buildings.emissiveIntensity=b.windows;
+    for(const name of ['Mountains','Hills'])m.get(name)?.color.setScalar(b.hills);
   }
   // Ship fireworks: one static buffer; the vertex shader evaluates every particle from show time.
   buildPyro(origins){
@@ -205,7 +237,7 @@ export class SkyStage{
   attach(gltf){
     if(!gltf||this.scenery)return;
     this.scenery=gltf.scene;this.scenery.scale.setScalar(this.scale);this.scenery.updateMatrixWorld(true);this.group.add(this.scenery);this.deck.visible=false;
-    this.materials=gltf.userData.materials;
+    this.materials=gltf.userData.materials;this.applyScenery();
     this.ships=(gltf.userData.ships||[]).map((o,i)=>({o,y:o.position.y,q:o.quaternion.clone(),phase:i*1.7}));
     const launchers=(gltf.userData.launchers||[]).map(o=>o.getWorldPosition(new THREE.Vector3()).toArray());
     if(launchers.length)this.buildPyro(launchers);
@@ -260,7 +292,7 @@ export class SkyStage{
   setGlow(center,color,amount){this.focus=this.focus||new THREE.Vector3();this.focus.fromArray(center);this.glow.position.copy(this.focus);this.glow.color.copy(color);this.glow.intensity=amount;}
   dispose(){
     this.scenery?.removeFromParent();
-    this.group.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();const m=o.material;if(m&&!m.userData.shared){m.map?.dispose();m.dispose();}});
+    this.group.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();for(const m of [o.material].flat())if(m&&!m.userData.shared){m.map?.dispose();m.dispose();}});// the drone frame uses a material array
     this.water.dispose?.();this.group.removeFromParent();
   }
 }

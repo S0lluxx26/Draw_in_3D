@@ -7,6 +7,7 @@ import {OutputPass} from './vendor/addons/postprocessing/OutputPass.js';
 import {createFrame,sampleShow,ShowClock} from './drone-show.js';
 import {directorView,framingAt} from './show-camera.js';
 import {SkyStage,loadStageAsset,stageScale} from './sky-stage.js';
+import {SKY_MODES,SKY_KEY} from './quality.js';
 import {TIERS,QUALITY_LEVELS,resolveTier,browserEnvironment,FrameGovernor} from './quality.js';
 import {ShowRecorder} from './show-recorder.js';
 import {ShowMusic} from './show-music.js';
@@ -39,6 +40,7 @@ export class DronePlayer{
     this.recorder=new ShowRecorder(this);this.music=new ShowMusic(()=>this.active?this.clock:null);this.music.onchange=()=>{if(this.active)this.syncMusic();};this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
     try{this.quality=QUALITY_LEVELS.includes(localStorage.getItem(QUALITY_KEY))?localStorage.getItem(QUALITY_KEY):'auto';}catch{this.quality='auto';}
     try{this.cameraMode=CAMERA_MODES.includes(localStorage.getItem(CAMERA_KEY))?localStorage.getItem(CAMERA_KEY):'follow';}catch{this.cameraMode='follow';}
+    try{this.sky=SKY_MODES.includes(localStorage.getItem(SKY_KEY))?localStorage.getItem(SKY_KEY):'night';}catch{this.sky='night';}
     $('show-pause').onclick=()=>this.toggle();$('show-restart').onclick=()=>{const now=performance.now();this.clock.seek(0,now);if(this.waiting)this.autoplay=true;else this.clock.play(now);this.refresh();};
     // A locked button asks for the tap browsers require before sound; otherwise it mutes and unmutes.
     $('show-music').onclick=()=>{if(this.music.state==='locked')this.music.prime();else this.music.toggle();if(!this.recorder.active)this.recorder.reset();this.syncMusic();};
@@ -55,6 +57,8 @@ export class DronePlayer{
     if(!QUALITY_LEVELS.includes(choice)||choice===this.quality)return;this.quality=choice;try{localStorage.setItem(QUALITY_KEY,choice);}catch{}
     if(!this.active||this.recorder.active)return;const time=this.clock.time,playing=this.clock.playing||this.waiting&&this.autoplay,rate=this.clock.rate;this.start(this.show);this.clock.seek(time,performance.now());this.clock.speed(rate,performance.now());this.autoplay=playing;this.refresh();
   }
+  // Background (Dark night / Late afternoon): applies live and is remembered on this device.
+  setSky(mode){if(!SKY_MODES.includes(mode))return;this.sky=mode;$('drone-show').dataset.sky=mode;try{localStorage.setItem(SKY_KEY,mode);}catch{}if(this.active&&this.stage){this.stage.setSky(mode);this.refresh();}}
   setCameraMode(mode){if(!CAMERA_MODES.includes(mode))return;this.cameraMode=mode;try{localStorage.setItem(CAMERA_KEY,mode);}catch{}if(this.active){this.freeLimits();this.refresh();}}
   // Free orbit keeps the wide original limits; "Stay around the show" narrows them every frame (see follow()).
   freeLimits(){const o=this.orbit,s=this.scale;Object.assign(o,{minAzimuthAngle:-Infinity,maxAzimuthAngle:Infinity,minPolarAngle:0,maxPolarAngle:Math.PI*.64,minDistance:8*s,maxDistance:3200*s});}
@@ -70,7 +74,7 @@ export class DronePlayer{
   syncMusic(){const b=$('show-music'),state=this.music.state,label={on:'Music on',off:'Music off',locked:'Tap for sound',unavailable:'No audio'}[state];if(b.dataset.state!==state){b.dataset.state=state;b.querySelector('.music-label').textContent=' '+label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(state==='on'));b.disabled=state==='unavailable';b.classList.toggle('locked',state==='locked');}}
   start(show){
     if(this.active)this.teardown();
-    this.show=show;$('show-demo-settings').hidden=!show.demo;this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:2},()=>createFrame(show));this.velocityFrame=createFrame(show);
+    this.show=show;const settings=$('show-demo-settings');settings.hidden=false;settings.lastElementChild.textContent=show.demo?' Demo settings':' Settings';settings.setAttribute('aria-label',show.demo?'Demo settings':'Player settings');this.clock=new ShowClock(show.duration);this.frame=createFrame(show);this.trailFrames=Array.from({length:2},()=>createFrame(show));this.velocityFrame=createFrame(show);
     this.tierName=resolveTier(this.quality,browserEnvironment(this.renderer));this.tier=TIERS[this.tierName];
     const r=this.renderer;this.saved={toneMapping:r.toneMapping,exposure:r.toneMappingExposure,pixelRatio:r.getPixelRatio()};
     r.toneMapping=THREE.ACESFilmicToneMapping;r.toneMappingExposure=1.05;this.basePixelRatio=Math.min(devicePixelRatio||1,this.tier.pixelRatio);r.setPixelRatio(this.basePixelRatio);
@@ -80,7 +84,7 @@ export class DronePlayer{
     this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.freeLimits();this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
     this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;this.waiting=true;this.autoplay=true;
-    this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r});this.createDrones();this.precrowd(show);
+    this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r,sky:this.sky});$('drone-show').dataset.sky=this.sky;this.createDrones();this.precrowd(show);
     if(this.tier.bloom){
       this.composer=new EffectComposer(r,new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:this.tierName==='high'?4:0}));
       this.composer.addPass(new RenderPass(this.scene,this.camera));this.bloom=new UnrealBloomPass(new THREE.Vector2(256,256),.78,.55,1.05);this.composer.addPass(this.bloom);this.composer.addPass(new OutputPass());
@@ -193,7 +197,7 @@ export class DronePlayer{
     this.scene=null;this.lights=null;this.trails=null;this.stage=null;this.composer=null;this.bloom=null;this.frame=null;this.trailFrames=null;this.velocityFrame=null;this.trailPositions=null;this.trailColors=null;
   }
   stop(){
-    if(!this.active)return;this.recorder.finish(true);this.music.stop();this.active=false;this.teardown();
+    if(!this.active)return;this.lastTime=this.clock.read(performance.now());this.recorder.finish(true);this.music.stop();this.active=false;this.teardown();
     $('drone-show').hidden=true;$('show-loading').hidden=true;this.show=null;this.onExit();
   }
 }

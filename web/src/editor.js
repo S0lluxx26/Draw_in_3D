@@ -362,7 +362,7 @@ const demoLink=()=>/^#demo$/i.test(location.hash);
 dronePlayer=new DronePlayer(renderer,canvas,requestFrame,()=>{
   document.body.classList.remove('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=false;
   if(demoLink())window.history.replaceState(null,'',location.pathname+location.search);// `history` here is the undo stack
-  controls.enabled=true;updateUI();requestFrame();const back=showReturn;showReturn=null;if(back)back();else $('drone-demo').focus({preventScroll:true});
+  controls.enabled=true;updateUI();requestFrame();const back=showReturn;showReturn=null;if(back)back(dronePlayer.lastTime);else $('drone-demo').focus({preventScroll:true});
 });
 function startDroneShow(useDrawing=false,compiled=null,onReturn=null,atTime){
   if(busy||dronePlayer.active)return;
@@ -373,7 +373,7 @@ function startDroneShow(useDrawing=false,compiled=null,onReturn=null,atTime){
     dronePlayer.start(show);$('show-exit').textContent=onReturn?'← Back to show':'← Back to drawing';if(atTime!==undefined)dronePlayer.seek(atTime);requestFrame();
   }catch(error){if(dronePlayer.active)dronePlayer.stop();document.body.classList.remove('drone-mode');for(const id of ['editor-tools','editor-inspector','editor-files','editor-history'])$(id).inert=false;controls.enabled=true;notify(error.message,true);}
 }
-installDemoSettings({play:show=>startDroneShow(false,show),player:()=>dronePlayer,notify});$('drone-drawing').onclick=()=>startDroneShow(true);
+installDemoSettings({play:show=>startDroneShow(false,show),player:()=>dronePlayer,notify,edit:(settings,focus)=>{if(busy||formationSession)return;finishGesture();leavePanorama();stopGame();showEditor.openDemo(settings,true,focus);}});$('drone-drawing').onclick=()=>startDroneShow(true);
 if(demoLink())requestAnimationFrame(()=>$('drone-demo').click());
 $('welcome-demo').onclick=()=>$('drone-demo').click();// same launch path; this click unlocks the music
 addEventListener('hashchange',()=>{if(demoLink()&&!dronePlayer.active)$('drone-demo').click();});

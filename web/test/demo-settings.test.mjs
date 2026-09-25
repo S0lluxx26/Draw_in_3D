@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import assets from '../src/formation-assets.js';
 import {demoSettings,compileDemo,FORMATIONS} from '../src/demo-settings.js';
-import {sampleShow,groundFocus,buildShow,demoPaths,samplePaths} from '../src/drone-show.js';
+import {sampleShow,groundFocus,buildShow,demoPaths,samplePaths,CINEMATIC_LANDING,TRAVEL_LEVEL} from '../src/drone-show.js';
+import {DEMO_TRANSFER} from '../src/demo-library.js';
 import {byPad} from './pads.mjs';
 
 test('Demo settings bound untrusted saved values and preserve explicit fire choices',()=>{
@@ -12,7 +13,7 @@ test('Demo settings bound untrusted saved values and preserve explicit fire choi
 });
 test('Landing reverses takeoff poses and navigation lights at a slower pace, with a ground camera',()=>{
   const show=compileDemo(assets,{count:512}),up=show.stages.find(s=>s.kind==='takeoff'),down=show.stages.find(s=>s.kind==='landing');
-  assert.equal(down.end-down.start,14);
+  assert.equal(down.end-down.start,CINEMATIC_LANDING[1]);
   for(const f of [.13,.37,.71,.91]){
     const a=sampleShow(show,up.start+(up.end-up.start)*(1-f)),b=sampleShow(show,down.start+(down.end-down.start)*f);
     // Pad by pad: the drone landing on pad k retraces pad k's takeoff, lights included.
@@ -22,7 +23,8 @@ test('Landing reverses takeoff poses and navigation lights at a slower pace, wit
   }
   assert.equal(groundFocus(show,down.start),1);assert.equal(groundFocus(show,up.start),1);
   assert.equal(groundFocus(show,show.cues.find(c=>c.label==='Fish').time),0);
-  assert.ok(show.stages.filter(s=>s.kind==='move').every(s=>s.end-s.start===9));
+  // Shape changes are quicker (DEMO_TRANSFER); firework launches and the flight home keep 9 s.
+  for(const s of show.stages.filter(s=>s.kind==='move')){const next=show.stages[show.stages.indexOf(s)+1];assert.equal(s.end-s.start,['hold','rise'].includes(next.kind)?DEMO_TRANSFER:9,s.name);}
 });
 test('Three firework types expand, then blink and fall to darkness with no teleporting or lost drones',()=>{
   const show=compileDemo(assets,{count:512}),bursts=show.stages.filter(s=>s.kind==='grow');
@@ -39,7 +41,7 @@ test('Three firework types expand, then blink and fall to darkness with no telep
 test('Blender formations have depth, distinct well-spaced samples and exact fleet counts',()=>{
   for(const name of FORMATIONS){const {positions}=assets[name].body;assert.equal(positions.length,4096);assert.equal(new Set(positions.map(p=>p.join(','))).size,4096);assert.ok(positions.every(p=>p.every(Number.isFinite)));assert.ok(Math.max(...positions.map(p=>p[2]))-Math.min(...positions.map(p=>p[2]))>1);}
   const show=compileDemo(assets,{count:512,scale:4,shape:'star'});
-  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,365);
+  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,387);
   for(const s of show.stages){assert.equal(s.to.positions.length,512);assert.equal(s.to.colors.length,512);}
   assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);
 });
@@ -50,16 +52,19 @@ test('Demo fire selection is explicit; Starship still rises when its fire is dis
   assert.ok(rise.to.positions.every((p,i)=>Math.abs(p[1]-rise.from.positions[i][1]-40)<1e-8));
   assert.equal(fish.effect,'fire');assert.equal(rise.fireEnabled,false);
 });
-test('Dim transition LEDs alternate, remain bounded, and fade continuously at every boundary',()=>{
+test('Between shapes every drone blinks red or blue at a quarter of full light, continuous at every boundary',()=>{
   const show=compileDemo(assets,{count:512});
   for(const s of show.stages.filter(s=>s.kind==='move')){
-    for(const elapsed of [.01,.15,.4,1,4,8.8]){
-      const f=sampleShow(show,s.start+elapsed);
-      for(let i=0;i<f.colors.length;i+=3){const [r,g,b]=f.colors.subarray(i,i+3);assert.ok(r>10*b||b>10*r||Math.max(r,g,b)<1e-8,'Only red or blue LEDs throughout transfer');}
+    const length=s.end-s.start;
+    for(const f of [.002,.02,.06,.15,.5,.85,.99]){
+      const frame=sampleShow(show,s.start+length*f);
+      for(let i=0;i<frame.colors.length;i+=3){const [r,g,b]=frame.colors.subarray(i,i+3);assert.ok(r>10*b||b>10*r||Math.max(r,g,b)<1e-8,s.name+': only red or blue LEDs in flight');}
+      assert.ok(frame.colors.every(v=>v>=0&&v<=TRAVEL_LEVEL+1e-9),'never above a quarter of full light');
     }
-    const a=sampleShow(show,s.start+3),b=sampleShow(show,s.start+3.4);
-    assert.ok(a.colors.some(v=>v>.01));assert.ok(a.colors.every(v=>v<=.121));
-    assert.notEqual(a.colors[0]>a.colors[2],b.colors[0]>b.colors[2]);
+    const a=sampleShow(show,s.start+length/2),b=sampleShow(show,s.start+length/2+.4);
+    assert.ok(a.colors.some(v=>v>TRAVEL_LEVEL*.9),s.name+' blinks at a quarter light, bright enough to follow');
+    assert.ok(Math.abs(TRAVEL_LEVEL**2.2-.25)<1e-12,'a quarter of the light an LED gives at full value');
+    assert.notEqual(a.colors[0]>a.colors[2],b.colors[0]>b.colors[2],'the colours alternate');
   }
   for(const s of show.stages.slice(1)){
     const a=sampleShow(show,s.start-1e-6),b=sampleShow(show,s.start+1e-6);
@@ -80,9 +85,9 @@ test('New stroke formations sample to full fleets; only Happy day carries the sh
     assert.ok(positions.every(p=>p.length===3&&p.every(Number.isFinite)&&Math.abs(p[0])<=12&&p[1]>=9&&p[1]<=29),name+' stays in the drawing frame');
     assert.ok(colors.every(c=>c.length===3&&c.every(v=>v>=0&&v<=1)));
   }
-  assert.deepEqual(drawn.filter(f=>f.pyro).map(f=>[f.name,f.hold,f.effect]),[['Happy day',16,'sparkle']]);
+  assert.deepEqual(drawn.filter(f=>f.pyro).map(f=>[f.name,f.hold,f.effect]),[['Happy day',19,'sparkle']]);
   for(const show of [buildShow(null,{count:256}),compileDemo(assets,{count:256})]){
-    const pyro=show.stages.filter(s=>s.pyro);assert.deepEqual(pyro.map(s=>[s.name,s.kind,s.effect,s.pyro,s.end-s.start]),[['Happy day','hold','sparkle',true,16]]);
+    const pyro=show.stages.filter(s=>s.pyro);assert.deepEqual(pyro.map(s=>[s.name,s.kind,s.effect,s.pyro,s.end-s.start]),[['Happy day','hold','sparkle',true,19]]);
     assert.ok(show.cues.some(c=>c.label==='Happy day'&&c.time>=pyro[0].start&&c.time<pyro[0].end));
   }
 });

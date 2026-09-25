@@ -27,7 +27,9 @@ test('Demo music follows every stage on the beat: build-ups into each formation,
     assert.ok(musicEvents(plan,d.start,d.start+.01).some(e=>e.voice==='impact'&&e.t===d.start),'impact exactly on arrival of '+d.name);}
   assert.deepEqual(drops.map(d=>d.shift),[0,0,0,0,0,0,2,2,2,2,2,2]);
   assert.deepEqual(s.filter(x=>x.mood==='peak').map(x=>x.name),['Growing heart','Five-point star','Three firework balls']);
-  assert.equal(s.filter(x=>x.mood==='outro').length,1,'returning home and landing share one outro phrase');
+  // With ship fireworks the landing is the finale: a build on the way home, a peak under the fireworks, the end chord.
+  assert.deepEqual(s.slice(-3).map(x=>[x.mood,x.name]),[['homebound','Returning home'],['finale','Landing'],['end','Landed']]);
+  assert.equal(musicPlan(compileDemo(assets,{count:256,pyro:false})).sections.filter(x=>x.mood==='outro').length,1,'without them, returning home and landing share one outro phrase');
   // A small custom drawing show still gets a complete score.
   const custom=musicPlan(buildShow({positions:Array.from({length:64},(_,i)=>[i%8,Math.floor(i/8),0]),colors:Array.from({length:64},()=>[1,.5,.2])},{count:64}));
   assert.deepEqual(custom.sections.map(x=>x.mood),['intro','lift','build','drop','build','peak','outro','end']);
@@ -45,7 +47,10 @@ test('scores are deterministic and any split of the timeline schedules every not
 
 test('ship-firework bursts get booms at their exact burst times, and none when ship fireworks are off',()=>{
   const bursts=pyroSchedule(demo,[[0,0,0]]).map(sh=>sh.t0+sh.delay).sort((a,b)=>a-b);
-  assert.ok(bursts.length>=20);assert.deepEqual(plan.booms.filter(b=>b.voice==='boom').map(b=>b.t),bursts);
+  // Shells bursting together (the finale's wall) share one fuller boom.
+  const booms=plan.booms.filter(b=>b.voice==='boom').map(b=>b.t);assert.ok(bursts.length>=60);
+  for(const t of bursts)assert.ok(booms.some(b=>t>=b-1e-9&&t-b<.06),'a boom for the burst at '+t);
+  for(const b of booms)assert.ok(bursts.includes(b));assert.ok(booms.length<bursts.length,'the wall is merged');
   assert.equal(musicPlan(compileDemo(assets,{count:256,pyro:false})).booms.length,0);
 });
 

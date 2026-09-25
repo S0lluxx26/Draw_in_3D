@@ -2,6 +2,7 @@
 // show and time always give the same pose, so seeking, recording and replays agree.
 // Each stage ends on a framing keyframe; the camera eases between keyframes over
 // the stage, which keeps position and target continuous at every boundary.
+import {stageUnit} from './drone-show.js';
 const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
 const smooth=t=>{t=clamp(t);return t*t*t*(10+t*(-15+6*t));};
 const cache=new WeakMap();
@@ -20,6 +21,10 @@ export function showKeyframes(show){
   const xs=show.home.map(p=>p[0]),zs=show.home.map(p=>p[2]),side=Math.ceil(Math.sqrt(show.count)),gap=(Math.max(...xs)-Math.min(...xs))/Math.max(1,side-1)||1,front=Math.max(...zs);
   const close={center:[(Math.max(...xs)+Math.min(...xs))/2,gap*.25,front],half:[gap*1.5,gap*.5,gap*.9],ground:.42,close:true};
   const grounded=s=>s?.kind==='hold'&&s.to.positions.every(p=>p[1]<=.2);
+  // Ship fireworks close a cinematic show: while the fleet returns and lands, the camera frames the harbour sky
+  // where the shells burst, with the launch field at the bottom of the picture.
+  const unit=stageUnit(show),finale=show.pyro!==false&&stages.some(s=>s.kind==='landing'&&s.reverse);
+  const harbour={center:[0,128*unit,-160*unit],half:[250*unit,148*unit,40*unit],ground:.1,wide:true};
   const keyframes=[grounded(stages[0])?{...close}:frame(box(stages[0].from.positions),1)];
   stages.forEach((s,i)=>{
     const next=stages[i+1];let b;
@@ -27,11 +32,12 @@ export function showKeyframes(show){
     else if(['fall','rise','burst'].includes(s.kind))b=box(s.from.positions,s.to.positions);
     else b=box(s.to.positions);
     if(grounded(s)&&(i===0||i===stages.length-1)){keyframes.push({...close});return;}
+    if(finale&&(s.kind==='landing'||next?.kind==='landing')){keyframes.push({...harbour});return;}
     keyframes.push(frame(b,b.top<=hoverTop*1.05+1e-6?1:0));
   });
   // Never zoom in on tiny intermediate shapes more than the show's typical formation allows.
-  const reference=Math.max(...keyframes.filter(k=>!k.ground).map(k=>Math.max(k.half[0],k.half[1])),...keyframes.filter(k=>!k.close).map(k=>k.half[0]*.5),1e-3);
-  for(const k of keyframes){if(k.close)continue;const size=Math.max(k.half[0],k.half[1]);if(size<reference*.45){const f=reference*.45/Math.max(size,1e-6);k.half=k.half.map((v,j)=>j<2?v*f:v);}}
+  const reference=Math.max(...keyframes.filter(k=>!k.ground).map(k=>Math.max(k.half[0],k.half[1])),...keyframes.filter(k=>!k.close&&!k.wide).map(k=>k.half[0]*.5),1e-3);
+  for(const k of keyframes){if(k.close||k.wide)continue;const size=Math.max(k.half[0],k.half[1]);if(size<reference*.45){const f=reference*.45/Math.max(size,1e-6);k.half=k.half.map((v,j)=>j<2?v*f:v);}}
   cache.set(show,keyframes);return keyframes;
 }
 export function framingAt(show,time){

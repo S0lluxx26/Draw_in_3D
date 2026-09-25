@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import assets from '../src/formation-assets.js';
 import {compileDemo,FORMATIONS} from '../src/demo-library.js';
-import {demoShowDoc,demoCue,drawingCue,withDemoLook,editableDemo,newCue,blankArtwork,encodeShow,decodeShow,compileShow,showDuration,ShowHistory} from '../src/show-project.js';
+import {demoShowDoc,demoCue,drawingCue,withDemoLook,editableDemo,newCue,blankArtwork,encodeShow,decodeShow,compileShow,showDuration,ShowHistory,DEMO_TIMING} from '../src/show-project.js';
 
 const signature=show=>show.stages.map(s=>[s.name,s.kind,s.end-s.start,s.motion||'',!!s.spout,!!s.waves,s.to.fire?.filter(Boolean).length??0].join('|'));
 const roundTrip=doc=>decodeShow(encodeShow(doc));
@@ -14,7 +14,7 @@ test('Edit demo opens the Demo itself: saved, reopened and played, it is the sam
   assert.deepEqual(signature(show),signature(demo));assert.equal(show.duration,demo.duration);assert.equal(showDuration(doc),demo.duration);
   for(const i of [3,9,20])assert.deepEqual(show.stages[i].to.positions,demo.stages[i].to.positions);
   assert.deepEqual([show.lightShape,show.pyro,show.lasers,show.count],['star',false,false,1024]);assert.ok(show.cinematic,'launch-pad close-ups and landing camera');
-  assert.ok(!show.demo,'an edited show keeps its own settings; the player offers no Demo settings for it');
+  assert.ok(!show.demo,'an edited show keeps its own look; the player offers it player options only');
   assert.ok(encodeShow(doc).length<8*1024,'the file stores choices, not drone positions');
 });
 
@@ -61,4 +61,22 @@ test('Demo show files are validated like any other show',()=>{
   assert.throws(()=>decodeShow(encodeShow({...doc,fireworks:{...doc.fireworks,style:'confetti'}})),/finale/);
   assert.throws(()=>compileShow(doc,null),/not available/,'playing needs the Demo library');
   assert.equal(roundTrip({...doc,cues:[newCue(),...doc.cues.slice(0,2)]}).cues.length,3);
+});
+
+test('converted Fish and Whale drawings keep their water, and any drawing can swim with waves or a spout',()=>{
+  const doc=demoShowDoc({count:1024}),fish=drawingCue('Fish',doc.cues[1]),whale=drawingCue('Whale',doc.cues[6]);
+  const mine={...newCue(editableDemo().cues[0].artwork,'My robot swims'),effect:'fish'};
+  const show=compileShow(roundTrip({...doc,cues:[fish,whale,mine]}),assets),stage=name=>show.stages.find(s=>s.name===name);
+  for(const [name,kind,share] of [['Fish','waves',8],['Whale','spout',10],['My robot swims','waves',8]]){
+    const s=stage(name);assert.ok(s[kind],`${name} keeps its ${kind}`);assert.equal(s.to.extra.filter(Boolean).length,Math.floor(1024/share));
+    const xs=s.to.positions.filter((p,i)=>!s.to.extra[i]).map(p=>p[1]),top=Math.max(...xs);
+    if(kind==='waves')assert.ok(s.waves.lines.every(l=>l.y>top),'waves roll above the drawing');else assert.ok(Math.abs(s.spout.hole[1]-top)<.05*(top-Math.min(...xs))+1,'the spout starts at the top of the head');
+  }
+  // Old-format shows keep their original behaviour (no extra drones).
+  assert.equal(compileShow(roundTrip({...editableDemo(),cues:[drawingCue('Fish')]})).stages.find(s=>s.name==='Fish').waves,undefined);
+});
+
+test('new drawings in a Demo-style show get the Demo timing; older shows keep theirs',()=>{
+  assert.deepEqual([newCue(undefined,'a',DEMO_TIMING).hold,newCue(undefined,'a',DEMO_TIMING).transfer],[15,7]);
+  assert.deepEqual([newCue().hold,newCue().transfer],[8,7]);assert.equal(demoCue('Robot').hold,15);assert.equal(demoCue('Robot').transfer,7);
 });

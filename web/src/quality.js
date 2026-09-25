@@ -1,6 +1,8 @@
 // Graphics quality tiers for the sky show. Pure, so it can be tested without a GPU.
 // high: bloom, water reflection, drone bodies · balanced: bloom, cheaper reflection · battery: direct render.
 export const QUALITY_LEVELS=['auto','high','balanced','battery'];
+// Show background, a viewing preference like quality: the dark-night harbour or a warm late afternoon.
+export const SKY_MODES=['night','afternoon'],SKY_KEY='draw3d-sky-v1';
 export const TIERS={
   high:{bloom:true,reflection:.5,bodies:true,pixelRatio:2,stars:1},
   balanced:{bloom:true,reflection:.3,bodies:false,pixelRatio:1.5,stars:.75},

@@ -1,9 +1,14 @@
 import {clone} from './model.js';
 import {drawingPaths,placePaths} from './drone-show.js';
-import {newShow,newCue,demoShowDoc,demoCue,drawingCue,withDemoLook,captureArtwork,fitArtwork,ShowHistory,SHOW_LIMITS,encodeShow,decodeShow,cueFormation,showDuration,DEMO_FINALE} from './show-project.js';
+import {newShow,newCue,demoShowDoc,demoCue,drawingCue,withDemoLook,captureArtwork,fitArtwork,ShowHistory,SHOW_LIMITS,encodeShow,decodeShow,cueFormation,showDuration,DEMO_FINALE,DEMO_TIMING,DEMO_LANDING,cueSequence,cueProblem,cueTimes} from './show-project.js';
+const clock=s=>{const r=Math.round(s);return `${Math.floor(r/60)}:${String(r%60).padStart(2,'0')}`;};
+// A card's problem is computed once per (immutable) formation.
+const problems=new WeakMap(),problemOf=c=>{if(!problems.has(c))problems.set(c,cueProblem(c));return problems.get(c);};
 import {FORMATIONS,FLEET_SIZES} from './demo-library.js';
 // "Edit demo" starts from the Demo exactly as it is set up in Demo settings on this device.
 const savedDemoSettings=()=>{try{return JSON.parse(localStorage.getItem('draw3d-demo-settings-v1'));}catch{return undefined;}};
+// A show's content without formation IDs: tells whether the Demo is still untouched.
+const content=doc=>JSON.stringify({...doc,cues:doc.cues.map(({id,...cue})=>cue)});
 import {createDraftStore,DraftWriter} from './drafts.js';
 const $=id=>document.getElementById('author-'+id);
 const button=(label,work)=>{const b=document.createElement('button');b.textContent=label;b.onclick=work;return b;};
@@ -11,7 +16,7 @@ export function downloadShowFile(text,name){const a=document.createElement('a'),
 
 export class ShowEditor{
   constructor(hooks){
-    this.hooks=hooks;this.state=new ShowHistory(demoShowDoc(savedDemoSettings()));this.active=this.doc.cues[0].id;this.selections=new WeakMap();this.revision=0;this.draftId=crypto.randomUUID();
+    this.hooks=hooks;this.state=new ShowHistory(demoShowDoc(savedDemoSettings()));this.untouched=content(this.doc);this.active=this.doc.cues[0].id;this.selections=new WeakMap();this.revision=0;this.draftId=crypto.randomUUID();
     document.body.insertAdjacentHTML('beforeend',`<dialog id="author-dialog" aria-labelledby="author-heading">
       <header class="author-head"><div><span class="eyebrow">DRAW → ARRANGE → PERFORM</span><h2 id="author-heading">Show editor</h2></div><button id="author-close">Back to drawing</button></header>
       <nav class="author-toolbar" aria-label="Show files"><button id="author-new">New show</button><button id="author-demo">Edit demo</button><button id="author-open">Open show</button><button id="author-save">Save show ↗</button><button id="author-recover">Show drafts</button><button id="author-help">How to make a show</button></nav>
@@ -19,8 +24,8 @@ export class ShowEditor{
       <p id="author-status" role="status">Edit the demo or capture your own drawing.</p><p id="author-storage" role="status">Show drafts stay in this browser. Save show for a lasting backup.</p>
       <section id="author-recovery" hidden><h3>Show drafts</h3><div id="author-drafts"></div><button id="author-recovery-close">Close drafts</button></section>
       <div class="author-layout"><section class="author-story"><div class="author-section-head"><h3>Storyboard</h3><select id="author-count" aria-label="Fleet size"><option value="4096">4,096 drones</option><option value="256">256 drones (legacy)</option></select></div><p class="author-bookend">↑ Automatic takeoff · 8s</p><div id="author-cards"></div><div class="author-add"><button id="author-blank">＋ Draw a formation</button><button id="author-capture">＋ Current drawing</button><button id="author-selection">＋ Selected ink</button><select id="author-library" aria-label="Add a Demo formation"><option value="">＋ Demo formation…</option>${FORMATIONS.map(n=>`<option>${n}</option>`).join('')}</select></div><p class="author-bookend">✦ Fireworks → ↓ Landing</p></section>
-      <section class="author-stage"><canvas id="author-preview" width="680" height="440" aria-label="Front view of sampled drone formation"></canvas><p id="author-preview-note"></p><div class="author-stage-actions"><button id="author-edit" class="primary">✎ Edit drawing</button><button id="author-formation-preview">View in 3D</button><button id="author-fit">Fit to stage</button></div><p class="hint">Dots follow stroke centre lines and colours. Curved sheets retain depth. Images, blocks, brush thickness and paper backgrounds do not become drones.</p></section>
-      <section class="author-properties"><h3>Formation</h3><fieldset id="author-fields"><label>Name<input id="author-cue-name" maxlength="64"></label><div class="author-pair"><label>Display · seconds<input id="author-hold" type="number" min="2" max="60" step="0.5"></label><label>Transition · seconds<input id="author-transfer" type="number" min="2" max="30" step="0.5"></label></div><label>Light reveal<select id="author-light"><option value="fade">Fade in</option><option value="draw-on">Draw on in stroke order</option><option value="bottom-up">Bottom to top</option></select></label><label>Motion / effect<select id="author-effect"><option value="none">Still formation</option><option value="sparkle">Firework sparkle</option><option value="fire">Falling fire</option><option value="starship">Starship rise + yellow exhaust</option><option value="flap">Wings flap (butterfly)</option><option value="swim">Swim (whale)</option><option value="fish">Swim (fish)</option><option value="balloons">Balloons drift up</option></select></label><label class="author-check" id="author-fire-row" hidden><input id="author-cue-fire" type="checkbox"> Falling fire</label><p id="author-library-note" class="hint" hidden>Demo formation · the Blender 3D model with its built-in motion. Convert to drawing to change its shape or position.</p><label>Brightness<input id="author-brightness" type="number" min="0.1" max="1" step="0.1"></label><p class="hint">Lights fade out before each transfer and reveal after arrival.</p><h4>Placement in the sky</h4><div class="author-triple"><label>X<input id="author-x" type="number" min="-20" max="20" step="1"></label><label>Height<input id="author-y" type="number" min="6" max="34" step="1"></label><label>Depth<input id="author-z" type="number" min="-20" max="20" step="1"></label></div><div class="author-pair"><label>Scale<input id="author-scale" type="number" min="0.1" max="100" step="0.5"></label><label>Rotation · °<input id="author-yaw" type="number" min="-180" max="180" step="5"></label></div><div class="author-actions"><button id="author-left">↑ Earlier</button><button id="author-right">↓ Later</button><button id="author-duplicate">Duplicate</button><button id="author-delete">Delete</button></div></fieldset>
+      <section class="author-stage"><canvas id="author-preview" width="680" height="440" aria-label="Front view of sampled drone formation"></canvas><p id="author-preview-note"></p><div class="author-stage-actions"><button id="author-edit" class="primary">✎ Edit drawing</button><button id="author-formation-preview" title="Play the show from this formation's transition, then come back here">▶ Run from here</button><button id="author-fit">Fit to stage</button></div><p class="hint">Dots follow stroke centre lines and colours. Curved sheets retain depth. Images, blocks, brush thickness and paper backgrounds do not become drones.</p></section>
+      <section class="author-properties"><h3>Formation</h3><fieldset id="author-fields"><label>Name<input id="author-cue-name" maxlength="64"></label><div class="author-pair"><label>Display · seconds<input id="author-hold" type="number" min="2" max="60" step="0.5"></label><label>Transition · seconds<input id="author-transfer" type="number" min="2" max="30" step="0.5"></label></div><label>Light reveal<select id="author-light"><option value="fade">Fade in</option><option value="draw-on">Draw on in stroke order</option><option value="bottom-up">Bottom to top</option></select></label><label>Motion / effect<select id="author-effect"><option value="none">Still formation</option><option value="sparkle">Firework sparkle</option><option value="fire">Falling fire</option><option value="starship">Starship rise + yellow exhaust</option><option value="flap">Wings flap (butterfly)</option><option value="swim">Swim (whale)</option><option value="fish">Swim (fish)</option><option value="balloons">Balloons drift up</option></select></label><label class="author-check" id="author-fire-row" hidden><input id="author-cue-fire" type="checkbox"> Falling fire</label><p id="author-library-note" class="hint" hidden>Demo formation · the Blender 3D model with its built-in motion. Convert to drawing to change its shape or position.</p><label>Brightness<input id="author-brightness" type="number" min="0.1" max="1" step="0.1"></label><p class="hint" id="author-light-hint"></p><h4>Placement in the sky</h4><div class="author-triple"><label>X<input id="author-x" type="number" min="-20" max="20" step="1"></label><label>Height<input id="author-y" type="number" min="6" max="34" step="1"></label><label>Depth<input id="author-z" type="number" min="-20" max="20" step="1"></label></div><div class="author-pair"><label>Scale<input id="author-scale" type="number" min="0.1" max="100" step="0.5"></label><label>Rotation · °<input id="author-yaw" type="number" min="-180" max="180" step="5"></label></div><div class="author-actions"><button id="author-left">↑ Earlier</button><button id="author-right">↓ Later</button><button id="author-duplicate">Duplicate</button><button id="author-delete">Delete</button></div></fieldset>
       <h3>Finale</h3><label class="author-check"><input id="author-fireworks" type="checkbox"> Light fireworks</label><label id="author-finale-row">Finale<select id="author-finale"><option value="demo">Demo finale · heart with family, star, firework balls</option><option value="classic">Classic firework bursts</option></select></label><div class="author-pair"><label>Duration · s<input id="author-fire-duration" type="number" min="2" max="20" step="1"></label><label>Radius<input id="author-fire-radius" type="number" min="2" max="8" step="0.5"></label></div><p class="hint">A visual simulation. Trajectories are not validated for real aircraft.</p><h3>Look</h3><div id="author-look"><div class="author-pair"><label>Lights<select id="author-look-shape"><option value="round">Round glow</option><option value="diamond">Diamond</option><option value="star">Star</option></select></label><label>Size<select id="author-look-scale"><option value="2">4×</option><option value="3">6× (Demo)</option><option value="4">8×</option></select></label></div><label class="author-check"><input id="author-look-pyro" type="checkbox"> Ship fireworks</label><label class="author-check"><input id="author-look-lasers" type="checkbox"> Stage lasers at takeoff and landing</label></div><div id="author-classic" hidden><p class="hint">This show uses the earlier small stage. Give it the Demo's scale, harbour camera, look and landing:</p><button id="author-demo-look">Use the Demo's look</button></div></section></div>
       <div id="author-timeline" aria-label="Show sequence and duration"></div><input id="author-file" type="file" accept=".json,application/json" hidden>
     </dialog><dialog id="author-guide" aria-labelledby="author-guide-title"><h2 id="author-guide-title">Your first sky story</h2>
@@ -31,14 +36,14 @@ export class ShowEditor{
     const run=fn=>()=>{try{fn();}catch(e){this.render();this.report(e.message,true);}};
     $('close').onclick=()=>this.close();$('dialog').oncancel=()=>this.cancelCompile();
     $('help').onclick=()=>$('guide').showModal();$('guide-close').onclick=()=>$('guide').close();
-    $('new').onclick=run(()=>this.replace(newShow()));$('demo').onclick=run(()=>this.replace(demoShowDoc(savedDemoSettings())));
+    $('new').onclick=run(()=>this.replace(newShow()));$('demo').onclick=run(()=>this.openDemo(savedDemoSettings(),false));
     $('name').onchange=run(()=>this.change({...this.doc,name:$('name').value.trim()}));
     $('undo').onclick=()=>this.travel(true);$('redo').onclick=()=>this.travel(false);
     $('save').onclick=run(()=>{downloadShowFile(encodeShow(this.doc),this.doc.name);this.dirty=false;this.report('Editable show downloaded.');});
     $('open').onclick=()=>$('file').click();$('file').onchange=async e=>{const file=e.target.files[0],revision=this.revision;e.target.value='';if(!file)return;try{if(file.size>SHOW_LIMITS.bytes)throw new Error('Show exceeds 16 MiB.');const doc=decodeShow(await file.text());if(revision!==this.revision)throw new Error('The show changed while this file was loading. Open the file again when ready.');this.replace(doc);}catch(error){this.report(error.message,true);}};
     $('recover').onclick=()=>this.recover();$('recovery-close').onclick=()=>$('recovery').hidden=true;
-    $('blank').onclick=run(()=>{this.add(newCue());this.edit();});
-    for(const [id,selected]of [['capture',false],['selection',true]])$(id).onclick=run(()=>{const source=this.hooks.capture(selected);const artwork=captureArtwork(source.entities,selected?source.selected:undefined);if(!artwork.some(e=>e.type==='stroke'))throw new Error('Choose some ink in the drawing workspace first.');this.add(newCue(artwork,'Formation '+(this.doc.cues.length+1)));});
+    $('blank').onclick=run(()=>{this.add(newCue(undefined,undefined,this.timing));this.edit();});
+    for(const [id,selected]of [['capture',false],['selection',true]])$(id).onclick=run(()=>{const source=this.hooks.capture(selected);const artwork=captureArtwork(source.entities,selected?source.selected:undefined);if(!artwork.some(e=>e.type==='stroke'))throw new Error('Choose some ink in the drawing workspace first.');this.add(newCue(artwork,'Formation '+(this.doc.cues.length+1),this.timing));});
     $('edit').onclick=run(()=>this.edit());$('fit').onclick=run(()=>this.updateCue({placement:fitArtwork(this.cue.artwork)}));
     $('cue-name').onchange=run(()=>this.updateCue({name:$('cue-name').value.trim()}));
     for(const key of ['hold','transfer','brightness'])$(key).onchange=run(()=>this.updateCue({[key]:Number($(key).value)}));
@@ -63,8 +68,16 @@ export class ShowEditor{
     window.addEventListener('beforeunload',e=>{if(this.dirty){e.preventDefault();e.returnValue='';}});
   }
   get doc(){return this.state.doc;}get cue(){return this.doc.cues.find(c=>c.id===this.active);}
+  // New drawings in a Demo-style show get the Demo's timing.
+  get timing(){return this.doc.version===3?DEMO_TIMING:undefined;}
+  // The Demo exactly as Demo settings describe it (also opened from the Demo settings dialog); `focus` selects a formation.
+  openDemo(settings,show=true,focus){this.replace(demoShowDoc(settings));this.untouched=content(this.doc);const pick=this.doc.cues.find(c=>c.name===focus);if(pick){this.active=pick.id;this.render();}
+    this.report('This is the Demo as set up in Demo settings. Edit it, then Save show to keep your version.');if(show)this.open();}
   report(message,error=false){$('status').textContent=message;$('status').classList.toggle('author-error',error);}
-  open(){if(!$('dialog').open){this.render();$('dialog').showModal();}this.loadAssets();}
+  open(){
+    // An untouched Demo follows Demo settings changed since it was made; edited shows are never replaced.
+    if(this.untouched&&content(this.doc)===this.untouched){const fresh=demoShowDoc(savedDemoSettings()),next=content(fresh);if(next!==this.untouched){const at=this.doc.cues.findIndex(c=>c.id===this.active);this.state.doc=fresh;this.active=fresh.cues[Math.max(0,at)]?.id;this.untouched=next;}}
+    if(!$('dialog').open){this.render();$('dialog').showModal();}this.loadAssets();}
   loadAssets(){return this.assetsPromise??=import('./formation-assets.js').then(m=>{this.assets=m.default;if($('dialog').open)this.render();}).catch(error=>this.report('Could not load the Demo formations: '+error.message,true));}
   close(){this.cancelCompile();$('dialog').close();this.hooks.closed?.();}
   change(doc,active=this.active){this.selections.set(this.doc,this.active);this.state.set(doc);this.active=active;this.changed();this.selections.set(this.doc,this.active);}
@@ -77,20 +90,28 @@ export class ShowEditor{
   add(cue){if(this.doc.cues.length>=SHOW_LIMITS.cues)throw new Error(`A show can contain at most ${SHOW_LIMITS.cues} formations.`);this.change({...this.doc,cues:[...this.doc.cues,cue]},cue.id);}
   move(delta){const i=this.doc.cues.findIndex(c=>c.id===this.active),j=i+delta;if(i<0||j<0||j>=this.doc.cues.length)return;const cues=[...this.doc.cues];[cues[i],cues[j]]=[cues[j],cues[i]];this.change({...this.doc,cues});}
   edit(){if(!this.cue)return;
-    if(this.cue.library){const converted=drawingCue(this.cue.library,this.cue);this.change({...this.doc,cues:this.doc.cues.map(c=>c.id===this.active?converted:c)});this.report(`${converted.name} is now an editable drawing (its line art). Undo restores the 3D Demo formation.`);}
+    if(this.cue.library){const fire=this.cue.fire,converted=drawingCue(this.cue.library,this.cue);this.change({...this.doc,cues:this.doc.cues.map(c=>c.id===this.active?converted:c)});this.report(`${converted.name} is now an editable drawing (its line art).${fire?' Its falling fire belongs to the 3D formation; for fire on a drawing, choose Falling fire and use bright yellow ink.':''} Undo restores the 3D Demo formation.`);}
     this.cancelCompile();this.editing=this.active;this.hooks.edit(clone(this.cue.artwork),this.cue.name,(artwork,cancel)=>{if(!cancel)this.updateCue({artwork:captureArtwork(artwork)});else this.queueDraft();this.editing=null;this.open();});$('dialog').close();}
   cancelCompile(){this.revision++;if(this.worker){this.worker.terminate();this.report('Preview preparation cancelled. Your show is still editable.');}this.worker=null;clearTimeout(this.compileTimer);$('play').disabled=!this.doc.cues.length;$('play').textContent='▶ Play my show';}
   play(formationOnly=false){
-    if(!this.doc.cues.length)return;this.cancelCompile();const revision=this.revision,active=this.active;
+    if(!this.doc.cues.length)return;
+    const broken=this.doc.cues.find(problemOf);if(broken){this.active=broken.id;this.render();this.report(`${broken.name}: ${problemOf(broken)}`,true);return;}
+    this.cancelCompile();const revision=this.revision,active=this.active,doc=this.doc;
     this.report('Preparing trajectories… You can keep editing; edits cancel this preview.');$('play').disabled=true;$('play').textContent='Preparing…';
     try{
       const worker=this.worker=new Worker(new URL('./show-worker.js',import.meta.url),{type:'module'});
       const fail=message=>{if(revision!==this.revision)return;this.cancelCompile();this.report(message,true);};
       this.compileTimer=setTimeout(()=>fail('Preview took too long. Reduce artwork complexity and try again.'),30000);
       worker.onerror=()=>fail('Could not prepare the show. Reload this page and try again.');
-      worker.onmessage=({data})=>{if(data.revision!==this.revision)return;if(data.error){fail(data.error);return;}this.cancelCompile();this.report('Preview ready. Edit a card to change the next performance.');$('dialog').close();try{const index=this.doc.cues.findIndex(c=>c.id===active);this.hooks.play(data.show,()=>this.open(),formationOnly?data.show.cues[index+1].time:undefined);}catch(error){this.open();this.report(error.message,true);}};
+      worker.onmessage=({data})=>{if(data.revision!==this.revision)return;if(data.error){fail(data.error);return;}this.cancelCompile();this.report('Preview ready. Edit a card to change the next performance.');$('dialog').close();try{const from=cueTimes(doc).find(t=>t.id===active);this.hooks.play(data.show,time=>this.returnFrom(doc,time),formationOnly?from?.start:undefined);}catch(error){this.open();this.report(error.message,true);}};
       worker.postMessage({revision,doc:this.doc});
     }catch(error){this.cancelCompile();this.report(error.message,true);}
+  }
+  // Back from Run: select the formation that was on screen, so the next edit is on what you just watched.
+  returnFrom(doc,time){
+    const at=doc===this.doc&&Number.isFinite(time)?cueTimes(doc).find(t=>time>=t.start&&time<t.end):null;
+    if(at){this.active=at.id;this.report(`Back from the show at ${this.cue.name} (${clock(time)}). Edit it, then Run from here to check.`);}
+    this.open();
   }
   async recover(){
     $('recovery').hidden=false;$('drafts').textContent='Loading…';
@@ -112,7 +133,7 @@ export class ShowEditor{
   render(){
     const v3=this.doc.version===3,sizes=v3?[...FLEET_SIZES].reverse():[4096,256];
     if($('count').dataset.sizes!==String(sizes)){$('count').dataset.sizes=String(sizes);$('count').innerHTML=sizes.map(n=>`<option value="${n}">${n.toLocaleString()} drones${!v3&&n===256?' (legacy)':''}</option>`).join('');}
-    $('count').value=this.doc.count;const c=this.cue; $('name').value=this.doc.name;$('total').textContent=`${this.doc.cues.length} / ${SHOW_LIMITS.cues} formations · ${showDuration(this.doc)}s`;
+    $('count').value=this.doc.count;const c=this.cue; $('name').value=this.doc.name;$('total').textContent=`${this.doc.cues.length} / ${SHOW_LIMITS.cues} formations · ${clock(showDuration(this.doc))}`;
     $('undo').disabled=!this.state.past.length;$('redo').disabled=!this.state.future.length;$('play').disabled=!this.doc.cues.length||!!this.worker;// stays off while a preview is preparing
     // Cards are kept per formation and updated in place. Clicking a card after typing in a field blurs the field,
     // which applies the edit and re-renders mid-click; replacing the pressed card would drop that click.
@@ -130,36 +151,44 @@ export class ShowEditor{
       card.classList.toggle('active',cue.id===this.active);card.setAttribute('aria-pressed',String(cue.id===this.active));
       // Cues are immutable, so a card repaints only when its formation (or the Demo library) changes.
       if(card.painted!==cue||card.paintedWith!==this.assets){this.paint(card.thumb,cue,true);card.painted=cue;card.paintedWith=this.assets;}
-      card.heading.textContent=`${index+1}. ${cue.name}`;card.detail.textContent=`${time}s → ${time+cue.transfer}s · hold ${cue.hold}s${cue.library?' · 3D':''}`;
+      const problem=problemOf(cue);card.classList.toggle('problem',!!problem);card.title=problem||'';
+      card.heading.textContent=`${index+1}. ${cue.name}`;card.detail.textContent=problem?'⚠ '+problem:`${clock(time)} → ${clock(time+cue.transfer)} · hold ${cue.hold}s${cue.library?' · 3D':''}`;
       nodes.push(card);time+=cue.transfer+cue.hold;
     }
     const list=$('cards');if(nodes.length!==list.children.length||nodes.some((n,i)=>list.children[i]!==n))list.replaceChildren(...nodes);
     $('fields').disabled=!c;for(const id of ['edit','formation-preview','fit'])$(id).disabled=!c;
     for(const id of ['blank','capture','selection'])$(id).disabled=this.doc.cues.length>=SHOW_LIMITS.cues;
     const library=!!c?.library;$('edit').textContent=library?'✎ Convert to drawing':'✎ Edit drawing';$('fire-row').hidden=$('library-note').hidden=!library;
-    if(c){$('cue-name').value=c.name;$('cue-fire').checked=!!c.fire;for(const id of ['effect','fit','x','y','z','scale','yaw'])$(id).disabled=library;for(const key of ['hold','transfer','brightness','light','effect'])$(key).value=c[key]??'none';['x','y','z'].forEach((key,i)=>$(key).value=c.placement.position[i]);for(const key of ['scale','yaw'])$(key).value=+c.placement[key].toFixed(3);const i=this.doc.cues.indexOf(c);$('left').disabled=i===0;$('right').disabled=i===this.doc.cues.length-1;$('duplicate').disabled=this.doc.cues.length>=SHOW_LIMITS.cues;}
+    if(c){$('cue-name').value=c.name;$('cue-fire').checked=!!c.fire;for(const id of ['effect','fit','x','y','z','scale','yaw'])$(id).disabled=library;for(const key of ['hold','transfer','brightness','light','effect'])$(key).value=c[key]??'none';const rises=['starship','balloons'].includes(c.effect);$('light').disabled=rises;$('light').title=rises?'This formation lights up as it rises, so a reveal does not apply.':'';['x','y','z'].forEach((key,i)=>$(key).value=c.placement.position[i]);for(const key of ['scale','yaw'])$(key).value=+c.placement[key].toFixed(3);const i=this.doc.cues.indexOf(c);$('left').disabled=i===0;$('right').disabled=i===this.doc.cues.length-1;$('duplicate').disabled=this.doc.cues.length>=SHOW_LIMITS.cues;}
     $('fireworks').checked=this.doc.fireworks.enabled;$('fire-duration').value=this.doc.fireworks.duration;$('fire-radius').value=this.doc.fireworks.radius;
     $('finale-row').hidden=!v3;$('finale').value=this.doc.fireworks.style??'classic';
     $('fire-duration').disabled=$('fire-radius').disabled=!this.doc.fireworks.enabled||v3&&this.doc.fireworks.style==='demo';
+    // How lights behave between formations in this show (Run plays it the same way).
+    $('light-hint').textContent=v3?'In flight every drone blinks red or blue at a quarter light; the formation lights up on arrival.':'Lights fade out before each transfer and reveal after arrival.';
     $('look').hidden=!v3;$('classic').hidden=v3;$('library').disabled=this.doc.cues.length>=SHOW_LIMITS.cues;
     if(v3){$('look-shape').value=this.doc.look.shape;$('look-scale').value=this.doc.look.scale;$('look-pyro').checked=this.doc.look.pyro;$('look-lasers').checked=this.doc.look.lasers;}
     this.paint($('preview'),c);
-    $('timeline').replaceChildren();for(const [label,duration]of [['Takeoff',8],...this.doc.cues.flatMap(c=>[['Transfer',c.transfer],[c.name,c.hold]]),...(this.doc.fireworks.enabled?v3&&this.doc.fireworks.style==='demo'?[['Demo finale',DEMO_FINALE]]:[['Firework launch',7],['Fireworks',this.doc.fireworks.duration]]:[]),['Return / land',v3?27:17]]){const part=document.createElement('span');part.textContent=label+' · '+duration+'s';part.style.flexGrow=duration;part.title=part.textContent;$('timeline').append(part);}
+    $('timeline').replaceChildren();for(const [label,duration]of [['Takeoff',8],...this.doc.cues.flatMap(c=>[['Transfer',c.transfer],[c.name,c.hold]]),...(this.doc.fireworks.enabled?v3&&this.doc.fireworks.style==='demo'?[['Demo finale',DEMO_FINALE]]:[['Firework launch',7],['Fireworks',this.doc.fireworks.duration]]:[]),['Return / land',v3?DEMO_LANDING:17]]){const part=document.createElement('span');part.textContent=label+' · '+duration+'s';part.style.flexGrow=duration;part.title=part.textContent;$('timeline').append(part);}
   }
   paint(canvas,c,thumbnail=false){
     const ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;ctx.fillStyle='#07111c';ctx.fillRect(0,0,w,h);
     if(!c){if(!thumbnail)$('preview-note').textContent='Add a drawing to begin your show.';return;}
     if(c.library&&!this.assets){this.loadAssets();ctx.fillStyle='#9bb3bf';ctx.font='13px sans-serif';ctx.fillText('Loading Demo formation…',16,h/2);if(!thumbnail)$('preview-note').textContent=`${c.name} · Demo formation`;return;}
     try{
-      const lights=thumbnail?256:this.doc.count,body=c.library&&this.assets[c.library].body;
-      const f=body?{positions:body.positions.slice(0,lights).map(p=>[p[0],p[1]+18,p[2]]),colors:body.colors.slice(0,lights).map(v=>v.map(x=>x*c.brightness))}:cueFormation(c,lights),paths=body?[]:placePaths(drawingPaths(c.artwork),c.placement);let minX=-34,maxX=34,minY=0,maxY=46;
+      const lights=thumbnail?256:this.doc.count,body=c.library&&this.assets[c.library].body,v3=this.doc.version===3;
+      // The large preview of a Demo-style show is the formation exactly as Run plays it (in stage units).
+      const played=!thumbnail&&v3?cueSequence(this.doc,c,this.assets):null,unit=this.doc.look?.scale*2;
+      const f=played?{positions:played.formation.positions.map(p=>p.map(v=>v/unit)),colors:played.formation.colors,extra:played.formation.extra,fire:played.formation.fire}
+        :body?{positions:body.positions.slice(0,lights).map(p=>[p[0],p[1]+18,p[2]]),colors:body.colors.slice(0,lights).map(v=>v.map(x=>x*c.brightness))}:cueFormation(c,lights),paths=body?[]:placePaths(drawingPaths(c.artwork),c.placement);let minX=-34,maxX=34,minY=0,maxY=46;
       if(thumbnail){const p=f.positions;minX=Math.min(...p.map(v=>v[0]))-1;maxX=Math.max(...p.map(v=>v[0]))+1;minY=Math.min(...p.map(v=>v[1]))-1;maxY=Math.max(...p.map(v=>v[1]))+1;}
       const s=Math.min((w-24)/(maxX-minX),(h-24)/(maxY-minY)),ox=(w-(maxX-minX)*s)/2,oy=(h-(maxY-minY)*s)/2;
       const xy=p=>[ox+(p[0]-minX)*s,h-oy-(p[1]-minY)*s];
       if(!thumbnail){ctx.strokeStyle='#193142';ctx.lineWidth=1;for(let y=0;y<=46;y+=5){ctx.beginPath();ctx.moveTo(...xy([-34,y]));ctx.lineTo(...xy([34,y]));ctx.stroke();}ctx.fillStyle='#6e91a8';ctx.font='12px sans-serif';ctx.fillText('FRONT / SKY STAGE',16,24);}
       ctx.lineWidth=.7;for(const path of paths){ctx.beginPath();path.points.forEach((p,i)=>ctx[i?'lineTo':'moveTo'](...xy(p)));ctx.strokeStyle='rgba(135,190,209,.2)';ctx.stroke();}
       for(let i=0;i<f.positions.length;i++){ctx.fillStyle=`rgb(${f.colors[i].map(v=>Math.round(v*255)).join(' ')})`;ctx.beginPath();ctx.arc(...xy(f.positions[i]),thumbnail?1:2,0,Math.PI*2);ctx.fill();}
-      if(!thumbnail&&body){$('preview-note').textContent=`${c.name} · Demo formation · Blender 3D · ${lights.toLocaleString()} lights${c.fire?' · falling fire':''}`;return;}
+      const water=f.extra?.filter(Boolean).length||0,fire=f.fire?.filter(Boolean).length||0,parts=[`${(lights-water-fire).toLocaleString()} lights`,water&&`${water.toLocaleString()} ${played?.spout?'in the spout':'in the waves'}`,fire&&`${fire.toLocaleString()} falling fire`].filter(Boolean).join(' · ');
+      if(!thumbnail&&body){$('preview-note').textContent=`${c.name} · Demo formation · Blender 3D · ${parts}`;return;}
+      if(!thumbnail&&played){const sparse=paths.filter(p=>p.points.length>1&&p.points.reduce((n,p1,i)=>i?n+Math.hypot(...p1.map((v,k)=>v-p.points[i-1][k])):0,0)<.5).length;$('preview-note').textContent=`${c.name} · ${parts} · ${paths.length} paths${sparse?' · Small details: inspect the dots':''}`;return;}
       if(!thumbnail){const sparse=paths.filter(p=>p.points.length>1&&p.points.reduce((n,p1,i)=>i?n+Math.hypot(...p1.map((v,k)=>v-p.points[i-1][k])):0,0)<.5).length;$('preview-note').textContent=`${c.name} · ${this.doc.count.toLocaleString()} sampled lights · ${paths.length} paths${sparse?' · Small details: inspect the dots':''}`;}
     }catch(error){ctx.fillStyle='#9bb3bf';ctx.font='13px sans-serif';ctx.fillText('Draw your formation',16,h/2);if(!thumbnail)$('preview-note').textContent=error.message;}
   }

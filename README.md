@@ -4,6 +4,18 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 18: late afternoon, drones you can watch fly, a firework finale
+
+![Late afternoon over the harbour, drones flying between shapes, and the landing firework finale](docs/media/studio18-show.jpg)
+
+**Settings → Background** switches between **Dark night** and a golden **Late afternoon**, live, for any show. Between shapes every drone now **blinks red or blue at a quarter of full light**, so you can watch the fleet fly to the next shape. Each formation holds **3 s longer** (15 s) and shape changes take **7 s** instead of 9. The landing is longer and becomes a **firework finale**: rolling salvos, **heart, star and Saturn shaped shells**, and a wall of every kind of shell at once over the harbour, while the drones touch down. The Show editor is built around Run: **▶ Run from here**, **Back** returns to the formation you were watching, the preview is exactly what Run plays, and ⚠ cards flag problems before Run. The Demo runs 6:27. [Details and checks](docs/STUDIO18.md).
+
+## Studio 17: the Demo and the Show editor in step
+
+![Demo settings with ✎ Edit in Show editor, and the Player settings an edited show gets](docs/media/studio17-flow.jpg)
+
+The Demo and your edited Demo now behave the same way. Change **Demo settings** and the Show editor's Demo follows, as long as you haven't edited it. Played unedited, it matches the Demo: same title, fleet, length and cues. **Demo settings → ✎ Edit in Show editor** opens the Demo you are watching in the editor, on the formation that was playing. Your own shows get **Player settings** for graphics quality and camera. **Convert to drawing** keeps the Fish's waves and the Whale's spout. New drawings in a Demo-style show get the Demo's 12 s display. Recordings are named after the show. On PCs, **← Back to drawing** from the Demo works again; it was stuck in Cinematic graphics. [Details and checks](docs/STUDIO17.md).
+
 ## Studio 16: edit the Demo, swimming fish, three balloons, a family in the heart
 
 ![The fish swims under rolling waves, three balloons drift up, and a family stands inside the growing heart](docs/media/studio16-formations.jpg)

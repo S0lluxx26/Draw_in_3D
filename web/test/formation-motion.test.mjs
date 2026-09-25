@@ -60,7 +60,7 @@ test('lasers light only takeoff and landing, blank at every cue, pulse with the 
     const power=t=>Math.max(...Array.from({length:LASER_COUNT},(_,e)=>laserBeam(sections,t,e,LASER_COUNT).power));
     assert.equal(power(sec.start),0,'blank at the cue change');
     const mid=power((sec.start+sec.end)/2);
-    if(sec.mood==='lift'||sec.mood==='outro')assert.ok(mid>.2,sec.name+' is lit');else assert.equal(mid,0,sec.name+' keeps the sky for the drones');
+    if(['lift','outro','homebound','finale'].includes(sec.mood))assert.ok(mid>.2,sec.name+' is lit');else assert.equal(mid,0,sec.name+' keeps the sky for the drones');
     if(sec.mood==='lift')assert.ok(power(sec.start+4)>power(sec.start+4.4),'takeoff beat pulse');
   }
   assert.deepEqual(laserBeam(sections,100,3,LASER_COUNT),laserBeam(sections,100,3,LASER_COUNT));

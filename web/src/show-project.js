@@ -1,7 +1,7 @@
 // Editable source is separate from compiled drone positions and drawing-only files.
 import {entity,clone,validate,documentOf,decode} from './model.js';
-import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT} from './drone-show.js';
-import {FORMATIONS,FLEET_SIZES,LIGHT_SHAPES,demoSettings,libraryCue,libraryFormation} from './demo-library.js';
+import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT,MOTIONS,CINEMATIC_LANDING} from './drone-show.js';
+import {FORMATIONS,FLEET_SIZES,LIGHT_SHAPES,DEMO_TRANSFER,demoSettings,libraryCue,libraryFormation,extrasFor,drawingExtras} from './demo-library.js';
 
 export const SHOW_LIMITS=Object.freeze({cues:14,bytes:16*1024*1024,history:24});
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -16,9 +16,10 @@ export function captureArtwork(entities,selection){
   const result=entities.filter(e=>strokes.includes(e)||e.type==='paper'&&(parents.has(e.id)||!selection));
   validate(documentOf(result));return clone(result);
 }
-export function newCue(artwork=blankArtwork(),label='New formation'){
+export const DEMO_TIMING=Object.freeze({hold:15,transfer:DEMO_TRANSFER});// a Demo formation's display and transition
+export function newCue(artwork=blankArtwork(),label='New formation',timing={hold:8,transfer:7}){
   const paths=drawingPaths(artwork);
-  return {id:crypto.randomUUID(),name:label,artwork,hold:8,transfer:7,light:'fade',effect:'none',brightness:1,
+  return {id:crypto.randomUUID(),name:label,artwork,hold:timing.hold,transfer:timing.transfer,light:'fade',effect:'none',brightness:1,
     placement:paths.length?fitArtwork(artwork):{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
 }
 export function fitArtwork(artwork){const p=fitPaths(drawingPaths(artwork));return {...p,scale:Math.min(100,Math.max(.1,p.scale))};}
@@ -39,7 +40,7 @@ export function editableDemo(){
 // The Demo itself as an editable show (version 3): the Blender-built formations with their built-in motion, the
 // Demo's look and its finale. Edit, reorder, remove or add formations, save the file, and it plays like the Demo.
 const DEFAULT_PLACEMENT={origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0};
-export const demoCue=(name,fire=false)=>({id:crypto.randomUUID(),name,library:name,artwork:[],hold:libraryCue(name).hold,transfer:9,light:'fade',effect:libraryCue(name).effect??'none',fire,brightness:1,placement:structuredClone(DEFAULT_PLACEMENT)});
+export const demoCue=(name,fire=false)=>({id:crypto.randomUUID(),name,library:name,artwork:[],hold:libraryCue(name).hold,transfer:DEMO_TRANSFER,light:'fade',effect:libraryCue(name).effect??'none',fire,brightness:1,placement:structuredClone(DEFAULT_PLACEMENT)});
 export function demoShowDoc(settings){
   const s=demoSettings(settings);
   return validateShow({format:'draw-in-3d-show',version:3,name:'Sky stories',count:s.count,look:{shape:s.shape,scale:s.scale,pyro:s.pyro,lasers:s.lasers},
@@ -87,6 +88,25 @@ export function cueFormation(c,count=DRONE_COUNT){
   need(paths.every(path=>path.points.every(p=>Math.abs(p[0])<=34&&p[1]>=2&&p[1]<=46&&Math.abs(p[2])<=24)),`${c.name}: ink is outside the sky stage. Use Fit to stage or adjust placement.`);
   const f=samplePaths(paths,count);f.colors=f.colors.map(c0=>c0.map(v=>v*c.brightness));return f;
 }
+// One formation of a version 3 show exactly as it will play (world units): Run compiles every formation with this,
+// and the Show editor previews the selected one with it, so the preview never drifts from the performance.
+export function cueSequence(doc,c,assets){
+  const scale=doc.look.scale*2;
+  if(c.library){const lib=libraryFormation(assets,c.library,doc.count,scale,c.fire);lib.formation.colors=lib.formation.colors.map(v=>v.map(x=>x*c.brightness));return {...c,...lib,name:c.name};}
+  // Drawings swim like the Demo formations: the whale swim adds a spout, the fish swim adds waves.
+  const motion=MOTIONS.includes(c.effect)?c.effect:undefined,extra=extrasFor(motion,doc.count),f=cueFormation(c,doc.count-extra);f.positions=f.positions.map(p=>p.map(v=>v*scale));
+  const water=drawingExtras(motion,f.positions,extra,scale);if(!water)return {...c,formation:f};
+  f.positions.push(...water.positions);f.colors.push(...water.colors.map(v=>v.map(x=>x*c.brightness)));f.extra=[...Array(doc.count-extra).fill(0),...water.drops];
+  return {...c,formation:f,...(water.spout?{spout:water.spout}:{waves:water.waves})};
+}
+// Why a formation cannot play yet (checked on its card before Run), or null.
+export function cueProblem(c){
+  if(c.library)return null;
+  if(!drawingPaths(c.artwork).length)return 'Nothing drawn yet. Choose Edit drawing and draw the formation.';
+  try{cueFormation(c,64);return null;}catch(error){return error.message.replace(c.name+': ','');}
+}
+// When each formation starts forming (its transfer) and when its display ends, as Run plays them.
+export function cueTimes(doc){let t=8;return doc.cues.map(c=>{const start=t;t+=c.transfer+c.hold;return {id:c.id,start,end:t};});}
 // assets: the Demo's formation library (formation-assets.js), needed when the show uses Demo formations.
 export function compileShow(doc,assets){
   validateShow(doc);need(doc.cues.length>0,'Add at least one formation to your show.');
@@ -97,17 +117,15 @@ export function compileShow(doc,assets){
   // Version 3 plays at the Demo's scale and look: Demo formations come from the Blender library with their motion,
   // and drawings are placed on the same stage (stage units × scale), so both kinds sit together naturally.
   const scale=doc.look.scale*2;
-  const sequence=doc.cues.map(c=>{try{
-    if(c.library){const lib=libraryFormation(assets,c.library,doc.count,scale,c.fire);lib.formation.colors=lib.formation.colors.map(v=>v.map(x=>x*c.brightness));return {...c,...lib,name:c.name};}
-    const f=cueFormation(c,doc.count);f.positions=f.positions.map(p=>p.map(v=>v*scale));return {...c,formation:f};
-  }catch(error){throw new Error(c.name+': '+error.message);}});
+  const sequence=doc.cues.map(c=>{try{return cueSequence(doc,c,assets);}catch(error){throw new Error(c.name+': '+error.message);}});
   const finale=!doc.fireworks.enabled?{enabled:false}:doc.fireworks.style==='demo'?{trilogy:true}:{duration:doc.fireworks.duration,radius:doc.fireworks.radius};
   const show=buildShow(null,{sequence,count:doc.count,transitionLights:true,motionScale:scale,reverseLanding:true,fireworks:finale,title:doc.name});
   return Object.assign(show,{lightShape:doc.look.shape,pyro:doc.look.pyro,lasers:doc.look.lasers,cinematic:true});
 }
 export const DEMO_FINALE=66;// heart, star and firework balls: three 9 s launches, 6 s growth and 7 s falling sparks
+export const DEMO_LANDING=CINEMATIC_LANDING.reduce((a,b)=>a+b);// return, descent under the firework finale, rest
 export const showDuration=doc=>doc.version===3
-  ?8+doc.cues.reduce((n,c)=>n+c.hold+c.transfer,0)+(doc.fireworks.enabled?(doc.fireworks.style==='demo'?DEMO_FINALE:7+doc.fireworks.duration):0)+27
+  ?8+doc.cues.reduce((n,c)=>n+c.hold+c.transfer,0)+(doc.fireworks.enabled?(doc.fireworks.style==='demo'?DEMO_FINALE:7+doc.fireworks.duration):0)+DEMO_LANDING
   :25+doc.cues.reduce((n,c)=>n+c.hold+c.transfer,0)+(doc.fireworks.enabled?7+doc.fireworks.duration:0);
 
 // Immutable cue edits share untouched artwork arrays; history is bounded.

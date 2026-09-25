@@ -51,8 +51,9 @@ export class ShowRecorder{
       recorder.onstop=()=>{
         if(this.active)this.finish(true,'Recording stopped early. No incomplete video was saved.');
         const cancelled=this.cancelled,chunks=this.chunks;this.recorder=null;this.chunks=[];
+        // The download is named after the show (e.g. sky-stories.webm, my-demo-remix.webm).
         if(!cancelled&&chunks.length){const webm=!recorder.mimeType.includes('mp4'),raw=new Blob(chunks,{type:recorder.mimeType});note().textContent='Finishing video…';
-          (webm?withWebmDuration(raw,this.elapsed):Promise.resolve(raw)).then(blob=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='draw-in-3d-show.'+(webm?'webm':'mp4');a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);note().textContent='Video downloaded · '+Math.round(blob.size/1024/1024)+' MiB';});}
+          (webm?withWebmDuration(raw,this.elapsed):Promise.resolve(raw)).then(blob=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=((this.player.show?.title||'Sky stories').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'drone-show')+'.'+(webm?'webm':'mp4');a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);note().textContent='Video downloaded · '+Math.round(blob.size/1024/1024)+' MiB';});}
         else if(!cancelled)note().textContent='No video frames were recorded. Try another browser.';
       };
       this.lock(true);recorder.start(1000);this.started=performance.now();p.clock.play(performance.now());$('show-record').textContent='Cancel recording';note().textContent=`Recording from takeoff${audio?' with music':''}… keep this tab visible.`;p.refresh();

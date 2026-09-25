@@ -124,7 +124,7 @@ export function waveGlow(waves,d,t){return .3+.7*Math.max(0,Math.sin(swell(waves
 // burners, and the whale swims and blows (see sampleShow).
 export const MOTIONS=['flap','swim','fish','balloons'];
 // Displays last about 12 s so each formation has time to be admired; the finale lingers longer.
-export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:12},{name:'Fish',paths:fish(),hold:12,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:12,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:12,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:12},{name:'Big ship',paths:ship(),hold:12},{name:'Whale',paths:whale(),hold:15,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:12,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:12,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:12},{name:'Starship launch',paths:starship(),hold:17,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:16,effect:'sparkle',pyro:true}];
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:19,effect:'sparkle',pyro:true}];
 // One spout droplet: position along the jet u, jet side, and a spray offset (angle, radius), all from its index.
 export function spoutDrop(j){const f=x=>x-Math.floor(x);return {kind:'spout',u:f(j*.6180339887+.13),side:j%2?1:-1,angle:f(j*.7548776662)*Math.PI*2,radius:Math.sqrt(f(j*.5698402910+.37))};}
 // The spout rises from the blowhole and splits into two jets that fan out and droop (formation units).
@@ -291,6 +291,16 @@ function shapedFirework(kind,count,scale){
   }
   return {positions,colors,centres};
 }
+// Return, descent and rest on the pads for the Demo and shows edited from it (seconds).
+export const CINEMATIC_LANDING=Object.freeze([9,20,8]);
+// While drones fly between shapes in the Demo they blink red and blue at this share of an LED's full light, so the
+// movement shows. Frame colours are gamma values (the LED shader raises them to 2.2), hence TRAVEL_LEVEL.
+export const TRAVEL_BLINK=.25,TRAVEL_LEVEL=TRAVEL_BLINK**(1/2.2);
+// World units per Demo metre: the Blender scenery, ship fireworks and camera framing are modelled at Demo scale.
+export function stageUnit(show){
+  const xs=show.home.map(p=>p[0]),span=Math.max(...xs)-Math.min(...xs),side=Math.ceil(Math.sqrt(show.count));
+  return (side>1&&span>0?span*side/(15*(side-1)):1)/6;
+}
 export function buildShow(custom,options={}){
   const count=options.count??custom?.positions.length??DRONE_COUNT,side=Math.ceil(Math.sqrt(count));
   const home=Array.from({length:count},(_,i)=>[(i%side-(side-1)/2)*15/side*(options.motionScale??1),.12,(Math.floor(i/side)-(side-1)/2)*13/side*(options.motionScale??1)]);
@@ -328,7 +338,9 @@ export function buildShow(custom,options={}){
   }
   // Return to the nearest free pads (uncrossed), not each drone's own pad; `pad` carries the landing permutation.
   const back=matchFormation(previous.positions,{...hover,pad:Array.from({length:count},(_,i)=>i)}),landed={positions:back.pad.map(k=>home[k]),colors:dark(),pad:back.pad};
-  add('Returning home','move',options.reverseLanding?9:7,back,{transitionLights:options.transitionLights});cues.push({label:'Landing',time:cursor+(options.reverseLanding?4:2)});add('Landing','landing',options.reverseLanding?14:8,landed,{reverse:options.reverseLanding});add('Landed','hold',options.reverseLanding?4:2,landed);
+  // The cinematic landing is long enough for the ship-firework finale over the harbour.
+  const [homeward,descent,rest]=options.reverseLanding?CINEMATIC_LANDING:[7,8,2];
+  add('Returning home','move',homeward,back,{transitionLights:options.transitionLights});cues.push({label:'Landing',time:cursor+(options.reverseLanding?4:2)});add('Landing','landing',descent,landed,{reverse:options.reverseLanding});add('Landed','hold',rest,landed);
   return {count,home,stages,cues,duration:cursor,custom:!!custom,title:options.title};
 }
 
@@ -401,8 +413,9 @@ export function sampleShow(show,time,out=createFrame(show)){
   const side=Math.ceil(Math.sqrt(show.count)),motion=(s.kind==='hold'||s.kind==='rise')&&s.motion?motionFrame(s):null,envelope=motion?ease(elapsed/1.2)*ease((duration-elapsed)/1.2):0;
   for(let i=0;i<show.count;i++){
     let q=0,light=0,navLight=0,color=s.to.colors[i];
-    if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
-    else if(s.kind==='move'){q=travel;light=s.transitionLights?0:fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=.12*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2);}
+    if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]/(s.motionScale??1)-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
+    // Lit transitions: the shape's lights are off in flight and every drone blinks red or blue at TRAVEL_BLINK.
+    else if(s.kind==='move'){q=travel;light=s.transitionLights?0:fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=TRAVEL_LEVEL*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2);}
     else if(s.kind==='takeoff'||s.kind==='landing'){// Row and LED phase follow the pad, so each pad reverses its own takeoff.
       const pad=s.to.pad?.[i]??i,row=Math.floor(pad/side)/Math.max(1,side-1),navTime=s.reverse?6*(1-elapsed/duration):elapsed,navDuration=s.reverse?6:duration;q=s.reverse?1-ease((navTime-row*.65)/(6-.65)):ease((elapsed-row*.65)/(duration-.65));light=ease(navTime/.35)*ease((navDuration-navTime)/.35)*(.35+.65*Math.sin(navTime*8+pad*.12)**2);color=(Math.floor(navTime*3)+pad)%2?navigationRed:navigationBlue;}
     else if(s.kind==='grow'){q=progress;light=fadeIn;}

@@ -18,7 +18,7 @@ export function laserBeam(sections,t,e,n){
     case 'lift':{// takeoff: a vertical tunnel that fans open and pulses on the beat as the fleet climbs
       const pattern=bar%2;tilt=pattern?(e%2?1:-1)*(.2+.3*p)+across*.3:across*(.2+1.1*p)+.08*Math.sin(lt*Math.PI*2/BAR);
       lean=.1+.15*p;power=(.35+.5*p)*(.7+.3*Math.exp(-beat*5));color=pick(bar+(e%2));break;}
-    case 'outro':{// returning home and landing: slow sweeps that settle back to vertical and fade as the drones touch down
+    case 'outro':case 'homebound':case 'finale':{// returning home and landing: slow sweeps that settle back to vertical and fade as the drones touch down
       const settle=clamp(1-p*1.15);tilt=across*1.3*settle+.3*settle*Math.sin(lt*.9+e*.7);lean=.12+.25*settle;
       power=.75*clamp(lt/2)*clamp((1-p)*3);color=[PALETTE[4],PALETTE[0]][e%2];break;}
   }// formations, fireworks and the close-ups keep the sky for the drones

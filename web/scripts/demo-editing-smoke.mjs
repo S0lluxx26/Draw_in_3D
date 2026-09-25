@@ -35,12 +35,12 @@ try{
   assert.equal(await page.locator('#show-title').textContent(),'My Demo remix');
   const cues=await page.locator('#show-cues button').allTextContents();
   assert.deepEqual(cues.slice(0,3),['Takeoff','Fish','Butterfly']);assert.ok(!cues.includes('Robot'));assert.ok(cues.includes('Growing heart'),'the Demo finale');
-  assert.ok(await page.locator('#show-demo-settings').isHidden(),'your show keeps its own settings');
+  assert.equal(await page.locator('#show-demo-settings').getAttribute('aria-label'),'Player settings','your show keeps its own look; only player options');
   await page.waitForFunction(()=>document.querySelector('#show-loading').hidden,null,{timeout:90000});
   await page.locator('#show-cues').getByRole('button',{name:'Whale',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#show-phase').textContent==='Whale');
   await page.screenshot({path:path.join(out,'demo-editing-played.png')});
-  // 365 s Demo − Robot (21 s) + 5 s longer Whale + another Butterfly (21 s) = 370 s.
-  const total=await page.locator('#show-time').textContent();assert.match(total,/\/ 06:10$/,'the edited show length: '+total);
+  // 387 s Demo − Robot (22 s) + 2 s longer Whale + another Butterfly (22 s) = 389 s.
+  const total=await page.locator('#show-time').textContent();assert.match(total,/\/ 06:29$/,'the edited show length: '+total);
   await page.locator('#show-exit').click();await page.locator('#author-dialog').waitFor({state:'visible'});
   assert.deepEqual(errors,[]);
   console.log('PASS: Edit demo opens the 3D Demo; remove, retime, fire, add a Demo formation and look edits; save; new show; reopen; Play my show performs the edited Demo; no browser errors.');
