@@ -75,12 +75,12 @@ export class ShowEditor{
   // New drawings in a Demo-style show get the Demo's timing.
   get timing(){return this.doc.version===3?DEMO_TIMING:undefined;}
   // The Demo exactly as Demo settings describe it (also opened from the Demo settings dialog); `focus` selects a formation.
-  openDemo(settings,show=true,focus){this.replace(demoShowDoc(settings));this.untouched=content(this.doc);const pick=this.doc.cues.find(c=>c.name===focus);if(pick){this.active=pick.id;this.render();}
+  openDemo(settings,show=true,focus){this.replace(demoShowDoc(settings));this.untouched=content(this.doc);this.settingsBaseline=content(demoShowDoc(savedDemoSettings()));const pick=this.doc.cues.find(c=>c.name===focus);if(pick){this.active=pick.id;this.render();}
     this.report('This is the Demo as set up in Demo settings. Edit it, then Save show to keep your version.');if(show)this.open();}
   report(message,error=false){$('status').textContent=message;$('status').classList.toggle('author-error',error);}
   open(){
     // An untouched Demo follows Demo settings changed since it was made; edited shows are never replaced.
-    if(this.untouched&&content(this.doc)===this.untouched){const fresh=demoShowDoc(savedDemoSettings()),next=content(fresh);if(next!==this.untouched){const at=this.doc.cues.findIndex(c=>c.id===this.active);this.state.doc=fresh;this.active=fresh.cues[Math.max(0,at)]?.id;this.untouched=next;}}
+    if(this.untouched&&content(this.doc)===this.untouched){const fresh=demoShowDoc(savedDemoSettings()),next=content(fresh);if(next!==(this.settingsBaseline??this.untouched)){const at=this.doc.cues.findIndex(c=>c.id===this.active);this.state.doc=fresh;this.active=fresh.cues[Math.max(0,at)]?.id;this.untouched=next;this.settingsBaseline=next;}}
     if(!$('dialog').open){this.render();$('dialog').showModal();}this.loadAssets();}
   loadAssets(){return this.assetsPromise??=import('./formation-assets.js').then(m=>{this.assets=m.default;if($('dialog').open)this.render();}).catch(error=>this.report('Could not load the Demo formations: '+error.message,true));}
   close(){this.cancelCompile();$('dialog').close();this.hooks.closed?.();}

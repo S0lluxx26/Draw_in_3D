@@ -67,6 +67,7 @@ export function validateShow(doc){
     need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship','flap','swim','fish','balloons','candles'].includes(c.effect??'none'),'Unknown formation effect.');
     if(c.library!==undefined){need(v3&&FORMATIONS.includes(c.library),`${c.name}: unknown Demo formation.`);need(Array.isArray(c.artwork)&&c.artwork.length===0,`${c.name}: a Demo formation has no drawing.`);need(c.fire===undefined||typeof c.fire==='boolean','Invalid falling-fire setting.');}
     need(Array.isArray(c.artwork)&&c.artwork.every(e=>e&&typeof e==='object'&&!Array.isArray(e)),`${c.name}: formation artwork must be a list of strokes and paper guides.`);
+    for(const e of c.artwork)if(e.designGroup!==undefined)need(e.type==='stroke'&&typeof e.designGroup==='string'&&e.designGroup.length>0&&e.designGroup.length<=100&&!/[\u0000-\u001f\u007f]/.test(e.designGroup),'Invalid designer group.');
     validate(documentOf(c.artwork));need(c.artwork.every(e=>['paper','stroke'].includes(e.type)),'Formations contain strokes and their paper guides only.');
     num(c.hold,2,60,'Display duration');num(c.transfer,2,30,'Transition duration');num(c.brightness,.1,1,'Brightness');
     need(['fade','draw-on','bottom-up'].includes(c.light),'Unknown light preset.');
@@ -84,7 +85,7 @@ export function decodeShow(text){
   const d=validateShow(JSON.parse(text));
   // Rebuild the known schema; imported properties never become application state.
   const v3=d.version===3;
-  return {format:d.format,version:v3?3:2,name:d.name,count:d.count,cues:d.cues.map(c=>({id:c.id,name:c.name,...(c.library?{library:c.library,fire:!!c.fire}:{}),artwork:c.library?[]:decode(JSON.stringify(documentOf(c.artwork))),hold:c.hold,transfer:c.transfer,light:c.light,effect:c.effect??'none',brightness:c.brightness,placement:{origin:[...c.placement.origin],position:[...c.placement.position],scale:c.placement.scale,yaw:c.placement.yaw}})),
+  return {format:d.format,version:v3?3:2,name:d.name,count:d.count,cues:d.cues.map(c=>({id:c.id,name:c.name,...(c.library?{library:c.library,fire:!!c.fire}:{}),artwork:c.library?[]:decode(JSON.stringify(documentOf(c.artwork))).map((e,i)=>({...e,...(c.artwork[i].designGroup?{designGroup:c.artwork[i].designGroup}:{})})),hold:c.hold,transfer:c.transfer,light:c.light,effect:c.effect??'none',brightness:c.brightness,placement:{origin:[...c.placement.origin],position:[...c.placement.position],scale:c.placement.scale,yaw:c.placement.yaw}})),
     fireworks:{enabled:d.fireworks.enabled,duration:d.fireworks.duration,radius:d.fireworks.radius,...(v3?{style:d.fireworks.style}:{})},...(v3?{look:{shape:d.look.shape,scale:d.look.scale,pyro:d.look.pyro,lasers:d.look.lasers}}:{})};
 }
 export function cueFormation(c,count=DRONE_COUNT){

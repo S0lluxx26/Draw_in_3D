@@ -26,9 +26,9 @@ export function isDesign(cue){
   return cue.artwork.every(e=>e.type==='paper'||e.type==='stroke'&&e.paperId===s.id&&e.pointSpace==='surface'&&!e.yaw&&near(e.scale,1)&&same(e.position,[0,0,0]));
 }
 // The formation's ink as stage polylines: [{id, color (ARGB int), points: [[x,y],…]}].
-export const designStrokes=cue=>cue.artwork.filter(e=>e.type==='stroke').map(e=>({id:e.id,color:e.color,points:e.points.map(toStage)}));
+export const designStrokes=cue=>cue.artwork.filter(e=>e.type==='stroke').map(e=>({id:e.id,color:e.color,...(e.designGroup?{group:e.designGroup}:{}),points:e.points.map(toStage)}));
 export function designArtwork(paper,strokes){
-  return [paper,...strokes.filter(s=>s.points.length>1).map(s=>({...entity('stroke'),id:s.id||crypto.randomUUID(),paperId:paper.id,pointSpace:'surface',color:s.color,points:s.points.map(toSheet)}))];
+  return [paper,...strokes.filter(s=>s.points.length>1).map(s=>({...entity('stroke'),id:s.id||crypto.randomUUID(),...(s.group?{designGroup:s.group}:{}),paperId:paper.id,pointSpace:'surface',color:s.color,points:s.points.map(toSheet)}))];
 }
 export const argb=([r,g,b])=>(0xff000000|Math.round(r*255)<<16|Math.round(g*255)<<8|Math.round(b*255))|0;
 export const cssColor=c=>'#'+(c&0xffffff).toString(16).padStart(6,'0');

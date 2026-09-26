@@ -41,7 +41,7 @@ export class FormationDesigner{
     this.traceInput=$('[data-role=trace]');this.traceInput.onchange=()=>{const file=this.traceInput.files[0];this.traceInput.value='';if(!file)return;const image=new Image();image.onload=()=>{this.backdrop=image;this.syncBar();this.draw();};image.onerror=()=>this.hooks.report('That file is not a picture this browser can show.',true);image.src=URL.createObjectURL(file);};
     const c=this.canvas;
     c.addEventListener('pointerdown',e=>this.down(e));c.addEventListener('pointermove',e=>this.move(e));
-    c.addEventListener('pointerup',e=>this.up(e));c.addEventListener('pointercancel',()=>{this.gesture=null;this.draw();});
+    c.addEventListener('pointerup',e=>this.up(e));c.addEventListener('pointercancel',e=>this.cancelPointer(e));c.addEventListener('lostpointercapture',e=>this.cancelPointer(e));
     c.addEventListener('pointerleave',()=>{if(!this.gesture&&this.hover>=0){this.hover=-1;this.draw();}});
     c.addEventListener('keydown',e=>this.key(e));
     new ResizeObserver(()=>this.resize()).observe($('.designer-stage'));
@@ -50,14 +50,15 @@ export class FormationDesigner{
   // ---- state from the Show editor ----
   // formation: the drones Run will fly to (stage units); unit: metres per stage unit; banner: why it is read-only.
   show({cue,formation,editable,count,unit,banner}){
-    this.cue=cue;this.editable=editable;this.strokes=editable?designStrokes(cue):[];this.formation=formation;this.count=count;this.unit=unit;
+    if(this.cue!==cue)this.cancelGesture();
+    this.cue=cue;this.editable=editable;this.strokes=editable?designStrokes(cue):[];this.groups=new Map(this.strokes.filter(s=>s.group).map(s=>[s.id,s.group]));this.formation=formation;this.count=count;this.unit=unit;
     const ids=new Set(this.strokes.map(s=>s.id));for(const id of this.selection)if(!ids.has(id))this.selection.delete(id);
     this.bar.classList.toggle('disabled',!editable);for(const el of this.bar.querySelectorAll('button,input,select'))el.disabled=!editable;
     this.banner.hidden=!banner;if(banner){this.banner.querySelector('span').textContent=banner.text;const actions=this.banner.querySelector('.designer-banner-actions');actions.replaceChildren(...(banner.actions||[]).map(([label,run])=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=run;return b;}));}
     this.syncBar();this.draw();
   }
   focus(tool){if(tool)this.setTool(tool);this.canvas.focus({preventScroll:true});}
-  setTool(tool){this.tool=tool;this.gesture=null;this.textBox.hidden=tool!=='text';this.canvas.dataset.tool=tool;this.syncBar();this.draw();}
+  setTool(tool){this.cancelGesture();this.tool=tool;this.textBox.hidden=tool!=='text';this.canvas.dataset.tool=tool;this.syncBar();this.draw();}
   pick(color){this.color=color;this.bar.querySelector('[data-role=color]').value=color;
     if(this.selection.size&&this.editable)this.commit(this.strokes.map(s=>this.selection.has(s.id)?{...s,color:colorOf(color)}:s),'Colour changed.');this.syncBar();}
   syncBar(){
@@ -75,7 +76,7 @@ export class FormationDesigner{
   added(lines,message){
     const color=colorOf(this.color),fresh=lines.map(points=>({id:crypto.randomUUID(),color,points}));
     const all=this.mirror?[...fresh,...mirrored(fresh).map(s=>({...s,id:crypto.randomUUID()}))]:fresh,group=crypto.randomUUID();
-    for(const s of all)this.groups.set(s.id,group);
+    for(const s of all)s.group=group;
     this.commit([...this.strokes,...all],message);
   }
   get selected(){return this.strokes.filter(s=>this.selection.has(s.id));}
@@ -95,7 +96,7 @@ export class FormationDesigner{
     if(action==='clear'){if(this.strokes.length){this.selection.clear();this.commit([],'Stage cleared. Undo brings the lines back.');}return;}
     if(!this.selection.size)return;
     if(action==='delete'){const n=this.selection.size;this.commit(this.strokes.filter(s=>!this.selection.has(s.id)),`${n} line${n>1?'s':''} deleted.`);this.selection.clear();}
-    if(action==='duplicate'){const renamed=new Map(),copies=mapStrokes(this.selected,translate(2,-2)).map(s=>{const id=crypto.randomUUID(),g=this.groups.get(s.id);if(g){if(!renamed.has(g))renamed.set(g,crypto.randomUUID());this.groups.set(id,renamed.get(g));}return {...s,id};});this.selection=new Set(copies.map(s=>s.id));this.commit([...this.strokes,...copies],'Duplicated. Drag the copy into place.');}
+    if(action==='duplicate'){const renamed=new Map(),copies=mapStrokes(this.selected,translate(2,-2)).map(s=>{const id=crypto.randomUUID(),g=this.groups.get(s.id);if(g&&!renamed.has(g))renamed.set(g,crypto.randomUUID());return {...s,id,...(g?{group:renamed.get(g)}:{})};});this.selection=new Set(copies.map(s=>s.id));this.commit([...this.strokes,...copies],'Duplicated. Drag the copy into place.');}
     if(action==='flip'){const b=bounds(this.selected),flip=([x,y])=>[2*b.cx-x,y];this.replaceSelected(mapStrokes(this.selected,flip),'Flipped left–right.');}
     this.syncBar();
   }
@@ -111,9 +112,12 @@ export class FormationDesigner{
   handles(){if(!this.selection.size)return null;const b=bounds(this.gesture?.preview||this.selected),pad=this.tolerance(6);
     const box={minX:b.minX-pad,maxX:b.maxX+pad,minY:b.minY-pad,maxY:b.maxY+pad};
     return {box,corners:[[box.minX,box.minY],[box.maxX,box.minY],[box.maxX,box.maxY],[box.minX,box.maxY]],rotate:[(box.minX+box.maxX)/2,box.maxY+this.tolerance(24)],centre:[b.cx,b.cy]};}
+  // One pointer owns a gesture. Cancel before releasing capture to ignore its lost-capture event.
+  cancelGesture(){const id=this.pointerId;this.pointerId=null;this.gesture=null;this.live=null;if(id!=null&&this.canvas.hasPointerCapture?.(id))this.canvas.releasePointerCapture(id);}
+  cancelPointer(e){if(e.pointerId!==this.pointerId)return;this.cancelGesture();this.draw();}
   // ---- pointer ----
   down(e){
-    if(!this.editable||e.button>0)return;e.preventDefault();this.canvas.setPointerCapture(e.pointerId);this.canvas.focus({preventScroll:true});
+    if(!this.editable||e.button>0||this.pointerId!=null)return;e.preventDefault();this.pointerId=e.pointerId;this.canvas.setPointerCapture(e.pointerId);this.canvas.focus({preventScroll:true});
     const p=this.at(e);
     if(this.tool==='pen')this.gesture={kind:'pen',points:[p]};
     else if(SHAPE_TOOLS.includes(this.tool)){const a=this.snapped(p);this.gesture={kind:'shape',a,b:a};}
@@ -135,6 +139,7 @@ export class FormationDesigner{
     this.syncBar();
   }
   move(e){
+    if(this.pointerId!=null&&e.pointerId!==this.pointerId)return;
     const p=this.at(e),g=this.gesture;
     if(!g){if(this.editable&&this.tool==='select'){const i=hitStroke(this.strokes,p,this.tolerance());if(i!==this.hover){this.hover=i;this.draw();}}return;}
     if(g.kind==='pen'){const last=g.points.at(-1);if(Math.hypot(p[0]-last[0],p[1]-last[1])>this.tolerance(1.5))g.points.push(p);}
@@ -147,7 +152,7 @@ export class FormationDesigner{
     this.liveDots();this.draw();
   }
   up(e){
-    const g=this.gesture;if(!g)return;this.gesture=null;this.live=null;
+    if(e.pointerId!==this.pointerId)return;const g=this.gesture;this.cancelGesture();if(!g)return;
     if(g.kind==='pen'){const points=simplify(g.points);if(length(points)>.3)this.added([points],'Line drawn.');}
     else if(g.kind==='shape'){const lines=this.shapeLines(g);if(lines)this.added(lines,`${this.tool==='rect'?'Box':this.tool[0].toUpperCase()+this.tool.slice(1)} added${this.fill&&this.tool!=='line'?', filled with drones':''}.`);}
     else if(g.kind==='erase'){if(g.removed.size){this.selection=new Set([...this.selection].filter(id=>!g.removed.has(id)));this.commit(this.strokes.filter(s=>!g.removed.has(s.id)),`${g.removed.size} line${g.removed.size>1?'s':''} erased.`);}}
@@ -169,7 +174,7 @@ export class FormationDesigner{
     if(e.ctrlKey||e.metaKey){if(k==='a'){e.preventDefault();this.selection=new Set(this.strokes.map(s=>s.id));this.setTool('select');}if(k==='d'){e.preventDefault();this.act('duplicate');}return;}
     const tool=TOOLS.find(t=>t[2].toLowerCase()===k);if(tool){e.preventDefault();this.setTool(tool[0]);return;}
     if(k==='delete'||k==='backspace'){e.preventDefault();this.act('delete');return;}
-    if(k==='escape'){if(this.gesture||this.selection.size){e.preventDefault();e.stopPropagation();this.gesture=null;this.selection.clear();this.syncBar();this.draw();}return;}
+    if(k==='escape'){if(this.gesture||this.selection.size){e.preventDefault();e.stopPropagation();this.cancelGesture();this.selection.clear();this.syncBar();this.draw();}return;}
     const nudge={arrowleft:[-1,0],arrowright:[1,0],arrowup:[0,1],arrowdown:[0,-1]}[k];
     if(nudge&&this.selection.size){e.preventDefault();const step=e.shiftKey?2:.5;this.replaceSelected(mapStrokes(this.selected,translate(nudge[0]*step,nudge[1]*step)),'Nudged.');}
   }

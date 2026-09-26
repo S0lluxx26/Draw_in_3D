@@ -82,7 +82,7 @@ export class DronePlayer{
     const s=this.scale=stageScale(show);
     this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(46,1,.25*s,20000*s);
     this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.freeLimits();this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
-    this.orbit.addEventListener('change',()=>this.refresh());this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
+    this.orbit.addEventListener('change',()=>{if(!this.updatingCamera)this.refresh();});this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;this.waiting=true;this.autoplay=true;
     this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r,sky:this.sky});$('drone-show').dataset.sky=this.sky;this.createDrones();this.precrowd(show);
     if(this.tier.bloom){
@@ -108,7 +108,10 @@ export class DronePlayer{
   // Automatic director camera. smooth=true eases from a manual orbit back to it.
   front(smooth=false){if(!this.active)return;if(smooth&&!this.frontMode)this.blend={position:this.camera.position.toArray(),target:this.orbit.target.toArray(),start:performance.now()};this.frontMode=true;this.updateCamera(this.clock.time,performance.now());}
   updateCamera(time,now){
-    if(!this.frontMode){if(this.cameraMode==='follow')this.follow(time);this.orbit.update();const floor=1.5*this.scale;if(this.camera.position.y<floor){this.camera.position.y=floor;this.camera.lookAt(this.orbit.target);}return;}
+    this.cameraSettling=false;this.updatingCamera=true;try{this.applyCamera(time,now);}finally{this.updatingCamera=false;}
+  }
+  applyCamera(time,now){
+    if(!this.frontMode){if(this.cameraMode==='follow')this.follow(time);this.cameraSettling=this.orbit.update();const floor=1.5*this.scale;if(this.camera.position.y<floor){this.camera.position.y=floor;this.camera.lookAt(this.orbit.target);}return;}
     const view=this.camera.view,offset=view?.enabled?view.offsetY/view.fullHeight:0;
     const pose=directorView(this.show,time,this.camera.aspect,this.camera.fov,offset,{drift:this.reducedMotion?0:1});let {position,target}=pose;
     if(this.blend){const k=smooth((now-this.blend.start)/1400),mix=(a,b)=>a.map((v,i)=>v+(b[i]-v)*k);position=mix(this.blend.position,position);target=mix(this.blend.target,target);if(k>=1)this.blend=null;}
@@ -188,7 +191,7 @@ export class DronePlayer{
       const glow=new THREE.Color().setRGB(...sum.map(v=>lit?(v/lit)**2.2:0)),center=framingAt(this.show,time).center;this.stage.setGlow(center,glow,1.6*lit/this.show.count);
       $('show-lit').textContent=lit+' / '+this.show.count;$('show-play-state').textContent=this.waiting?'GETTING READY':this.clock.playing?'LIVE PREVIEW':time>=this.show.duration?'SHOW COMPLETE':'PAUSED';this.syncMusic();
     }
-    return this.clock.playing||!!this.blend;
+    return this.clock.playing||!!this.blend||this.cameraSettling;
   }
   teardown(){
     this.orbit.dispose();this.stage.dispose();this.composer?.dispose();this.bloom?.dispose();this.composer?.passes.forEach(p=>p.dispose?.());
