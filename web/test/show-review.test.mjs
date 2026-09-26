@@ -69,7 +69,7 @@ test('Play stays disabled while a preview worker is preparing trajectories',t=>{
   const elements=new Map(),previous=globalThis.document;
   const element=()=>{const e={children:[],style:{},dataset:{},classList:{toggle(){}},setAttribute(){},append(...items){e.children.push(...items);},replaceChildren(){e.children=[];}};return e;};
   globalThis.document={getElementById(id){if(!elements.has(id))elements.set(id,element());return elements.get(id);},createElement:element};t.after(()=>{globalThis.document=previous;});
-  const editor=Object.create(ShowEditor.prototype);editor.state=new ShowHistory(editableDemo());editor.active=editor.doc.cues[0].id;editor.paint=()=>{};
+  const editor=Object.create(ShowEditor.prototype);editor.state=new ShowHistory(editableDemo());editor.active=editor.doc.cues[0].id;editor.paint=()=>{};editor.stage=()=>{};// no canvas here: skip the thumbnails and the designer
   editor.worker={};editor.render();assert.equal(document.getElementById('author-play').disabled,true);
   editor.worker=null;editor.render();assert.equal(document.getElementById('author-play').disabled,false);
 });

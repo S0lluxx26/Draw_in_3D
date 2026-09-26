@@ -1,4 +1,4 @@
-# Make your own drone show — Studio 12
+# Make your own drone show — Studio 19
 
 Open [Draw in 3D](https://s0lluxx26.github.io/Draw_in_3D/) and choose **Show editor** above the canvas. The same guide is available under **How to make a show** inside the app. This workflow works in the web app on a PC, phone or tablet; it does not need a camera or IMU.
 
@@ -34,16 +34,41 @@ While your show plays, **Settings** offers the viewing options: graphics quality
 - The preview shows the formation as Run plays it, including the whale's spout, the fish's waves and falling fire. Card times use the player's clock.
 - A card marked **⚠** cannot play yet: it has nothing drawn, or its ink is outside the sky stage. **Play my show** selects it and says why.
 
-## Change a formation's drawing
+## Design a formation on the stage
 
-1. Click **Edit demo**, select the Robot card and click **Convert to drawing**. (Older shows, or a card you already converted, show **Edit drawing**.)
-2. The Robot's strokes open on a hidden drawing guide. Use Select or Box select to change colours or move parts; use Line, Curve, Rectangle, Ellipse or freehand Draw to add details. Undo and Redo work here. **Drone dots** previews the 4,096 samples over committed strokes.
-3. Click **Save formation & return**. The app restores the drawing you had before entering formation editing, including its undo history. **Cancel** returns without changing the formation. The show itself has a separate Undo/Redo history.
-4. Select Fish, edit its drawing and colour it. For a different third scene, select Eiffel Tower, edit it, select its strokes and delete them, then draw a heart, star or your own symbol. Keep the guide if you want to draw on the same sheet. Rename the card when finished.
-5. Drag the cards to reorder them on desktop, or use **Earlier / Later** on any device. **Display** is the time a completed shape remains visible. **Transition** is the travel interval before that shape. The timeline below shows the complete sequence, including generated takeoff and landing.
-6. Choose **Fade in**, **Draw on in stroke order**, or **Bottom to top**, and set brightness. Lights fade out before transfer and reveal after arrival. Draw-on animates the LEDs; it does not make drones physically follow the pen path.
-7. Set stage X, Height, Depth, Scale and Rotation. Small artwork changes preserve this placement. **Fit to stage** explicitly recalculates the centre and size. A warning identifies artwork outside the supported stage; reduce scale, reposition it or use Fit. **View in 3D** opens the show paused at the selected formation so you can orbit and inspect depth.
-8. Set the fireworks radius and duration, or disable the finale. **Play my show** performs takeoff → your formations → optional light fireworks → return and landing. The same 4,096 virtual drones persist throughout.
+The middle of the Show editor is the **sky stage**: the audience's front view of the whole playable sky (408 × 264 m in the Demo look), with the harbour skyline along the bottom. Every line you draw becomes a line of drones in its colour, and the dots are the drones that Run flies to.
+
+1. **＋ Draw a formation** adds a blank stage and picks the **Pen**.
+2. Draw:
+   - **Pen** draws freehand, and the line is smoothed.
+   - **Line**, **Box**, **Ellipse**, **Heart** and **Star** draw by dragging. Hold Shift for equal width and height, or for 15° steps on a line.
+   - **Text:** type in the box, choose a size, then click the stage. It has letters A–Z, digits and `! ? . , - + ' : ♥`. Accents fold away (Hà Nội → HA NOI).
+   - **Erase** removes the lines you click or drag over.
+   - Pick a colour from the eight swatches, or any colour from the picker.
+   - **Fill** fills shapes with rings of drones.
+   - **Mirror** mirrors each new line across the centre.
+   - **Snap** keeps to the 1-unit grid.
+   - **Trace image…** shows a picture behind the stage to draw over. It isn't saved in the show.
+3. Adjust with **Select**:
+   - Click a shape to pick it. A filled shape or a word comes as one piece; Alt-click picks a single line. Shift-click adds to the selection, and dragging on empty stage selects with a box.
+   - Drag to move it, drag a corner to resize it, or drag the knob to rotate it (Shift gives 15° steps).
+   - The arrow keys nudge it (hold Shift for bigger steps), and a colour swatch recolours it.
+   - **Duplicate** (Ctrl+D), **Flip**, **Delete** (Del), **Clear**, Ctrl+A to select everything, and Undo (Ctrl+Z) all work here.
+4. While you draw or drag, the dots follow live. The note under the stage counts the lights and any water drones, the lines, and how closely the drones sit ("a drone every 0.7 m").
+5. **▶ Run from here** plays the show from this formation's transition, so you watch the drones fly into your drawing.
+
+**Demo formations** keep their 3D Blender shape; **✎ Convert to drawing** puts their line art on the stage to change. **Drawings from the 3D workspace** (curved sheets, several sheets) show on the stage as they will play. **Flatten into the designer** makes them 2D-editable, and **Edit in 3D workspace** keeps their depth.
+
+A formation holds up to 79 lines and 4,000 points; the designer says when it is full. Ink past the stage edge is cut off at the edge.
+
+### Build the program
+
+- Drag the cards to reorder them on desktop, or use **Earlier / Later** on any device.
+- **Display** is how long a finished shape stays; **Transition** is the flight into it. The timeline below shows the whole sequence, including takeoff and landing.
+- Choose **Fade in**, **Draw on in stroke order** or **Bottom to top**, and set the brightness. In a Demo-style show the drones blink red or blue in flight, and the shape lights up on arrival.
+- **Motion / effect** adds swimming (with waves or a spout), wing flaps, drifting balloons, a Starship rise, sparkle or falling fire.
+- **Fit to stage** scales and centres the drawing.
+- Set the finale. **Play my show** performs takeoff → your formations → the finale → return and landing.
 
 ## Start with your own artwork
 

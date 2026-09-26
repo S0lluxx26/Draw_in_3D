@@ -2,6 +2,7 @@
 import {entity,clone,validate,documentOf,decode} from './model.js';
 import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT,MOTIONS,CINEMATIC_LANDING} from './drone-show.js';
 import {FORMATIONS,FLEET_SIZES,LIGHT_SHAPES,DEMO_TRANSFER,demoSettings,libraryCue,libraryFormation,extrasFor,drawingExtras} from './demo-library.js';
+import {designPaper,designPlacement,toSheet,argb} from './formation-design.js';
 
 export const SHOW_LIMITS=Object.freeze({cues:14,bytes:16*1024*1024,history:24});
 const need=(ok,message)=>{if(!ok)throw new Error(message);};
@@ -17,18 +18,19 @@ export function captureArtwork(entities,selection){
   validate(documentOf(result));return clone(result);
 }
 export const DEMO_TIMING=Object.freeze({hold:15,transfer:DEMO_TRANSFER});// a Demo formation's display and transition
-export function newCue(artwork=blankArtwork(),label='New formation',timing={hold:8,transfer:7}){
-  const paths=drawingPaths(artwork);
-  return {id:crypto.randomUUID(),name:label,artwork,hold:timing.hold,transfer:timing.transfer,light:'fade',effect:'none',brightness:1,
-    placement:paths.length?fitArtwork(artwork):{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
+// Without artwork, a new formation is a blank sky stage for the 2D designer; captured ink is fitted to the stage.
+export function newCue(artwork,label='New formation',timing={hold:8,transfer:7}){
+  const blank=!artwork,ink=artwork||[designPaper()],paths=blank?[]:drawingPaths(ink);
+  return {id:crypto.randomUUID(),name:label,artwork:ink,hold:timing.hold,transfer:timing.transfer,light:'fade',effect:'none',brightness:1,
+    placement:blank?designPlacement():paths.length?fitArtwork(ink):{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
 }
 export function fitArtwork(artwork){const p=fitPaths(drawingPaths(artwork));return {...p,scale:Math.min(100,Math.max(.1,p.scale))};}
 export function newShow(){return {format:'draw-in-3d-show',version:2,name:'My sky story',count:DRONE_COUNT,cues:[],fireworks:{enabled:true,duration:9,radius:6.3}};}
-// A Demo formation's line art as editable strokes on a hidden guide sheet (Convert to drawing).
+// A Demo formation's line art as editable stage ink (Convert to drawing): the 2D designer edits it in place.
 export function drawingCue(name,base={}){
-  const {paths,hold,effect='none'}=libraryCue(name),paper=blankArtwork(name+' guide')[0];
-  const artwork=[paper,...paths.map(path=>({...entity('stroke'),paperId:paper.id,pointSpace:'surface',color:(0xff000000|path.color.reduce((n,v,k)=>n|(Math.round(v*255)<<(16-k*8)),0)),points:path.points.map(p=>[p[0]/10,(p[1]-18)/10,p[2]/10,1])}))];
-  const cue={...newCue(artwork,name),hold,effect,placement:{origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0}};
+  const {paths,hold,effect='none'}=libraryCue(name),paper=designPaper();
+  const artwork=[paper,...paths.map(path=>({...entity('stroke'),paperId:paper.id,pointSpace:'surface',color:argb(path.color),points:path.points.map(toSheet)}))];
+  const cue={...newCue(artwork,name),hold,effect,placement:designPlacement()};
   for(const key of ['id','name','hold','transfer','light','brightness'])if(base[key]!==undefined)cue[key]=base[key];
   return cue;
 }
@@ -102,7 +104,7 @@ export function cueSequence(doc,c,assets){
 // Why a formation cannot play yet (checked on its card before Run), or null.
 export function cueProblem(c){
   if(c.library)return null;
-  if(!drawingPaths(c.artwork).length)return 'Nothing drawn yet. Choose Edit drawing and draw the formation.';
+  if(!drawingPaths(c.artwork).length)return 'Nothing drawn yet. Draw the formation on the stage.';
   try{cueFormation(c,64);return null;}catch(error){return error.message.replace(c.name+': ','');}
 }
 // When each formation starts forming (its transfer) and when its display ends, as Run plays them.

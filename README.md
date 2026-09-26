@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 19: design drone formations in 2D
+
+![A formation drawn on the Show editor's sky stage, and the same formation flown by 2,048 drones](docs/media/studio19-designer.jpg)
+
+The Show editor's stage is now a **2D formation designer**. Draw straight onto the sky stage with the pen, lines, boxes, ellipses, hearts, stars and text. **Fill** shapes with rings of drones, **Mirror** both halves, and trace over a picture. Then select shapes to move, resize, rotate, recolour, duplicate or flip them. The dots are the drones and follow live as you draw. **▶ Run from here** shows them flying into it. Demo formations convert onto the stage, and saved shows stay editable. [Details and checks](docs/STUDIO19.md).
+
 ## Studio 18: late afternoon, drones you can watch fly, a firework finale
 
 ![Late afternoon over the harbour, drones flying between shapes, and the landing firework finale](docs/media/studio18-show.jpg)

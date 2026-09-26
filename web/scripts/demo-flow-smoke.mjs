@@ -45,7 +45,7 @@ try{
   await page.locator('#show-exit').click();await page.locator('#author-dialog').waitFor({state:'visible'});
   assert.equal((await editor()).active,'8. Firework star');assert.match(await page.locator('#author-status').textContent(),/Back from the show at Firework star/);
   // 6. A formation that cannot play is flagged on its card, and Play points at it instead of failing mid-compile.
-  await page.locator('#author-blank').click();await page.locator('#formation-cancel').click();await page.locator('#author-dialog').waitFor({state:'visible'});
+  await page.locator('#author-blank').click();
   const blank=page.locator('.author-card').last();assert.ok(await blank.evaluate(c=>c.classList.contains('problem')));assert.match(await blank.locator('small').textContent(),/^⚠ Nothing drawn yet/);
   await page.locator('.author-card').first().click();await page.locator('#author-play').click();
   assert.match(await page.locator('#author-status').textContent(),/New formation: Nothing drawn yet/);assert.ok(await blank.evaluate(c=>c.classList.contains('active')),'the problem card is selected');assert.ok(await page.locator('#drone-show').isHidden());
