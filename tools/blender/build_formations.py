@@ -12,6 +12,7 @@ X/right, Y/up, Z/toward-the-audience: app = (x, z, -y).
 Each formation is a collection. Object custom properties:
   fire=True   optional exhaust/flame emitters (sampled separately, 512 lights)
   emit=False  occluder only: hides lights inside it but receives none
+  density=1   sampling weight: a small but important part (candle flames) gets its share of lights
 LED colours come from the 'LED' colour attribute when present (paint it in
 Vertex Paint), otherwise from the material's viewport colour.
 
@@ -136,7 +137,7 @@ class Part:
                 loop[self.led] = (*self.color(loop.vert.co), 1.0)
         bpy.data.meshes.remove(me)
 
-    def finish(self, name, material, fire=False, emit=True, smooth=True):
+    def finish(self, name, material, fire=False, emit=True, smooth=True, density=1.0):
         bmesh.ops.remove_doubles(self.bm, verts=self.bm.verts, dist=1e-5)
         me = bpy.data.meshes.new(name); self.bm.to_mesh(me); self.bm.free()
         me.materials.append(materials[material])
@@ -146,10 +147,10 @@ class Part:
         o = bpy.data.objects.new(name, me)
         o.matrix_world = APP_TO_BLENDER
         collection.objects.link(o)
-        o['fire'] = fire; o['emit'] = emit
+        o['fire'] = fire; o['emit'] = emit; o['density'] = density
         return o
 
-def flame(name, base, height, radius, twist=0.0, sides=18, fire=True, lean=0.0):
+def flame(name, base, height, radius, twist=0.0, sides=18, fire=True, lean=0.0, density=1.0):
     """Twisting teardrop flame: white-hot base, yellow body, orange/red tips."""
     ts = np.linspace(0, 1, 16)
     col = lambda p: ramp([(0, (1, .98, .7)), (.35, (1, .85, .12)), (.7, (1, .45, .05)), (1, (1, .14, .05))], (p.y - base[1]) / height)
@@ -157,7 +158,7 @@ def flame(name, base, height, radius, twist=0.0, sides=18, fire=True, lean=0.0):
     pts = [(base[0] + math.sin(t * 3.1 + twist) * radius * .35 * t + lean * t * t * height, base[1] + t * height, base[2] + math.cos(t * 2.3 + twist) * radius * .2 * t) for t in ts]
     radii = [radius * (math.sin(math.pi * min(1, t * 1.25)) ** .7) * (1 - t) ** .55 + .02 for t in ts]
     part.lathe(pts, radii, sides)
-    return part.finish(name, 'fire', fire=fire)
+    return part.finish(name, 'fire', fire=fire, density=density)
 
 def exhaust(xs, y, z=0.0, length=3.2, r=.5):
     """Optional falling-fire emitters under a formation (fire=True)."""
@@ -576,7 +577,7 @@ def cake():
         candles.tube((x, 2.2, z), (x, 4.8, z), .22, .22, 10)
     candles.finish('Candles', 'white')
     for i, (x, z) in enumerate(spots):
-        flame('Candle flame', (x, 4.85, z), 2.3, .55, twist=i, fire=False)
+        flame('Candle flame', (x, 4.85, z), 2.9, .72, twist=i, fire=False, density=2.4)  # bright enough to read as fire
     exhaust([-6, -2, 2, 6], -8.8, 0, 2.8, .45)
 
 def happy_day():
@@ -656,6 +657,7 @@ def sample(objects, count, seed):
     rng = np.random.default_rng(seed)
     data = {o.name: mesh_data(o) for o in objects if o.type == 'MESH'}
     emitting = [o.name for o in objects if o.type == 'MESH' and o.get('emit', True) and len(data[o.name]['tris'])]
+    density = {o.name: float(o.get('density', 1.0)) for o in objects}
     occluders = [(name, BVHTree.FromPolygons([tuple(v) for v in d['verts']], d['polys']), d['verts'].min(0) - 1e-3, d['verts'].max(0) + 1e-3)
                  for name, d in data.items() if d['closed']]
     tri = np.concatenate([data[n]['verts'][data[n]['tris']] for n in emitting])
@@ -664,26 +666,28 @@ def sample(objects, count, seed):
     owner = np.concatenate([[n] * len(data[n]['tris']) for n in emitting])
     open_part = np.concatenate([[not data[n]['closed']] * len(data[n]['tris']) for n in emitting])
     areas = np.linalg.norm(np.cross(tri[:, 1] - tri[:, 0], tri[:, 2] - tri[:, 0]), axis=1) / 2
+    # Denser parts get proportionally more candidates and a larger farthest-point weight (spacing / density).
+    dense = np.concatenate([[density[n]] * len(data[n]['tris']) for n in emitting])
     m = count * 10
-    idx = rng.choice(len(tri), size=m, p=areas / areas.sum())
+    idx = rng.choice(len(tri), size=m, p=areas * dense ** 2 / (areas * dense ** 2).sum())
     uv = rng.random((m, 2)); flip = uv.sum(axis=1) > 1; uv[flip] = 1 - uv[flip]
     w = np.stack([1 - uv[:, 0] - uv[:, 1], uv[:, 0], uv[:, 1]], axis=1)
     points = np.einsum('ij,ijk->ik', w, tri[idx]); colors = np.einsum('ij,ijk->ik', w, col[idx])
-    normals, owners, opened, weights = nrm[idx], owner[idx], open_part[idx], np.ones(m)
+    normals, owners, opened, weights = nrm[idx], owner[idx], open_part[idx], dense[idx]
     # Feature-edge candidates, spaced about a third of the expected light spacing.
     spacing = math.sqrt(areas.sum() / count) * .33
-    ep, ec, en, eo, eopen = [], [], [], [], []
+    ep, ec, en, eo, eopen, ew = [], [], [], [], [], []
     for name in emitting:
         d = data[name]
         for a, b, n in d['edges']:
             pa, pb = d['verts'][a], d['verts'][b]
-            k = max(1, int(np.linalg.norm(pb - pa) / spacing))
+            k = max(1, int(np.linalg.norm(pb - pa) / (spacing / density[name])))
             for t in (np.arange(k) + rng.random()) / k:
                 ep.append(pa + (pb - pa) * t); ec.append(d['vertex_color'][a] * (1 - t) + d['vertex_color'][b] * t)
-                en.append(n); eo.append(name); eopen.append(not d['closed'])
+                en.append(n); eo.append(name); eopen.append(not d['closed']); ew.append(1.3 * density[name])
     if ep:
         points = np.concatenate([points, ep]); colors = np.concatenate([colors, ec]); normals = np.concatenate([normals, en])
-        owners = np.concatenate([owners, eo]); opened = np.concatenate([opened, eopen]); weights = np.concatenate([weights, np.full(len(ep), 1.3)])
+        owners = np.concatenate([owners, eo]); opened = np.concatenate([opened, eopen]); weights = np.concatenate([weights, ew])
     # Discard candidates inside any other closed part (hidden from every view).
     keep = np.ones(len(points), dtype=bool)
     for name, bvh, lo, hi in occluders:

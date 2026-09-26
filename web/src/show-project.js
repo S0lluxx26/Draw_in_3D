@@ -62,7 +62,7 @@ export function validateShow(doc){
   need(doc.version>=2||doc.count===256&&doc.cues.every(c=>!c.effect||c.effect==='none'),'Large fleets and animated effects require show version 2 or later.');
   const ids=new Set();
   for(const c of doc.cues){
-    need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship','flap','swim','fish','balloons'].includes(c.effect??'none'),'Unknown formation effect.');
+    need(typeof c.id==='string'&&c.id.length>0&&c.id.length<=100&&!ids.has(c.id),'Invalid or duplicate formation ID.');ids.add(c.id);name(c.name,'Formation name');need(['none','sparkle','fire','starship','flap','swim','fish','balloons','candles'].includes(c.effect??'none'),'Unknown formation effect.');
     if(c.library!==undefined){need(v3&&FORMATIONS.includes(c.library),`${c.name}: unknown Demo formation.`);need(Array.isArray(c.artwork)&&c.artwork.length===0,`${c.name}: a Demo formation has no drawing.`);need(c.fire===undefined||typeof c.fire==='boolean','Invalid falling-fire setting.');}
     need(Array.isArray(c.artwork)&&c.artwork.every(e=>e&&typeof e==='object'&&!Array.isArray(e)),`${c.name}: formation artwork must be a list of strokes and paper guides.`);
     validate(documentOf(c.artwork));need(c.artwork.every(e=>['paper','stroke'].includes(e.type)),'Formations contain strokes and their paper guides only.');

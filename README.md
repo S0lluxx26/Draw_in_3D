@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 20: candles that burn, a family you can recognise
+
+![The birthday cake with flickering candle flames, and the growing heart with the family holding hands](docs/media/studio20-cake-family.jpg)
+
+The Demo's **birthday cake** now has a bright flame on every candle, and the flames dance and flicker through the display. The **growing heart's family** is drawn as people instead of sticks: a man, a boy, a woman in a dress and a waving girl, with faces, hair, arms and clothes, holding hands. [Details and checks](docs/STUDIO20.md).
+
 ## Studio 19: design drone formations in 2D
 
 ![A formation drawn on the Show editor's sky stage, and the same formation flown by 2,048 drones](docs/media/studio19-designer.jpg)

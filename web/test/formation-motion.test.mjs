@@ -45,8 +45,8 @@ test('the whale swims with a travelling wave strongest at the flukes and blows a
 
 test('the Show editor keeps every motion effect through a file round trip',()=>{
   const doc=decodeShow(encodeShow(editableDemo()));
-  assert.deepEqual(doc.cues.filter(c=>c.effect!=='none').map(c=>[c.name,c.effect]),[['Fish','fish'],['Butterfly','flap'],['Hot air balloon','balloons'],['Whale','swim'],['Firework star','sparkle'],['Row of fire','fire'],['Starship launch','starship'],['Happy day','sparkle']]);
-  const show=compileShow(doc);assert.equal(show.stages.find(s=>s.name==='Butterfly').motion,'flap');assert.equal(show.stages.find(s=>s.name==='Fish').motion,'fish');assert.equal(show.stages.find(s=>s.name==='Hot air balloon').kind,'rise');assert.equal(show.stages.find(s=>s.name==='Whale').motion,'swim');
+  assert.deepEqual(doc.cues.filter(c=>c.effect!=='none').map(c=>[c.name,c.effect]),[['Fish','fish'],['Butterfly','flap'],['Hot air balloon','balloons'],['Whale','swim'],['Firework star','sparkle'],['Row of fire','fire'],['Birthday cake','candles'],['Starship launch','starship'],['Happy day','sparkle']]);
+  const show=compileShow(doc);assert.equal(show.stages.find(s=>s.name==='Butterfly').motion,'flap');assert.equal(show.stages.find(s=>s.name==='Fish').motion,'fish');assert.equal(show.stages.find(s=>s.name==='Hot air balloon').kind,'rise');assert.equal(show.stages.find(s=>s.name==='Whale').motion,'swim');assert.equal(show.stages.find(s=>s.name==='Birthday cake').motion,'candles');
   assert.throws(()=>decodeShow(encodeShow({...doc,cues:[{...doc.cues[0],effect:'teleport'}]})),/Unknown formation effect/);
 });
 

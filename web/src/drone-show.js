@@ -122,9 +122,9 @@ export function wavePoint(waves,d,t=0){const {l,x,a}=swell(waves,d,t);return [x,
 export function waveGlow(waves,d,t){return .3+.7*Math.max(0,Math.sin(swell(waves,d,t).a))**2;}
 // Formation motions: the fish swims in its waves, the butterfly flaps, the balloons drift up with flickering
 // burners, and the whale swims and blows (see sampleShow).
-export const MOTIONS=['flap','swim','fish','balloons'];
+export const MOTIONS=['flap','swim','fish','balloons','candles'];
 // Displays last about 12 s so each formation has time to be admired; the finale lingers longer.
-export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:19,effect:'sparkle',pyro:true}];
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15,effect:'candles'},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:19,effect:'sparkle',pyro:true}];
 // One spout droplet: position along the jet u, jet side, and a spray offset (angle, radius), all from its index.
 export function spoutDrop(j){const f=x=>x-Math.floor(x);return {kind:'spout',u:f(j*.6180339887+.13),side:j%2?1:-1,angle:f(j*.7548776662)*Math.PI*2,radius:Math.sqrt(f(j*.5698402910+.37))};}
 // The spout rises from the blowhole and splits into two jets that fan out and droop (formation units).
@@ -253,26 +253,51 @@ function fireworksSeeds(count){
 // Full-size targets plus compact launch seeds. Reuse the fleet; no extra particles.
 // A family inside the growing heart: man, boy, woman and girl holding hands (heart-local units, all inside its
 // innermost contour). The little girl waves.
-function familyPaths(){
-  const circle=(x,y,r,n=20)=>Array.from({length:n+1},(_,i)=>[x+r*Math.cos(i*2*Math.PI/n),y+r*Math.sin(i*2*Math.PI/n),0]),rose=[1,.72,.88];
-  const base=-3.1,people=[{x:-4,h:6.7,c:cyan},{x:-1.3,h:4.1,c:gold},{x:1.55,h:6.2,c:pink,dress:true,hair:true},{x:4.15,h:3.7,c:rose,dress:true,hair:true,wave:true}];
-  const paths=[],hand=(a,b)=>[(a.x+b.x)/2,base+Math.min(a.h,b.h)*.46,0];
-  people.forEach((p,i)=>{
-    const {x,h,c}=p,head=h*.105,sh=base+h*.7,hip=base+h*.44,left=people[i-1],right=people[i+1];
-    paths.push({points:circle(x,base+h*.88,head),color:c});
-    if(p.dress){paths.push({points:[[x-h*.07,sh,0],[x-h*.2,base+h*.3,0],[x+h*.2,base+h*.3,0],[x+h*.07,sh,0],[x-h*.07,sh,0]],color:c});
-      for(const s of [-1,1])paths.push({points:[[x+s*h*.07,base+h*.3,0],[x+s*h*.07,base,0]],color:c});}
-    else{paths.push({points:[[x,base+h*.78,0],[x,hip,0]],color:c});for(const s of [-1,1])paths.push({points:[[x,hip,0],[x+s*h*.1,base,0]],color:c});}
-    if(p.hair)paths.push({points:Array.from({length:13},(_,k)=>{const a=Math.PI*(.05+.9*k/12);return [x+head*1.25*Math.cos(a),base+h*.88+head*1.1*Math.sin(a)-(k<3||k>9?head*.9:0),0];}),color:c});
-    paths.push({points:[[x,sh,0],left?hand(left,p):[x-h*.24,base+h*.4,0]],color:c});
-    paths.push({points:[[x,sh,0],right?hand(p,right):p.wave?[x+h*.22,base+h*.98,0]:[x+h*.24,base+h*.4,0]],color:c});
+// The family inside the growing heart: a man, a boy, a woman and a waving girl holding hands. Each is a filled
+// silhouette (face and hair, shoulders and arms, shirt or dress, legs, shoes) sampled on an even grid for exactly
+// `count` lights, rim first and a little brighter so the outlines read. Heart-local units (its centre is 24 up).
+function familyFigures(count){
+  const base=-3.1,skin=[1,.78,.6],shoe=[.85,.9,1];
+  const people=[{x:-4,h:6.7,shirt:cyan,legs:[.3,.45,1],hair:[.55,.75,1]},{x:-1.3,h:4.1,shirt:gold,legs:[1,.5,.12],hair:[1,.85,.4],shorts:true},
+    {x:1.55,h:6.2,shirt:pink,hair:[1,.45,.7],dress:true,long:true},{x:4.15,h:3.7,shirt:[1,.72,.88],hair:[1,.6,.8],dress:true,pigtails:true,wave:true}];
+  const near=(px,py,ax,ay,bx,by)=>{const dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy,t=l?clamp(((px-ax)*dx+(py-ay)*dy)/l):0;return Math.hypot(px-ax-t*dx,py-ay-t*dy);};
+  const inPoly=(x,y,pts)=>{let c=false;for(let i=0,j=pts.length-1;i<pts.length;j=i++){const [xi,yi]=pts[i],[xj,yj]=pts[j];if(yi>y!==yj>y&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;};
+  const parts=[],hand=(a,b)=>[(a.x+b.x)/2,base+Math.min(a.h,b.h)*.46];// in paint order: later parts cover earlier ones
+  people.forEach((p,who)=>{
+    const {x,h}=p,y=f=>base+h*f,r=h*(h<5?.125:.1),hy=y(.87),left=people[who-1],right=people[who+1];
+    const add=(color,test)=>parts.push({who,color,test}),capsule=(ax,ay,bx,by,w,color)=>add(color,(px,py)=>near(px,py,ax,ay,bx,by)<=w),disc=(cx,cy,rr)=>(px,py)=>(px-cx)**2+(py-cy)**2<=rr*rr;
+    if(p.long)add(p.hair,(px,py)=>disc(x,hy,r*1.25)(px,py)||Math.abs(px-x)<=r*1.18&&py<=hy&&py>=hy-r*1.9);// long hair behind the face
+    if(p.pigtails)for(const s of [-1,1])add(p.hair,disc(x+s*r*1.35,hy-r*.25,r*.5));
+    for(const s of [-1,1]){
+      if(p.dress)capsule(x+s*h*.05,y(.25),x+s*h*.055,y(.05),h*.03,skin);
+      else if(p.shorts){capsule(x+s*h*.05,y(.46),x+s*h*.06,y(.3),h*.055,p.legs);capsule(x+s*h*.06,y(.3),x+s*h*.065,y(.05),h*.035,skin);}
+      else capsule(x+s*h*.05,y(.46),x+s*h*.07,y(.05),h*.05,p.legs);
+      capsule(x+s*h*.07,y(.03),x+s*h*.12,y(.03),h*.03,shoe);
+    }
+    // Arms: sleeves from the shoulders to hands that meet the neighbours' hands; the girl waves.
+    for(const s of [-1,1]){
+      const next=s<0?left:right,wave=p.wave&&s>0&&!next,[ax,ay]=[x+s*h*.13,y(.74)];
+      const [bx,by]=next?(s<0?hand(next,p):hand(p,next)):wave?[x+h*.3,y(1)]:[x+s*h*.22,y(.42)],[ex,ey]=wave?[x+h*.27,y(.72)]:[(ax+bx)/2+s*h*.02,(ay+by)/2];
+      capsule(ax,ay,ex,ey,h*.038,p.shirt);capsule(ex,ey,bx,by,h*.032,wave?skin:p.shirt);add(skin,disc(bx,by,h*.042));
+    }
+    if(p.dress)add(p.shirt,(px,py)=>inPoly(px,py,[[x-h*.12,y(.765)],[x+h*.12,y(.765)],[x+h*.075,y(.56)],[x+h*.24,y(.22)],[x-h*.24,y(.22)],[x-h*.075,y(.56)]]));
+    else add(p.shirt,(px,py)=>inPoly(px,py,[[x-h*.15,y(.765)],[x+h*.15,y(.765)],[x+h*.11,y(.46)],[x-h*.11,y(.46)]]));
+    capsule(x-h*.13,y(.745),x+h*.13,y(.745),h*.03,p.shirt);capsule(x,y(.8),x,y(.76),h*.035,skin);// shoulders, neck
+    add(skin,disc(x,hy,r));add(p.hair,(px,py)=>disc(x,hy,r*(p.long?1.1:1.08))(px,py)&&py>=hy+r*(p.long?.45:.3));// face, hair on top
   });
-  return paths;
+  const at=(px,py)=>{let hit=null;for(const part of parts)if(part.test(px,py))hit=part;return hit;};
+  const grid=step=>{const points=[];for(let gy=base-.2;gy<=base+7.3;gy+=step)for(let gx=-6;gx<=6.4;gx+=step){const part=at(gx,gy);if(part)points.push({x:gx,y:gy,part});}return points;};
+  let lo=.01,hi=1.5;for(let k=0;k<22;k++){const mid=(lo+hi)/2;if(grid(mid).length>=count)lo=mid;else hi=mid;}
+  const points=grid(lo),step=lo;
+  for(const q of points)q.rim=[[step,0],[-step,0],[0,step],[0,-step]].some(([dx,dy])=>at(q.x+dx,q.y+dy)?.who!==q.part.who);
+  const rim=points.filter(q=>q.rim),inner=points.filter(q=>!q.rim),pick=(list,n)=>Array.from({length:n},(_,k)=>list[Math.floor(k*list.length/n)]);
+  const chosen=rim.length>=count?pick(rim,count):[...rim,...pick(inner,count-rim.length)];
+  return {positions:chosen.map(q=>[q.x,q.y,0]),colors:chosen.map(q=>q.part.color.map(v=>Math.min(1,q.rim?v*1.05+.08:v*.8)))};
 }
 function shapedFirework(kind,count,scale){
   const positions=[],colors=[],centres=[];
   // The heart keeps ~72% of the fleet for its contours; the rest draw the family inside it.
-  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?samplePaths(familyPaths(),count-outline):null;
+  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?familyFigures(count-outline):null;
   for(let i=0;i<count;i++){
     if(i>=outline){const p=family.positions[i-outline],centre=[0,24,0];colors.push([...family.colors[i-outline]]);centres.push(centre.map(v=>v*scale));positions.push(p.map((v,k)=>(centre[k]+v)*scale));continue;}
     let p,centre=[0,24,0];
@@ -366,11 +391,12 @@ export function frontView(show,aspect,fov=46,verticalOffset=0){
 const motionCache=new WeakMap();
 function motionFrame(s){
   let m=motionCache.get(s);if(m)return m;
-  const P=s.to.positions,extra=s.to.extra;let min=Infinity,max=-Infinity,z=0,n=0;
-  for(let i=0;i<P.length;i++)if(!extra?.[i]){min=Math.min(min,P[i][0]);max=Math.max(max,P[i][0]);}
+  const P=s.to.positions,extra=s.to.extra;let min=Infinity,max=-Infinity,bottom=Infinity,top=-Infinity,z=0,n=0;
+  for(let i=0;i<P.length;i++)if(!extra?.[i]){min=Math.min(min,P[i][0]);max=Math.max(max,P[i][0]);bottom=Math.min(bottom,P[i][1]);top=Math.max(top,P[i][1]);}
   const cx=(min+max)/2,L=Math.max(1e-6,max-min),hinge=.035*L;
   for(let i=0;i<P.length;i++)if(!extra?.[i]&&Math.abs(P[i][0]-cx)<hinge){z+=P[i][2];n++;}
-  m={max,cx,L,hinge,cz:n?z/n:0};motionCache.set(s,m);return m;
+  // Candle flames: the warm lights in the top 14%, above the candles (the sprinkles and the flame bases stay still).
+  m={max,cx,L,hinge,cz:n?z/n:0,top,flameBase:top-.14*(top-bottom)};motionCache.set(s,m);return m;
 }
 // Whale blows: the spout shoots up, sprays for a couple of seconds, fades, rests, and blows again.
 export function blowGlow(elapsed,u){const c=elapsed-.8,cycle=(c%4.6+4.6)%4.6;if(c<0)return 0;const front=Math.min(1,cycle/.7),glow=cycle<2.8?1:cycle<3.8?3.8-cycle:0;return u<=front?glow*(1-u)**.45:0;}
@@ -398,6 +424,13 @@ function moveDrone(s,m,i,elapsed,envelope,out){
       const w=clamp((m.max-P[o])/m.L),phase=elapsed*Math.PI*2*.8,bob=elapsed*Math.PI*2*.28;
       P[o+2]+=envelope*m.L*.06*w**1.6*Math.sin(phase-2.4*w);
       P[o+1]+=envelope*m.L*(.02*Math.sin(bob)+.014*(P[o]-m.cx)/m.L*Math.cos(bob));
+    }
+  }else if(s.motion==='candles'){// each candle flame dances and flickers on its own; the cake stays still
+    const c=s.to.colors[i];
+    if(P[o+1]>m.flameBase&&c[0]>.5&&c[2]<.4*c[0]){
+      const u=clamp((P[o+1]-m.flameBase)/Math.max(1e-6,m.top-m.flameBase)),flame=Math.round((P[o]-m.cx)/(m.L*.08));// lights of one flame share its phase
+      P[o]+=envelope*m.L*(.012*u*u*Math.sin(elapsed*6.3+flame*1.9)+.003*u*Math.sin(elapsed*17+i));P[o+1]+=envelope*m.L*.008*u*Math.sin(elapsed*9.1+flame*2.6);
+      const f=1-envelope*(.4-.4*Math.sin(elapsed*11+flame*2.3+i*.4)**2*(.7+.3*Math.sin(elapsed*2.7+flame)));for(let k=0;k<3;k++)out.colors[o+k]*=f;
     }
   }else if(s.motion==='balloons'){// each balloon sways on its own; the burner flames flicker
     const dx=P[o]-m.cx,group=dx<-.235*m.L?0:dx>.235*m.L?2:1,c=s.to.colors[i];

@@ -66,7 +66,7 @@ A formation holds up to 79 lines and 4,000 points; the designer says when it is 
 - Drag the cards to reorder them on desktop, or use **Earlier / Later** on any device.
 - **Display** is how long a finished shape stays; **Transition** is the flight into it. The timeline below shows the whole sequence, including takeoff and landing.
 - Choose **Fade in**, **Draw on in stroke order** or **Bottom to top**, and set the brightness. In a Demo-style show the drones blink red or blue in flight, and the shape lights up on arrival.
-- **Motion / effect** adds swimming (with waves or a spout), wing flaps, drifting balloons, a Starship rise, sparkle or falling fire.
+- **Motion / effect** adds swimming (with waves or a spout), wing flaps, drifting balloons, flickering candle flames, a Starship rise, sparkle or falling fire.
 - **Fit to stage** scales and centres the drawing.
 - Set the finale. **Play my show** performs takeoff → your formations → the finale → return and landing.
 
