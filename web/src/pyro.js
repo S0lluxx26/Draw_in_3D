@@ -36,6 +36,17 @@ export function pyroSchedule(show,origins,{scale=1}={}){
       ['crown','rings','heart','crown','rings'].forEach((p,i)=>fire(s.start+i*.9,k++,p,1.05,2.4));
     }else if(s.kind==='spin'){// the spinning star among stars, rings and a crown
       ['star','rings','crown','star'].forEach((p,i)=>fire(s.start-.6+i*.9,k++,p,1.05,2.4));
+    }else if(s.grows){// the tower grows among rising palms and crowns; a wall of shells when it stands complete
+      ['palm','crown','palm','crown','chrysanthemum'].forEach((p,i)=>fire(s.start-.6+i*.9,k++,p,1,2.2));
+      ['peony','ring','crossette','star','heart','rings'].forEach((p,i)=>fire(s.start+s.grows.time-1.4+i*.08,k++,p,1.1,3));
+    }else if(s.salute){// the ships salute the liner
+      ['peony','ring','palm','chrysanthemum','crown','rings','willow','heart'].forEach((p,i)=>fire(s.start+.4+i*1.5,k++,p,1,2.6));
+    }else if(s.fairy){// hearts, stars and showpieces for the princess
+      ['heart','star','chrysanthemum','heart','saturn','crown','star'].forEach((p,i)=>fire(s.start+.4+i*1.8,k++,p,1,2.4));
+    }else if(s.kind==='rise'){// balloons drift up among soft bursts; the Starship launches among crackling ones
+      (s.effect==='starship'?['crossette','strobe','palm']:['peony','ring','willow']).forEach((p,i)=>fire(s.start+.5+i*(s.end-s.start-3)/3,k++,p,.95,2));
+    }else if(s.kind==='hold'&&s.reveal&&!s.phrase){// every other formation is welcomed by a pair of shells
+      for(let i=0;i<2;i++)fire(s.start+.2+i*1.7,k++,PATTERNS[(k+i)%PATTERNS.length],.9,2);
     }else if(s.phrase){// every phrase of the sentence gets two showpiece shells
       // three shells a phrase: a showpiece as it forms, a classic, then a shaped shell
       fire(s.start-.8,k++,FINE[k%FINE.length],.95,2.2);fire(s.start+.5,k++,PATTERNS[k%PATTERNS.length],.9,2.8);fire(s.start+1.6,k++,SHAPES[k%SHAPES.length],1,2.4);

@@ -38,7 +38,7 @@ test('showpiece fireworks bloom around the heart and the sentence: colour-changi
   assert.ok(star(kiku,o=>data[o+24]===0&&data[o+15]>4).length>=50,'around a white pistil');
   assert.ok(star(crown,o=>data[o+20]===-2).length>=400,'the crown glitters');
   const ringColours=new Set(star(rings,()=>true).map(o=>[data[o+15],data[o+16],data[o+17]].map(v=>v.toFixed(2)).join()));assert.equal(ringColours.size,2,'two crossed rings, two colours');
-  assert.ok(data.length/PARTICLE_FLOATS<50000,'still within the particle budget');
+  assert.ok(data.length/PARTICLE_FLOATS<80000,'still within the particle budget');
   for(const s of demo.stages.filter(s=>s.phrase))assert.ok(at(s.start-1,s.end+2).length>=3,s.name+' gets three shells');
 });
 

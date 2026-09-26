@@ -13,7 +13,7 @@ test('Blender v2 formations decode to full fleets with bounded LED colours and a
     for(const c of [...body.colors,...fire.colors])assert.ok(c.length===3&&c.every(v=>v>=0&&v<=1));
     assert.ok(body.colors.some(c=>Math.max(...c)>.6),name+' has bright lights');
   }
-  assert.ok((await stat(new URL('../src/formation-assets.js',import.meta.url))).size<900*1024,'asset stays compact (12 formations)');
+  assert.ok((await stat(new URL('../src/formation-assets.js',import.meta.url))).size<1100*1024,'asset stays compact (12 formations, 5 phrases, the princess)');
 });
 test('every fleet-size prefix of a formation is evenly spread (farthest-point order)',()=>{
   for(const name of ['Robot','Eiffel Tower']){

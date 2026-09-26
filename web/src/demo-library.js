@@ -22,17 +22,27 @@ export function libraryFormation(assets,name,count,scale,fire=false){
   // an evenly spread prefix of its lights. Spout and waves are converted to world units here.
   const cue=libraryCue(name),asset=assets?.[name];if(!cue||!asset)throw new Error(`The Demo formation "${name}" is not available.`);
   // The whale has both: a spout (a tenth) and its sea (a twelfth).
-  const fireCount=fire?Math.floor(count/8):0,spoutCount=cue.spout?Math.floor(count/10):0,waveCount=cue.waves?Math.floor(count/(cue.spout?12:8)):0,extraCount=spoutCount+waveCount,bodyCount=count-fireCount-extraCount;
+  // A companion (the princess of the Row of fire) takes a share too: her body, her wings and her sparkle trail.
+  const comp=cue.companion&&assets[cue.companion],compWings=comp&&assets[cue.companion+' wings'],companion=comp?[Math.floor(count*.17),compWings?Math.floor(count*.1):0,Math.floor(count*.09)]:[0,0,0];
+  const fireCount=fire?Math.floor(count/8):0,spoutCount=cue.spout?Math.floor(count/10):0,waveCount=cue.waves?Math.floor(count/(cue.spout?12:8)):0,extraCount=spoutCount+waveCount,bodyCount=count-fireCount-extraCount-companion[0]-companion[1]-companion[2];
   const world=p=>[p[0]*scale,(p[1]+18)*scale,p[2]*scale];
   const spout=cue.spout&&{hole:world(cue.spout.hole),height:cue.spout.height*scale,spread:cue.spout.spread*scale};
   const waves=cue.waves&&{...cue.waves,unit:scale,wavelength:cue.waves.wavelength*scale,lines:cue.waves.lines.map(l=>({...l,y:(l.y+18)*scale,x0:l.x0*scale,x1:l.x1*scale,z:l.z*scale,amp:l.amp*scale}))};
   const drops=[...Array.from({length:spoutCount},(_,j)=>spoutDrop(j)),...Array.from({length:waveCount},(_,j)=>waveDrop(j,waveCount,cue.waves))];
-  const formation={positions:[...[...asset.body.positions.slice(0,bodyCount),...asset.fire.positions.slice(0,fireCount)].map(world),...drops.map(d=>d.kind==='spout'?spoutPoint(spout,d):wavePoint(waves,d))],
-    colors:[...asset.body.colors.slice(0,bodyCount),...asset.fire.colors.slice(0,fireCount),...drops.map(d=>d.kind==='spout'?[.46+.16*d.radius,.68,.9]:[.1,.5+.18*(d.line%2),1])],
-    fire:Array.from({length:count},(_,i)=>i>=bodyCount&&i<bodyCount+fireCount),...extraCount?{extra:Array.from({length:count},(_,i)=>drops[i-bodyCount-fireCount]??0)}:{}};
+  // The companion rests above the formation's centre (world units); her points are stored relative to it.
+  const k=scale*1.05,fairy=comp?{centre:world([0,15.6,3.4]),unit:scale,hinge:.3*k,back:-.5*k,wand:[1.98*k,4.62*k,.5*k]}:null,partner=[],partnerAt=[],partnerColor=[];// as tall as the flames, above them
+  if(comp){const add=(b,n,wing)=>{for(let j=0;j<n;j++){const p=b.positions[j],local=[p[0]*k,p[1]*k,p[2]*k];partner.push({kind:'fairy',local,wing});partnerAt.push(local.map((v,q)=>fairy.centre[q]+v));partnerColor.push([...b.colors[j]]);}};
+    add(comp.body,companion[0],false);if(compWings)add(compWings.body,companion[1],true);
+    const g=Math.PI*(3-Math.sqrt(5)),glints=[[1,.85,.4],[1,.5,.8],[1,1,1],[.5,.9,1]];
+    for(let j=0;j<companion[2];j++){const y=1-2*(j+.5)/companion[2],r=Math.sqrt(1-y*y),a=j*g;partner.push({kind:'trail',lag:(j+.5)/companion[2],dir:[Math.cos(a)*r,y,Math.sin(a)*r]});
+      const ring=2*Math.PI*j/companion[2];partnerAt.push([fairy.centre[0]+Math.cos(ring)*6*k,fairy.centre[1]+Math.sin(ring)*6*k,fairy.centre[2]]);partnerColor.push(glints[j%4]);}}// at rest, a halo of sparkles around her
+  const formation={positions:[...[...asset.body.positions.slice(0,bodyCount),...asset.fire.positions.slice(0,fireCount)].map(world),...drops.map(d=>d.kind==='spout'?spoutPoint(spout,d):wavePoint(waves,d)),...partnerAt],
+    colors:[...asset.body.colors.slice(0,bodyCount),...asset.fire.colors.slice(0,fireCount),...drops.map(d=>d.kind==='spout'?[.46+.16*d.radius,.68,.9]:[.1,.5+.18*(d.line%2),1]),...partnerColor],
+    fire:Array.from({length:count},(_,i)=>i>=bodyCount&&i<bodyCount+fireCount),...extraCount||partner.length?{extra:[...Array(bodyCount+fireCount).fill(0),...drops,...partner]}:{}};
   // Its sentence, if it has one: every phrase uses the whole fleet (no fire, no water).
   const phrases=(cue.prelude||[]).filter(label=>assets[label]).map(label=>{const b=assets[label].body;return {label,formation:{positions:b.positions.slice(0,count).map(world),colors:b.colors.slice(0,count).map(c=>[...c])}};});
-  return {formation,fireEnabled:fireCount>0,pyro:cue.pyro,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none',motion:MOTIONS.includes(cue.effect)?cue.effect:undefined,spout,waves,...(phrases.length?{phrases}:{})};
+  return {formation,fireEnabled:fireCount>0,pyro:cue.pyro,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none',motion:cue.motion??(MOTIONS.includes(cue.effect)?cue.effect:undefined),spout,waves,
+    ...(phrases.length?{phrases}:{}),...(fairy?{fairy}:{}),...(cue.salute?{salute:true}:{}),...(cue.grows?{grows:true}:{})};
 }
 // Drawings with the whale or fish swim get the same water as the Demo formations: a spout from the top of the
 // drawing's front (the whale's head faces +x) or rolling waves above it. `positions` are world points of the

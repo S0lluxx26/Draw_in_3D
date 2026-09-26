@@ -337,6 +337,16 @@ def ship():
             wake.path([(x, -8.6 - off + .25 * math.sin(x * 1.3 + off * 3 + (s > 0)), s * (3.4 + off)) for x in np.linspace(-14.5, 14.5, 60)], .1)
     wake.finish('Wake', 'cyan')
     exhaust([-9, -5, 0, 5, 9], -8.6, 0, 3.0, .5)
+    # Two smaller ships sail alongside the liner: scaled copies, a little in front, with recoloured hulls.
+    liner = list(collection.objects)
+    for tag, offset, k, order in ((' port', (-19.5, -4.4, 5.0), .42, (2, 0, 1)), (' starboard', (19.5, -4.2, 4.2), .4, (1, 2, 0))):
+        T = Matrix.Translation(Vector(offset)) @ Matrix.Scale(k, 4)
+        for o in liner:
+            c = o.copy(); c.data = o.data.copy(); c.name = o.name + tag; c.matrix_world = APP_TO_BLENDER @ T
+            if o.name.startswith('Hull') and c.data.color_attributes.get('LED'):
+                for d in c.data.color_attributes['LED'].data:
+                    col = tuple(d.color); d.color = (col[order[0]], col[order[1]], col[order[2]], col[3])
+            collection.objects.link(c)
 
 def star():
     part = Part(lambda p: ramp([(0, (1, .55, .08)), (4.5, (1, .78, .25)), (10.2, (1, .98, .88))], math.hypot(p.x, p.y)))
@@ -517,13 +527,15 @@ def whale():
     print('Whale blowhole (app units):', tuple(round(v, 3) for v in hole), flush=True)
     exhaust([-5, -1, 3], -4.6, .3, 2.8, .45)
 
-BALLOONS = [  # (x, y, z, scale, gore colours): one big balloon between two smaller ones
+BALLOONS = [  # (x, y, z, scale, gore colours): a big balloon, two medium ones beside it and two small ones outside
     (0.0, 0.0, 0.0, .92, [(1, .15, .35), (1, .72, .1), (.1, .8, 1), (1, 1, 1), (1, .38, .08), (.25, .35, 1)]),
-    (-10.6, 3.2, -2.0, .55, [(1, .2, .55), (1, 1, 1), (1, .5, .8), (1, .85, .3), (.95, .3, .6), (1, 1, 1)]),
-    (10.6, -2.4, -1.5, .55, [(.2, .5, 1), (1, .8, .2), (.1, .85, .8), (1, 1, 1), (.3, .35, 1), (1, .6, .1)])]
+    (-11.8, 3.2, -2.0, .6, [(1, .2, .55), (1, 1, 1), (1, .5, .8), (1, .85, .3), (.95, .3, .6), (1, 1, 1)]),
+    (11.8, -2.4, -1.5, .6, [(.2, .5, 1), (1, .8, .2), (.1, .85, .8), (1, 1, 1), (.3, .35, 1), (1, .6, .1)]),
+    (-21.0, -3.4, -3.5, .42, [(.3, 1, .45), (1, 1, 1), (1, .9, .2), (.2, .7, .35), (1, 1, 1), (1, .55, .1)]),
+    (21.0, 4.2, -3.0, .42, [(.75, .35, 1), (1, .85, .95), (.45, .2, .9), (1, 1, 1), (1, .4, .75), (.6, .5, 1)])]
 
 def balloon():
-    """Three striped hot air balloons (one big, two small), each with load tapes, basket, ropes and a burner flame.
+    """Five striped hot air balloons (one big, two medium, two small), each with load tapes, basket, ropes and a burner flame.
     The web app lifts them gently during their display and flickers the flames."""
     profile = [(-3.2, 1.1), (-2, 2.6), (0, 4.6), (2, 6.0), (4, 6.6), (6, 6.3), (7.5, 5.4), (8.7, 4.0), (9.6, 2.2), (10, .02)]
     for n, (ox, oy, oz, k, gores) in enumerate(BALLOONS):
@@ -639,6 +651,36 @@ def phrase(lines, stops):
             v.co = Vector(((v.co.x - cx) * k, (v.co.y - cy) * k + y_centre, v.co.z * 1.2))  # shallow: the faces, not the sides, carry the lights
         bmesh.ops.triangulate(bm, faces=bm.faces)
         part = Part(colour); part.merge(bm); part.finish(text, 'gold', smooth=False)
+
+def princess():
+    """A fairy princess for the Row of fire scene: gown, tiara, long hair, a star wand and two pairs of butterfly wings.
+    The web app flies her around the fire, flapping her wings and trailing sparkles from the wand."""
+    gown = Part(lambda p: ramp([(-5.2, (.72, .4, 1)), (-2.5, (1, .45, .8)), (0, (1, .58, .84))], p.y))
+    gown.lathe([(0, 0, 0), (0, -1.2, 0), (0, -2.8, 0), (0, -4.2, 0), (0, -5.2, 0)], [.42, .75, 1.35, 2.0, 2.35], 32); gown.finish('Gown', 'pink')
+    trim = Part((1, .86, .38)); trim.path([(math.cos(a) * 2.38, -5.15, math.sin(a) * 2.38) for a in np.linspace(0, 2 * math.pi, 48, endpoint=False)], .09, 6, closed=True); trim.finish('Gown trim', 'gold')
+    bodice = Part((1, .42, .72)); bodice.lathe([(0, -.1, 0), (0, .8, 0), (0, 1.55, 0)], [.45, .4, .52], 24); bodice.finish('Bodice', 'pink')
+    skin = (1, .8, .66)
+    head = Part(skin); head.sphere((0, 2.35, .05), .55, 20, 12); head.finish('Face', 'white', density=1.8)
+    neck = Part(skin); neck.tube((0, 1.5, 0), (0, 1.9, 0), .16, .16, 10); neck.finish('Neck', 'white')
+    hair = Part((1, .8, .35)); hair.sphere((0, 2.5, -.12), (.62, .6, .55), 20, 12); hair.lathe([(0, 2.3, -.35), (0, .9, -.4), (0, -.2, -.35)], [.62, .7, .45], 18); hair.finish('Hair', 'gold')
+    tiara = Part((1, .9, .45))
+    for j in range(5):
+        a = (j - 2) * .34
+        tiara.tube((math.sin(a) * .5, 2.82, math.cos(a) * .3), (math.sin(a) * .52, 3.1 + (.25 if j == 2 else .1), math.cos(a) * .32), .05, .02, 6)
+    tiara.path([(math.sin(a) * .52, 2.84, math.cos(a) * .32) for a in np.linspace(-.8, .8, 12)], .05, 6); tiara.finish('Tiara', 'gold', density=2.0)
+    arms = Part(skin)
+    arms.tube((-.5, 1.4, 0), (-1.1, .5, .3), .13, .1, 8); arms.tube((-1.1, .5, .3), (-1.5, -.3, .5), .1, .09, 8)
+    arms.tube((.5, 1.4, 0), (1.2, 2.2, .3), .13, .1, 8); arms.tube((1.2, 2.2, .3), (1.6, 3.2, .4), .1, .09, 8); arms.finish('Arms', 'white')
+    wand = Part((1, .95, .7)); wand.tube((1.62, 3.15, .42), (1.95, 4.3, .5), .05, .04, 6); wand.finish('Wand', 'gold')
+    tip = Part((1, .96, .55)); tip.prism([(1.98 + math.cos(math.pi / 2 + j * math.pi / 5) * (.5 if j % 2 == 0 else .2), 4.62 + math.sin(math.pi / 2 + j * math.pi / 5) * (.5 if j % 2 == 0 else .2)) for j in range(10)], .38, .62); tip.finish('Wand star', 'gold', density=2.0)
+def princess_wings():
+    """Her two pairs of butterfly wings, a separate asset so the web app can flap them."""
+    wings = lambda p: ramp([(0, (.55, .95, 1)), (2.5, (.78, .72, 1)), (4.6, (1, .62, .9))], abs(p.x))
+    for s in (-1, 1):
+        fin('Upper wing', (s * .25, 1.2, -.5), [(s * 1.2, 3.6, -.6), (s * 2.9, 4.6, -.7), (s * 4.3, 4.0, -.8), (s * 4.5, 2.4, -.8), (s * 3.0, 1.2, -.7), (s * 1.0, .9, -.6)], wings, 'cyan', .05)
+        fin('Lower wing', (s * .25, .6, -.5), [(s * .9, .3, -.6), (s * 2.6, -.2, -.7), (s * 3.5, -1.6, -.75), (s * 2.4, -2.6, -.7), (s * .9, -1.4, -.6)], wings, 'cyan', .05)
+
+COMPANIONS = [('Princess', princess), ('Princess wings', princess_wings)]  # extra figures a Demo formation brings along (body only)
 
 BUILDERS = {'Robot': robot, 'Fish': fish, 'Butterfly': butterfly, 'Hot air balloon': balloon, 'Eiffel Tower': tower, 'Big ship': ship, 'Whale': whale,
             'Firework star': star, 'Row of fire': fire_row, 'Birthday cake': cake, 'Starship launch': starship, 'Happy day': happy_day}
@@ -787,6 +829,16 @@ for i, (label, lines, stops) in enumerate(PHRASES):  # body only: the phrases ca
         phrase(lines, stops)
     bpy.context.view_layer.update()
     encoded[label] = {'body': encode(*sample(list(collection.all_objects), BODY, 300 + i))}
+    print('Exported', label, flush=True)
+for i, (label, build) in enumerate(COMPANIONS):
+    if EXPORT_ONLY:
+        collection = bpy.data.collections[label]
+    else:
+        collection = bpy.data.collections.new(label)
+        bpy.context.scene.collection.children.link(collection)
+        build()
+    bpy.context.view_layer.update()
+    encoded[label] = {'body': encode(*sample(list(collection.all_objects), BODY, 400 + i))}
     print('Exported', label, flush=True)
 if not EXPORT_ONLY:
     (ROOT / 'assets').mkdir(exist_ok=True)

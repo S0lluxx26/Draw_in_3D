@@ -31,9 +31,11 @@ export function showKeyframes(show){
   const keyframes=[grounded(stages[0])?{...close}:frame(box(stages[0].from.positions),1)];
   stages.forEach((s,i)=>{
     const next=stages[i+1];let b;
-    if(s.kind==='move'&&(next?.kind==='grow'||next?.kind==='burst'))b=box(next.to.positions);// frame where the firework will open
+    if(s.kind==='move'&&(next?.kind==='grow'||next?.kind==='burst'||next?.grows))b=box(next.to.positions);// frame where it will open or grow// frame where the firework will open
     else if(['fall','rise','burst'].includes(s.kind))b=box(s.from.positions,s.to.positions);
     else b=box(s.to.positions);
+    const turning=s.kind==='hold'&&s.turn&&!s.turn.spin?s:s.kind==='move'&&next?.grows&&next.turn?next:null;// room for a growing formation to turn
+    if(turning){const r=Math.hypot(b.half[0],b.half[2]);b={...b,half:[r,b.half[1],b.half[2]]};}
     if(grounded(s)&&(i===0||i===stages.length-1)){keyframes.push({...close});return;}
     if(finale&&(s.kind==='landing'||next?.kind==='landing')){keyframes.push({...harbour});return;}
     // A sentence holds one steady frame, the one its closing formation needs, so the words change in place.
@@ -41,7 +43,9 @@ export function showKeyframes(show){
     keyframes.push(frame(b,b.top<=hoverTop*1.05+1e-6?1:0));
   });
   // Never zoom in on tiny intermediate shapes more than the show's typical formation allows.
-  const reference=Math.max(...keyframes.filter(k=>!k.ground).map(k=>Math.max(k.half[0],k.half[1])),...keyframes.filter(k=>!k.close&&!k.wide).map(k=>k.half[0]*.5),1e-3);
+  // A typical formation's size (70th percentile, so a few very wide scenes such as five balloons don't shrink the rest).
+  const typical=values=>{const v=[...values].sort((a,b)=>a-b);return v.length?v[Math.min(v.length-1,Math.floor(v.length*.7))]:0;};
+  const reference=Math.max(typical(keyframes.filter(k=>!k.ground).map(k=>Math.max(k.half[0],k.half[1]))),typical(keyframes.filter(k=>!k.close&&!k.wide).map(k=>k.half[0]*.5)),1e-3);
   for(const k of keyframes){if(k.close||k.wide)continue;const size=Math.max(k.half[0],k.half[1]);if(size<reference*.45){const f=reference*.45/Math.max(size,1e-6);k.half=k.half.map((v,j)=>j<2?v*f:v);}}
   cache.set(show,keyframes);return keyframes;
 }

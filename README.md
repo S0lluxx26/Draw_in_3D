@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 23: fireworks all through the show, a growing Eiffel Tower, five balloons, a flying princess
+
+![Five hot air balloons; the Eiffel Tower growing; the liner with its two escorts; the princess flying over the waving row of fire](docs/media/studio23-scenes.jpg)
+
+**Ship fireworks now burst through the whole show**, 143 shells in all, with every formation getting its own. The **Eiffel Tower grows** like the heart: it rises from its foot with a glowing band at the growing edge and fireworks around it, then turns. There are **five hot air balloons**, the **big ship sails with two smaller escorts** and a firework salute, and the **row of fire waves** while a **winged fairy princess** flies around it, spraying sparkles from her wand among hearts and stars. [Details and checks](docs/STUDIO23.md).
+
 ## Studio 22: a whale that swims and blows, a spinning 3D star, readable words
 
 ![The whale surfacing and blowing, then diving under its sea; TODAY IS A GIFT in thinner letters; the 3D star mid-turn](docs/media/studio22-whale-star.jpg)

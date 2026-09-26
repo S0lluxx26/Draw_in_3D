@@ -19,7 +19,7 @@ test('ship fireworks are deterministic, launch from the ships and burst during H
 });
 test('particles follow finite ballistic paths: comets rise to the burst, stars spread and fall away',()=>{
   const shells=pyroSchedule(demo,ships),data=pyroParticles(shells),n=data.length/PARTICLE_FLOATS;
-  assert.equal(n%1,0);assert.ok(n>5000&&n<50000,'bounded particle budget: '+n);// the sentence's showpieces included
+  assert.equal(n%1,0);assert.ok(n>5000&&n<80000,'bounded particle budget: '+n);// fireworks all through the show
   const shell=shells[0],burstTime=shell.t0+shell.delay;
   // Find this shell's comet head and one star.
   let comet=-1,star=-1;for(let i=0;i<n;i++){if(data[i*PARTICLE_FLOATS]!==Math.fround(shell.t0))continue;/* the buffer is float32 */const type=data[i*PARTICLE_FLOATS+11],lag=data[i*PARTICLE_FLOATS+12];if(type===0&&lag===0&&comet<0)comet=i;if(type===1&&lag===0&&star<0)star=i;}

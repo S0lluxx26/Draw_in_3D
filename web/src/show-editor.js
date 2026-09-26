@@ -201,8 +201,8 @@ export class ShowEditor{
     if(c.library&&!this.assets){this.loadAssets();return {formation:null,note:`${c.name} · Demo formation · loading…`};}
     try{
       if(this.doc.version===3){
-        const played=cueSequence(this.doc,c,this.assets),f=played.formation,kind=k=>f.extra?.filter(d=>d?.kind===k).length||0,spout=kind('spout'),sea=kind('wave'),fire=f.fire?.filter(Boolean).length||0;
-        const parts=[`${(this.doc.count-spout-sea-fire).toLocaleString()} lights`,spout&&`${spout.toLocaleString()} in the spout`,sea&&`${sea.toLocaleString()} in the ${spout?'sea':'waves'}`,fire&&`${fire.toLocaleString()} falling fire`].filter(Boolean).join(' · ');
+        const played=cueSequence(this.doc,c,this.assets),f=played.formation,kind=k=>f.extra?.filter(d=>d?.kind===k).length||0,spout=kind('spout'),sea=kind('wave'),princess=kind('fairy')+kind('trail'),fire=f.fire?.filter(Boolean).length||0;
+        const parts=[`${(this.doc.count-spout-sea-fire-princess).toLocaleString()} lights`,spout&&`${spout.toLocaleString()} in the spout`,sea&&`${sea.toLocaleString()} in the ${spout?'sea':'waves'}`,princess&&`${princess.toLocaleString()} for the flying princess`,fire&&`${fire.toLocaleString()} falling fire`].filter(Boolean).join(' · ');
         const formation={positions:f.positions.map(p=>p.map(v=>v/unit)),colors:f.colors};
         return {formation,note:c.library?`${c.name} · Demo formation · Blender 3D · ${parts}${played.phrases?` · after a ${played.phrases.length}-phrase sentence`:''}`:`${c.name} · ${parts}${this.spacing(c,unit)}`};
       }
