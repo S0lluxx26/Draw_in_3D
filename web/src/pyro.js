@@ -34,8 +34,11 @@ export function pyroSchedule(show,origins,{scale=1}={}){
       ['heart','chrysanthemum','heart','chrysanthemum'].forEach((p,i)=>fire(s.start+.2+i*1.15,k++,p,1,2));
     }else if(s.kind==='beat'){// while it beats: crowns, rings and hearts all around it
       ['crown','rings','heart','crown','rings'].forEach((p,i)=>fire(s.start+i*.9,k++,p,1.05,2.4));
+    }else if(s.kind==='spin'){// the spinning star among stars, rings and a crown
+      ['star','rings','crown','star'].forEach((p,i)=>fire(s.start-.6+i*.9,k++,p,1.05,2.4));
     }else if(s.phrase){// every phrase of the sentence gets two showpiece shells
-      fire(s.start-.8,k++,FINE[k%FINE.length],.95,2);
+      // three shells a phrase: a showpiece as it forms, a classic, then a shaped shell
+      fire(s.start-.8,k++,FINE[k%FINE.length],.95,2.2);fire(s.start+.5,k++,PATTERNS[k%PATTERNS.length],.9,2.8);fire(s.start+1.6,k++,SHAPES[k%SHAPES.length],1,2.4);
     }else if(s.kind==='grow'||s.kind==='burst'){
       for(let i=0;i<3;i++)fire(s.start+.4+i*length/3.4,k++,PATTERNS[(i*2+k)%PATTERNS.length],.95);
     }

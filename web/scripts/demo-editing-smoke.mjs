@@ -39,8 +39,8 @@ try{
   await page.waitForFunction(()=>document.querySelector('#show-loading').hidden,null,{timeout:90000});
   await page.locator('#show-cues').getByRole('button',{name:'Whale',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#show-phase').textContent==='Whale');
   await page.screenshot({path:path.join(out,'demo-editing-played.png')});
-  // 419 s Demo − Robot (22 s) + 2 s longer Whale + another Butterfly (22 s) = 421 s.
-  const total=await page.locator('#show-time').textContent();assert.match(total,/\/ 07:01$/,'the edited show length: '+total);
+  // 423 s Demo − Robot (22 s) + 2 s longer Whale + another Butterfly (22 s) = 425 s.
+  const total=await page.locator('#show-time').textContent();assert.match(total,/\/ 07:05$/,'the edited show length: '+total);
   await page.locator('#show-exit').click();await page.locator('#author-dialog').waitFor({state:'visible'});
   assert.deepEqual(errors,[]);
   console.log('PASS: Edit demo opens the 3D Demo; remove, retime, fire, add a Demo formation and look edits; save; new show; reopen; Play my show performs the edited Demo; no browser errors.');

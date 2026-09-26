@@ -107,6 +107,9 @@ function whale(){return [
 ];}
 // Water spout from the Blender whale's blowhole (tools/blender/build_formations.py whale_blowhole), in formation units.
 export const WHALE_SPOUT={hole:[7.4,1.538,0],height:9,spread:3.1};
+// The sea the whale swims through: two rolling lines just below its blowhole, so each stroke carries the blowhole
+// out of the water (and the whale blows) and each dive takes most of the body under (formation units).
+export const WHALE_SEA={lines:[{y:.8,x0:-17,x1:15,z:1.4,amp:.34,phase:0},{y:.15,x0:-15,x1:13,z:-1.6,amp:.26,phase:2.1}],wavelength:6,speed:.5};
 // The sea surface above the swimming fish: three rolling swells, clear of its bubbles, in formation units
 // (waves travel toward the tail). Swells below it would sit on the skyline, since the camera looks up at formations.
 export const FISH_WAVES={lines:[{y:8.6,x0:-12.5,x1:5.5,z:.6,amp:.42,phase:3.1},{y:10.6,x0:-11,x1:11,z:0,amp:.5,phase:0},{y:12.4,x0:-7,x1:7,z:-.6,amp:.34,phase:1.7}],wavelength:7,speed:.45};
@@ -124,7 +127,7 @@ export function waveGlow(waves,d,t){return .3+.7*Math.max(0,Math.sin(swell(waves
 // burners, and the whale swims and blows (see sampleShow).
 export const MOTIONS=['flap','swim','fish','balloons','candles'];
 // Displays last about 12 s so each formation has time to be admired; the finale lingers longer.
-export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15,effect:'candles'},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:16,effect:'sparkle',pyro:true,prelude:HAPPY_PHRASES}];
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT,waves:WHALE_SEA},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15,effect:'candles'},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:16,effect:'sparkle',pyro:true,prelude:HAPPY_PHRASES}];
 // Happy day grows out of a sentence, one 3D phrase at a time (Blender assets of these names), each morphing into the next:
 // 'Yesterday is history, tomorrow is a mystery, today is a gift - that's why it's called the present.'
 export const HAPPY_PHRASES=Object.freeze(['Yesterday is history','Tomorrow is a mystery','Today is a gift',"That's why it's called",'the present']);
@@ -337,12 +340,35 @@ function heartShell(n){
     colors.push(edge?[1,.82,.4]:base.map((v,k)=>Math.min(1,v*light+[1,.72,.42][k]*rim)).map(v=>p[2]<0&&w<1?v*.45:v));}// dim behind the family
   return {positions,colors};
 }
+// Farthest-point sampling: each next light as far as possible from those already chosen (points: {p}).
+function farthest(points,n){
+  const N=points.length,dist=new Float64Array(N).fill(Infinity),chosen=[];let next=0;
+  for(let c=0;c<n&&c<N;c++){chosen.push(next);const q=points[next].p;let best=-1,far=-1;
+    for(let j=0;j<N;j++){const o=points[j].p,d=(o[0]-q[0])**2+(o[1]-q[1])**2+(o[2]-q[2])**2;if(d<dist[j])dist[j]=d;if(dist[j]>far){far=dist[j];best=j;}}next=best;}
+  return chosen;
+}
+// The five-point star as a faceted 3D solid: ten points in a plane with a front and a back peak, evenly sampled,
+// gold with facet shading and bright ridges, so it glitters as it spins. Same size as the earlier flat star.
+export const STAR_SPIN=4;// seconds the grown star spins before it falls
+function starSolid(n){
+  const R=11,r=4.8,depth=3.6,v=Array.from({length:10},(_,j)=>{const a=Math.PI/2+j*Math.PI/5,k=j%2?r:R;return [Math.cos(a)*k,Math.sin(a)*k,0];});
+  const sub=(a,b)=>a.map((x,k)=>x-b[k]),cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]],len=a=>Math.hypot(...a);
+  const tris=[];for(let j=0;j<10;j++){tris.push([[0,0,depth],v[j],v[(j+1)%10]]);tris.push([[0,0,-depth],v[(j+1)%10],v[j]]);}
+  const areas=tris.map(t=>len(cross(sub(t[1],t[0]),sub(t[2],t[0])))/2),total=areas.reduce((a,b)=>a+b,0),m=n*3,points=[];
+  const halton=(i,b)=>{let f=1,x=0;while(i>0){f/=b;x+=f*(i%b);i=Math.floor(i/b);}return x;};let h=1;
+  tris.forEach((t,ti)=>{const nrm=cross(sub(t[1],t[0]),sub(t[2],t[0])),l=len(nrm)||1,normal=nrm.map(x=>x/l),k=Math.max(1,Math.round(m*areas[ti]/total));
+    for(let c=0;c<k;c++,h++){const a=Math.sqrt(halton(h,2)),b=halton(h,3);points.push({p:t[0].map((x,q)=>x*(1-a)+t[1][q]*a*(1-b)+t[2][q]*a*b),normal});}});
+  const spacing=Math.sqrt(total/n),ridge=(a,b)=>{const k=Math.max(2,Math.round(len(sub(b,a))/(spacing*.6)));for(let c=0;c<=k;c++)points.push({p:a.map((x,q)=>x+(b[q]-x)*c/k),ridge:true});};
+  for(let j=0;j<10;j++){ridge(v[j],v[(j+1)%10]);if(j%2===0){ridge([0,0,depth],v[j]);ridge([0,0,-depth],v[j]);}}
+  const chosen=farthest(points,n),L=[-.45,.55,.7].map(x=>x/Math.hypot(-.45,.55,.7));
+  return {positions:chosen.map(c=>points[c].p),colors:chosen.map(c=>{const q=points[c];if(q.ridge)return [1,.95,.72];const shade=.4+.6*Math.max(0,q.normal[0]*L[0]+q.normal[1]*L[1]+q.normal[2]*L[2]);return [1*shade,.78*shade,.28*shade];})};
+}
 function shapedFirework(kind,count,scale){
   const positions=[],colors=[],centres=[];
   // The heart keeps ~72% of the fleet for its contours; the rest draw the family inside it.
-  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?familyFigures(count-outline):null,shell=kind==='heart'?heartShell(outline):null,turn=[];
+  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?familyFigures(count-outline):null,shell=kind==='heart'?heartShell(outline):kind==='star'?starSolid(count):null,turn=[];
   for(let i=0;i<count;i++){
-    turn.push(kind==='heart'&&i<outline);// the shell turns and beats; the family stands still in its window
+    turn.push(kind==='star'||kind==='heart'&&i<outline);// the shell turns and beats (the family stands still); the star spins
     if(i>=outline){const p=family.positions[i-outline],centre=[0,24,0];colors.push([...family.colors[i-outline]]);centres.push(centre.map(v=>v*scale));positions.push(p.map((v,k)=>(centre[k]+v)*scale));continue;}
     if(shell){const centre=[0,24,0];colors.push(shell.colors[i]);centres.push(centre.map(v=>v*scale));positions.push(shell.positions[i].map((v,k)=>(centre[k]+v)*scale));continue;}
     let p,centre=[0,24,0];
@@ -359,7 +385,7 @@ function shapedFirework(kind,count,scale){
     }
     centres.push(centre.map(v=>v*scale));positions.push(p.map((v,k)=>(centre[k]+v)*scale));
   }
-  return {positions,colors,centres,...(kind==='heart'?{turn}:{})};
+  return {positions,colors,centres,...(kind==='heart'||kind==='star'?{turn}:{})};
 }
 // Return, descent and rest on the pads for the Demo and shows edited from it (seconds).
 export const CINEMATIC_LANDING=Object.freeze([9,20,8]);
@@ -381,8 +407,9 @@ export function buildShow(custom,options={}){
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
   const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths,count)})));
   for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled,pyro,motion=MOTIONS.includes(effect)?effect:undefined,spout,waves,phrases} of sequence){
-    if(phrases?.length){// a sentence first: each phrase holds, then morphs (lights on) into the next, and the last into the formation
-      const natural=phrases.length*(PHRASE_TIMING.hold+PHRASE_TIMING.morph),k=Math.min(1,Math.max(0,hold-6)/natural),final=hold-natural*k;
+    const natural=(phrases?.length||0)*(PHRASE_TIMING.hold+PHRASE_TIMING.morph);
+    if(natural&&hold>=6+natural*.5){// a sentence first: each phrase holds, then morphs (lights on) into the next, and the last into the formation
+      const k=Math.min(1,(hold-6)/natural),final=hold-natural*k;// a shorter display shortens the phrases; too short, and HAPPY DAY plays alone
       phrases.forEach((p,j)=>{const target=matchFormation(previous.positions,p.formation);
         if(j)add(p.label+' · forming','move',PHRASE_TIMING.morph*k,target,{morph:true,within:true});else add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});
         cues.push({label:p.label,time:cursor+.2});add(p.label,'hold',PHRASE_TIMING.hold*k,target,{reveal:!j,light,phrase:true,motionScale:options.motionScale});});
@@ -406,9 +433,11 @@ export function buildShow(custom,options={}){
       add('Launching '+name.toLowerCase(),'move',9,seeds,{transitionLights:options.transitionLights});
       const expanded={positions:indices.map(i=>shape.positions[i]),colors:indices.map(i=>shape.colors[i]),...(shape.turn?{turn:indices.map(i=>shape.turn[i])}:{})};
       // The 3D heart turns gently while it grows and beats, then falls; star and balls fall straight away.
-      const beat=kind==='heart'?HEART_BEAT:0,turn=beat?{start:cursor,period:6+beat,angle:.3,pivot:[0,24*(options.motionScale??1),0]}:null;
-      cues.push({label:name,time:cursor+4.5});add(name,'grow',6,expanded,turn?{heart:true,turn}:{});
+      const beat=kind==='heart'?HEART_BEAT:0,spin=kind==='star'?STAR_SPIN:0,pivot=[0,24*(options.motionScale??1),0];
+      const turn=beat?{start:cursor,period:6+beat,angle:.3,pivot}:spin?{start:cursor,period:6+spin,spin:true,pivot}:null;
+      cues.push({label:name,time:cursor+4.5});add(name,'grow',6,expanded,turn?{...(beat?{heart:true}:{star:true}),turn}:{});
       if(beat)add('Beating heart','beat',beat,expanded,{turn});
+      if(spin)add('Spinning star','spin',spin,expanded,{turn});// one whole smooth turn from growing to here, so it falls from where it grew
       const fallen={positions:expanded.positions.map((p,i)=>[p[0]+Math.sin(i*2.4)*.7*(options.motionScale??1),p[1]-7*(options.motionScale??1),p[2]]),colors:dark()};
       add(name+' · falling sparks','fall',7,fallen);
     }
@@ -447,6 +476,22 @@ export function frontView(show,aspect,fov=46,verticalOffset=0){
 }
 // Formation motion during a hold. Bounds come from the formation itself, so authored shows work too.
 const motionCache=new WeakMap();
+// The whale's stroke at this moment (once per frame): a 6 s rise and dive, nose up while rising, eased in and out by
+// the envelope. With a sea, the spout blows from the moment the blowhole surfaces until it dives again.
+const swimCache=new WeakMap();
+function swimPose(s,m,elapsed,envelope){
+  const cached=swimCache.get(s);if(cached&&cached.at===elapsed&&cached.envelope===envelope)return cached;
+  const period=6,A=.085*m.L,pose=t=>{const a=2*Math.PI*t/period;return [.1*Math.cos(a)*envelope,A*Math.sin(a)*envelope];};
+  const [theta,dy]=pose(elapsed),c=Math.cos(theta),sn=Math.sin(theta),apply=([x,y,z])=>[m.cx+(x-m.cx)*c-(y-m.cy)*sn,m.cy+(x-m.cx)*sn+(y-m.cy)*c+dy,z];
+  const sea=s.waves?s.waves.lines[0].y:undefined;let blow;
+  if(sea===undefined||!s.spout)blow=u=>.06+.94*blowGlow(elapsed,u);// no sea: it blows on a timer
+  else{
+    const [hx,hy]=s.spout.hole,above=t=>{const [th,d]=pose(t);return m.cy+(hx-m.cx)*Math.sin(th)+(hy-m.cy)*Math.cos(th)+d-sea;},now=above(elapsed);
+    let since=0;if(now>0)while(since<period&&above(elapsed-since-.05)>0)since+=.05;
+    const front=Math.min(1,since/.7),fade=clamp(now/(.02*m.L));blow=u=>now>0&&u<=front?fade*(1-u)**.45:0;
+  }
+  const result={at:elapsed,envelope,apply,blow,sea};swimCache.set(s,result);return result;
+}
 function motionFrame(s){
   let m=motionCache.get(s);if(m)return m;
   const P=s.to.positions,extra=s.to.extra;let min=Infinity,max=-Infinity,bottom=Infinity,top=-Infinity,z=0,n=0;
@@ -454,7 +499,7 @@ function motionFrame(s){
   const cx=(min+max)/2,L=Math.max(1e-6,max-min),hinge=.035*L;
   for(let i=0;i<P.length;i++)if(!extra?.[i]&&Math.abs(P[i][0]-cx)<hinge){z+=P[i][2];n++;}
   // Candle flames: the warm lights in the top 14%, above the candles (the sprinkles and the flame bases stay still).
-  m={max,cx,L,hinge,cz:n?z/n:0,top,flameBase:top-.14*(top-bottom)};motionCache.set(s,m);return m;
+  m={max,cx,L,hinge,cz:n?z/n:0,top,cy:(top+bottom)/2,flameBase:top-.14*(top-bottom)};motionCache.set(s,m);return m;
 }
 // Whale blows: the spout shoots up, sprays for a couple of seconds, fades, rests, and blows again.
 export function blowGlow(elapsed,u){const c=elapsed-.8,cycle=(c%4.6+4.6)%4.6;if(c<0)return 0;const front=Math.min(1,cycle/.7),glow=cycle<2.8?1:cycle<3.8?3.8-cycle:0;return u<=front?glow*(1-u)**.45:0;}
@@ -464,14 +509,17 @@ function moveDrone(s,m,i,elapsed,envelope,out){
     const dx=P[o]-m.cx,side=dx<0?-1:1,wing=Math.abs(dx)-m.hinge;if(wing<=0)return;
     const angle=envelope*.4*Math.sin(elapsed*Math.PI*2*.55),c=Math.cos(angle),sn=Math.sin(angle),dz=P[o+2]-m.cz;
     P[o]=m.cx+side*(m.hinge+wing*c-dz*sn);P[o+2]=m.cz+wing*sn+dz*c;
-  }else if(s.motion==='swim'){
-    const d=s.to.extra?.[i];
-    if(d&&s.spout){// a droplet flows up its jet; the lights follow each blow
-      const u=(d.u+elapsed*.55)%1,p=spoutPoint(s.spout,d,u),b=.06+.94*blowGlow(elapsed,u);
-      for(let k=0;k<3;k++){P[o+k]+=envelope*(p[k]-P[o+k]);out.colors[o+k]*=1-envelope*(1-b);}
-    }else{// a slow vertical wave travels from head to flukes, plus a gentle bob
-      const w=clamp((m.max-P[o])/m.L),phase=elapsed*Math.PI*2*.3;
-      P[o+1]+=envelope*m.L*(.045*w**1.8*Math.sin(phase-2.2*w)+.012*Math.sin(phase+1.3));
+  }else if(s.motion==='swim'){// the whale swims: it rises and dives through its sea, and blows as its blowhole surfaces
+    const d=s.to.extra?.[i],pose=swimPose(s,m,elapsed,envelope);
+    if(d?.kind==='wave'&&s.waves){const p=wavePoint(s.waves,d,elapsed),b=waveGlow(s.waves,d,elapsed);for(let k=0;k<3;k++){P[o+k]+=envelope*(p[k]-P[o+k]);out.colors[o+k]*=1-envelope*(1-b);}}
+    else if(d&&s.spout){// a droplet flows up the jet, which rides on the blowhole
+      const u=(d.u+elapsed*.55)%1,q=pose.apply(spoutPoint(s.spout,d,u)),b=pose.blow(u);
+      for(let k=0;k<3;k++){P[o+k]+=envelope*(q[k]-P[o+k]);out.colors[o+k]*=1-envelope*(1-b);}
+    }else{// a slow wave travels from head to flukes; the whole whale pitches and rises with each stroke
+      const w=clamp((m.max-P[o])/m.L),phase=elapsed*Math.PI*2*.3;P[o+1]+=envelope*m.L*.045*w**1.8*Math.sin(phase-2.2*w);
+      const q=pose.apply([P[o],P[o+1],P[o+2]]);P[o]=q[0];P[o+1]=q[1];P[o+2]=q[2];
+      if(pose.sea!==undefined){const under=clamp((pose.sea-q[1])/(.025*m.L))*envelope;// under the sea: dim, deep blue
+        out.colors[o]*=1-.72*under;out.colors[o+1]*=1-.6*under;out.colors[o+2]=out.colors[o+2]*(1-.3*under)+.05*under;}
     }
   }else if(s.motion==='fish'){
     const d=s.to.extra?.[i];
@@ -504,7 +552,7 @@ export function sampleShow(show,time,out=createFrame(show)){
   const side=Math.ceil(Math.sqrt(show.count)),motion=(s.kind==='hold'||s.kind==='rise')&&s.motion?motionFrame(s):null,envelope=motion?ease(elapsed/1.2)*ease((duration-elapsed)/1.2):0;
   // The heart's lub-dub (twice a second, zero at both ends of the stage) and its gentle turn (zero where it starts and ends).
   const u=elapsed%1.05,beat=s.kind==='beat'?(Math.exp(-(((u-.12)/.05)**2))+.6*Math.exp(-(((u-.36)/.06)**2)))*ease(elapsed/.4)*ease((duration-elapsed)/.4):0;
-  const turnAngle=s.turn?s.turn.angle*Math.sin(2*Math.PI*(t-s.turn.start)/s.turn.period):0,tc=Math.cos(turnAngle),ts=Math.sin(turnAngle),swell=1+.05*beat,blend=[0,0,0];
+  const turnAngle=s.turn?(s.turn.spin?2*Math.PI*ease((t-s.turn.start)/s.turn.period):s.turn.angle*Math.sin(2*Math.PI*(t-s.turn.start)/s.turn.period)):0,tc=Math.cos(turnAngle),ts=Math.sin(turnAngle),swell=1+.05*beat,blend=[0,0,0];
   for(let i=0;i<show.count;i++){
     let q=0,light=0,navLight=0,color=s.to.colors[i];
     if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]/(s.motionScale??1)-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
@@ -516,6 +564,7 @@ export function sampleShow(show,time,out=createFrame(show)){
       const pad=s.to.pad?.[i]??i,row=Math.floor(pad/side)/Math.max(1,side-1),navTime=s.reverse?6*(1-elapsed/duration):elapsed,navDuration=s.reverse?6:duration;q=s.reverse?1-ease((navTime-row*.65)/(6-.65)):ease((elapsed-row*.65)/(duration-.65));light=ease(navTime/.35)*ease((navDuration-navTime)/.35)*(.35+.65*Math.sin(navTime*8+pad*.12)**2);color=(Math.floor(navTime*3)+pad)%2?navigationRed:navigationBlue;}
     else if(s.kind==='grow'){q=progress;light=fadeIn;}
     else if(s.kind==='beat'){q=1;light=1-.14*(1-beat)*ease(elapsed/.4)*ease((duration-elapsed)/.4);}// brightest on each beat
+    else if(s.kind==='spin'){q=1;const twinkle=Math.max(0,Math.sin(elapsed*7.3+i*2.39))**12;light=1-.28*(1-twinkle)*ease(elapsed/.4)*ease((duration-elapsed)/.4);}// it glitters as it turns
     // Sparks accelerate uniformly for 80% of the fall, then brake to rest, matching the next transfer's zero start speed.
     else if(s.kind==='fall'){const u=elapsed/duration;q=u<.8?u*u/.8:.8+2*(u-.8)-(u-.8)**2/.2;light=(1-ease(elapsed/duration))*(1-.92*Math.sin(Math.PI*elapsed/duration)**2*(.5+.5*Math.sin(elapsed*12+i*2.4)));color=s.from.colors[i];}
     else if(s.kind==='burst'||s.kind==='rise'){q=progress;light=fadeIn;}

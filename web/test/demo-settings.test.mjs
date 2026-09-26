@@ -42,7 +42,7 @@ test('Three firework types expand, then blink and fall to darkness with no telep
 test('Blender formations have depth, distinct well-spaced samples and exact fleet counts',()=>{
   for(const name of FORMATIONS){const {positions}=assets[name].body;assert.equal(positions.length,4096);assert.equal(new Set(positions.map(p=>p.join(','))).size,4096);assert.ok(positions.every(p=>p.every(Number.isFinite)));assert.ok(Math.max(...positions.map(p=>p[2]))-Math.min(...positions.map(p=>p[2]))>1);}
   const show=compileDemo(assets,{count:512,scale:4,shape:'star'});
-  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,419);
+  assert.equal(show.count,512);assert.equal(show.lightShape,'star');assert.equal(show.duration,423);
   for(const s of show.stages){assert.equal(s.to.positions.length,512);assert.equal(s.to.colors.length,512);}
   assert.deepEqual(byPad(show,sampleShow(show,show.duration).positions),sampleShow(show,0).positions);
 });

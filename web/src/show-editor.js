@@ -89,7 +89,7 @@ export class ShowEditor{
   replace(doc){void this.writer.flush();this.draftId=crypto.randomUUID();this.change(doc);}
   queueDraft(doc=this.doc){const saved=doc,id=this.draftId,updatedAt=Date.now();this.writer.enqueue(id,()=>({id,kind:'show',name:saved.name,updatedAt,objects:saved.cues.length,text:encodeShow(saved)}));}
   sessionChanged(entities){if(!this.editing)return;this.dirty=true;const artwork=captureArtwork(entities);this.queueDraft({...this.doc,cues:this.doc.cues.map(c=>c.id===this.editing?{...c,artwork}:c)});}
-  travel(back){this.selections.set(this.doc,this.active);if(this.state.travel(back)){this.active=this.selections.get(this.doc);this.changed();}}
+  travel(back){this.selections.set(this.doc,this.active);if(this.state.travel(back)){this.active=this.selections.get(this.doc);this.changed();this.report(back?'Undone.':'Redone.');}}
   updateCue(patch){this.change({...this.doc,cues:this.doc.cues.map(c=>c.id===this.active?{...c,...patch}:c)});}
   add(cue){if(this.doc.cues.length>=SHOW_LIMITS.cues)throw new Error(`A show can contain at most ${SHOW_LIMITS.cues} formations.`);this.change({...this.doc,cues:[...this.doc.cues,cue]},cue.id);}
   move(delta){const i=this.doc.cues.findIndex(c=>c.id===this.active),j=i+delta;if(i<0||j<0||j>=this.doc.cues.length)return;const cues=[...this.doc.cues];[cues[i],cues[j]]=[cues[j],cues[i]];this.change({...this.doc,cues});}
@@ -201,8 +201,8 @@ export class ShowEditor{
     if(c.library&&!this.assets){this.loadAssets();return {formation:null,note:`${c.name} · Demo formation · loading…`};}
     try{
       if(this.doc.version===3){
-        const played=cueSequence(this.doc,c,this.assets),f=played.formation,water=f.extra?.filter(Boolean).length||0,fire=f.fire?.filter(Boolean).length||0;
-        const parts=[`${(this.doc.count-water-fire).toLocaleString()} lights`,water&&`${water.toLocaleString()} ${played.spout?'in the spout':'in the waves'}`,fire&&`${fire.toLocaleString()} falling fire`].filter(Boolean).join(' · ');
+        const played=cueSequence(this.doc,c,this.assets),f=played.formation,kind=k=>f.extra?.filter(d=>d?.kind===k).length||0,spout=kind('spout'),sea=kind('wave'),fire=f.fire?.filter(Boolean).length||0;
+        const parts=[`${(this.doc.count-spout-sea-fire).toLocaleString()} lights`,spout&&`${spout.toLocaleString()} in the spout`,sea&&`${sea.toLocaleString()} in the ${spout?'sea':'waves'}`,fire&&`${fire.toLocaleString()} falling fire`].filter(Boolean).join(' · ');
         const formation={positions:f.positions.map(p=>p.map(v=>v/unit)),colors:f.colors};
         return {formation,note:c.library?`${c.name} · Demo formation · Blender 3D · ${parts}${played.phrases?` · after a ${played.phrases.length}-phrase sentence`:''}`:`${c.name} · ${parts}${this.spacing(c,unit)}`};
       }

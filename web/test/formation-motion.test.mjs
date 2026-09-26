@@ -25,19 +25,21 @@ test('the butterfly flaps its wings about the body, easing in and out so the tra
   assert.deepEqual(sampleShow(demo,s.start+4).positions,sampleShow(demo,s.start+4).positions,'deterministic');
 });
 
-test('the whale swims with a travelling wave strongest at the flukes and blows a split spout from its blowhole',()=>{
-  const s=stage('Whale');assert.equal(s.motion,'swim');assert.ok(s.spout);
-  const spray=s.to.extra.map((d,i)=>d?i:-1).filter(i=>i>=0),bodyIds=s.to.extra.map((d,i)=>d?-1:i).filter(i=>i>=0);
-  assert.equal(spray.length,Math.floor(demo.count/10));assert.ok(spray.every(i=>!s.to.fire[i]),'spout droplets are not fire');
+test('the whale swims through its sea: it rises and dives, dims under water, and blows only when its blowhole surfaces',()=>{
+  const s=stage('Whale');assert.equal(s.motion,'swim');assert.ok(s.spout&&s.waves);
+  const kind=k=>s.to.extra.map((d,i)=>d?.kind===k?i:-1).filter(i=>i>=0),spray=kind('spout'),sea=kind('wave'),bodyIds=s.to.extra.map((d,i)=>d?-1:i).filter(i=>i>=0);
+  assert.equal(spray.length,Math.floor(demo.count/10));assert.equal(sea.length,Math.floor(demo.count/12),'a sea to swim through');assert.ok(spray.every(i=>!s.to.fire[i]),'spout droplets are not fire');
   assert.ok(largest(offsets(demo,s,s.start))<1e-4&&largest(offsets(demo,s,s.end-1e-6))<1e-4,'continuous with the transfers');
-  // Every droplet rests on its own jet and, mid-hold, flows exactly along it.
-  for(const i of spray)assert.ok(spoutPoint(s.spout,s.to.extra[i]).every((v,k)=>Math.abs(v-s.to.positions[i][k])<1e-9));
-  const t=s.start+6,f=sampleShow(demo,t);
-  for(const i of spray.slice(0,40)){const d=s.to.extra[i],u=(d.u+(t-s.start)*.55)%1,p=spoutPoint(s.spout,d,u);assert.ok(p.every((v,k)=>Math.abs(v-f.positions[i*3+k])<1e-3));}
-  const xs=bodyIds.map(i=>s.to.positions[i][0]),head=Math.max(...xs),tail=Math.min(...xs),L=head-tail;
-  const swing=ids=>Math.max(...[2,3.5,5,6.5].map(dt=>Math.max(...ids.map(i=>Math.abs(sampleShow(demo,s.start+dt).positions[i*3+1]-s.to.positions[i][1]))))),near=f=>bodyIds.filter(i=>Math.abs(s.to.positions[i][0]-f)<L*.06);
-  assert.ok(swing(near(tail))>swing(near(head))*2.5,'the flukes beat far more than the head');
-  // Blows: the spout rises, sprays, fades and rests.
+  for(const i of spray)assert.ok(spoutPoint(s.spout,s.to.extra[i]).every((v,k)=>Math.abs(v-s.to.positions[i][k])<1e-9),'droplets rest on the jet');
+  // One stroke lasts 6 s: at the top (1.5 s into it) the blowhole is out of the water; at the bottom (4.5 s) it is under.
+  const at=dt=>sampleShow(demo,s.start+6+dt),top=at(1.5),bottom=at(4.5),mean=(f,ids,k)=>ids.reduce((n,i)=>n+f.positions[i*3+k],0)/ids.length;
+  const xs=bodyIds.map(i=>s.to.positions[i][0]),L=Math.max(...xs)-Math.min(...xs);
+  assert.ok(mean(top,bodyIds,1)-mean(bottom,bodyIds,1)>.12*L,'it rises and dives');
+  const light=(f,ids)=>ids.reduce((n,i)=>n+f.colors[i*3]+f.colors[i*3+1]+f.colors[i*3+2],0);
+  assert.ok(light(top,spray)>light(top,bodyIds)*.02,'surfaced: it blows through its blowhole');assert.ok(light(bottom,spray)<1e-6,'under water: no spout');
+  assert.ok(light(bottom,bodyIds)<light(top,bodyIds)*.8,'what is under the sea glows deep and dim');
+  const surface=s.waves.lines[0].y,headIds=bodyIds.filter(i=>s.to.positions[i][0]>Math.max(...xs)-L*.15);assert.ok(mean(top,headIds,1)>surface&&mean(bottom,headIds,1)<surface,'the head breaks the surface, then dives');
+  // Drawings with the whale swim and no sea keep blowing on a timer.
   assert.equal(blowGlow(.5,.2),0);assert.ok(blowGlow(2,.2)>.5);assert.equal(blowGlow(.8+4.3,.2),0);assert.ok(blowGlow(.8+.35,.2)>0&&blowGlow(.8+.35,.9)===0,'the jet front climbs');
   assert.deepEqual(WHALE_SPOUT.hole,[7.4,1.538,0],'matches the Blender whale_blowhole()');
   assert.equal(compileDemo(assets,{count:256,fire:{Whale:true}}).stages.find(x=>x.name==='Whale').to.fire.filter(Boolean).length,32);

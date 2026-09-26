@@ -1,6 +1,6 @@
 // Editable source is separate from compiled drone positions and drawing-only files.
 import {entity,clone,validate,documentOf,decode} from './model.js';
-import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT,MOTIONS,CINEMATIC_LANDING,HEART_BEAT,demoHold} from './drone-show.js';
+import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT,MOTIONS,CINEMATIC_LANDING,HEART_BEAT,STAR_SPIN,demoHold} from './drone-show.js';
 import {FORMATIONS,FLEET_SIZES,LIGHT_SHAPES,DEMO_TRANSFER,demoSettings,libraryCue,libraryFormation,extrasFor,drawingExtras} from './demo-library.js';
 import {designPaper,designPlacement,toSheet,argb} from './formation-design.js';
 
@@ -32,6 +32,8 @@ export function drawingCue(name,base={}){
   const artwork=[paper,...paths.map(path=>({...entity('stroke'),paperId:paper.id,pointSpace:'surface',color:argb(path.color),points:path.points.map(toSheet)}))];
   const cue={...newCue(artwork,name),hold,effect,placement:designPlacement()};
   for(const key of ['id','name','hold','transfer','light','brightness'])if(base[key]!==undefined)cue[key]=base[key];
+  // The sentence belongs to the 3D formation: a converted drawing keeps only the formation's own display time.
+  if(base.hold!==undefined)cue.hold=Math.max(2,Math.min(60,base.hold-(demoHold(libraryCue(name))-libraryCue(name).hold)));
   return cue;
 }
 // The Demo as editable line drawings (show version 2).
@@ -124,7 +126,7 @@ export function compileShow(doc,assets){
   const show=buildShow(null,{sequence,count:doc.count,transitionLights:true,motionScale:scale,reverseLanding:true,fireworks:finale,title:doc.name});
   return Object.assign(show,{lightShape:doc.look.shape,pyro:doc.look.pyro,lasers:doc.look.lasers,cinematic:true});
 }
-export const DEMO_FINALE=66+HEART_BEAT;// heart, star and firework balls: three 9 s launches, 6 s growth, 7 s falling sparks; the heart beats
+export const DEMO_FINALE=66+HEART_BEAT+STAR_SPIN;// heart, star and firework balls: three 9 s launches, 6 s growth, 7 s falling sparks; the heart beats, the star spins
 export const DEMO_LANDING=CINEMATIC_LANDING.reduce((a,b)=>a+b);// return, descent under the firework finale, rest
 export const showDuration=doc=>doc.version===3
   ?8+doc.cues.reduce((n,c)=>n+c.hold+c.transfer,0)+(doc.fireworks.enabled?(doc.fireworks.style==='demo'?DEMO_FINALE:7+doc.fireworks.duration):0)+DEMO_LANDING

@@ -30,9 +30,9 @@ export function musicPlan(show){
   const q=t=>Math.round(t/BEAT)*BEAT,sections=[],grand=show.pyro!==false&&show.stages.some(s=>s.kind==='landing'&&s.reverse);
   show.stages.forEach((s,i)=>{
     const next=show.stages[i+1],start=q(s.start),end=q(s.end),last=sections.at(-1);
-    const mood=s.kind==='takeoff'?'lift':s.kind==='landing'?(grand?'finale':'outro'):s.kind==='move'&&next?.kind==='landing'?(grand?'homebound':'outro'):s.within||s.phrase&&!s.reveal?'drop':s.kind==='move'?'build':s.kind==='grow'||s.kind==='burst'||s.kind==='beat'?'peak':s.kind==='fall'?'spark':s.kind==='rise'||s.reveal||s.climax?'drop':i?'end':'intro';
+    const mood=s.kind==='takeoff'?'lift':s.kind==='landing'?(grand?'finale':'outro'):s.kind==='move'&&next?.kind==='landing'?(grand?'homebound':'outro'):s.within||s.phrase&&!s.reveal?'drop':s.kind==='move'?'build':s.kind==='grow'||s.kind==='burst'||s.kind==='beat'||s.kind==='spin'?'peak':s.kind==='fall'?'spark':s.kind==='rise'||s.reveal||s.climax?'drop':i?'end':'intro';
     if(end<=start)return;
-    if(last?.mood===mood&&(mood==='outro'||mood==='end'||s.kind==='beat'||s.within||s.phrase&&!s.reveal))last.end=end;/* the heartbeat continues the heart's peak */else sections.push({mood,start,end,name:s.name});
+    if(last?.mood===mood&&(mood==='outro'||mood==='end'||s.kind==='beat'||s.kind==='spin'||s.within||s.phrase&&!s.reveal))last.end=end;/* the heartbeat continues the heart's peak */else sections.push({mood,start,end,name:s.name});
   });
   const drops=sections.filter(s=>s.mood==='drop').length,lifted=drops>=4?Math.ceil(drops/2):Infinity;let d=0,p=0;
   for(const s of sections){if(s.mood==='drop')s.index=d++;if(s.mood==='peak')s.index=p++;s.shift=(s.mood==='drop'?s.index>=lifted:['peak','spark','finale'].includes(s.mood)&&d>=lifted)?2:0;}

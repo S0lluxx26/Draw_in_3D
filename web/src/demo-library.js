@@ -21,11 +21,12 @@ export function libraryFormation(assets,name,count,scale,fire=false){
   // Extra drones: a tenth of the fleet becomes the whale's water spout, an eighth the fish's waves. The body keeps
   // an evenly spread prefix of its lights. Spout and waves are converted to world units here.
   const cue=libraryCue(name),asset=assets?.[name];if(!cue||!asset)throw new Error(`The Demo formation "${name}" is not available.`);
-  const fireCount=fire?Math.floor(count/8):0,extraCount=cue.spout?Math.floor(count/10):cue.waves?Math.floor(count/8):0,bodyCount=count-fireCount-extraCount;
+  // The whale has both: a spout (a tenth) and its sea (a twelfth).
+  const fireCount=fire?Math.floor(count/8):0,spoutCount=cue.spout?Math.floor(count/10):0,waveCount=cue.waves?Math.floor(count/(cue.spout?12:8)):0,extraCount=spoutCount+waveCount,bodyCount=count-fireCount-extraCount;
   const world=p=>[p[0]*scale,(p[1]+18)*scale,p[2]*scale];
   const spout=cue.spout&&{hole:world(cue.spout.hole),height:cue.spout.height*scale,spread:cue.spout.spread*scale};
   const waves=cue.waves&&{...cue.waves,unit:scale,wavelength:cue.waves.wavelength*scale,lines:cue.waves.lines.map(l=>({...l,y:(l.y+18)*scale,x0:l.x0*scale,x1:l.x1*scale,z:l.z*scale,amp:l.amp*scale}))};
-  const drops=Array.from({length:extraCount},(_,j)=>spout?spoutDrop(j):waveDrop(j,extraCount,cue.waves));
+  const drops=[...Array.from({length:spoutCount},(_,j)=>spoutDrop(j)),...Array.from({length:waveCount},(_,j)=>waveDrop(j,waveCount,cue.waves))];
   const formation={positions:[...[...asset.body.positions.slice(0,bodyCount),...asset.fire.positions.slice(0,fireCount)].map(world),...drops.map(d=>d.kind==='spout'?spoutPoint(spout,d):wavePoint(waves,d))],
     colors:[...asset.body.colors.slice(0,bodyCount),...asset.fire.colors.slice(0,fireCount),...drops.map(d=>d.kind==='spout'?[.46+.16*d.radius,.68,.9]:[.1,.5+.18*(d.line%2),1])],
     fire:Array.from({length:count},(_,i)=>i>=bodyCount&&i<bodyCount+fireCount),...extraCount?{extra:Array.from({length:count},(_,i)=>drops[i-bodyCount-fireCount]??0)}:{}};

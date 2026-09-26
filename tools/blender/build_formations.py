@@ -612,21 +612,22 @@ def happy_day():
 
 # The sentence Happy day grows from, one 3D phrase at a time (the web app morphs the drones between them):
 # 'Yesterday is history, tomorrow is a mystery, today is a gift - that's why it's called the present.'
-PHRASES = [('Yesterday is history', [('YESTERDAY', 5.2, 24.0), ('IS HISTORY', -2.8, 21.0)], [(-12, (.3, .55, 1)), (12, (.72, .45, 1))]),
-           ('Tomorrow is a mystery', [('TOMORROW', 5.2, 22.0), ('IS A MYSTERY', -2.8, 24.0)], [(-12, (.7, .35, 1)), (12, (1, .3, .72))]),
-           ('Today is a gift', [('TODAY', 5.2, 17.0), ('IS A GIFT', -2.8, 20.0)], [(-12, (1, .78, .2)), (12, (1, .42, .22))]),
-           ("That's why it's called", [("THAT'S WHY", 5.2, 22.0), ("IT'S CALLED", -2.8, 23.0)], [(-12, (.3, .88, 1)), (12, (.85, .95, 1))]),
-           ('the present', [('THE', 6.8, 9.0), ('PRESENT', -1.2, 26.0)], [(-13, (1, .3, .55)), (-4, (1, .62, .15)), (4, (1, .88, .25)), (13, (.4, 1, .6))])]
+# Light, bright tints so the words read against the night sky.
+PHRASES = [('Yesterday is history', [('YESTERDAY', 5.2, 24.0), ('IS HISTORY', -2.8, 21.0)], [(-12, (.62, .82, 1)), (12, (.86, .78, 1))]),
+           ('Tomorrow is a mystery', [('TOMORROW', 5.2, 22.0), ('IS A MYSTERY', -2.8, 24.0)], [(-12, (.9, .7, 1)), (12, (1, .66, .88))]),
+           ('Today is a gift', [('TODAY', 5.2, 17.0), ('IS A GIFT', -2.8, 20.0)], [(-12, (1, .94, .55)), (12, (1, .74, .45))]),
+           ("That's why it's called", [("THAT'S WHY", 5.2, 22.0), ("IT'S CALLED", -2.8, 23.0)], [(-12, (.6, .98, 1)), (12, (.95, 1, 1))]),
+           ('the present', [('THE', 6.8, 9.0), ('PRESENT', -1.2, 26.0)], [(-13, (1, .6, .75)), (-4, (1, .82, .5)), (4, (1, .96, .55)), (13, (.65, 1, .78))])]
 
 def phrase(lines, stops):
-    """Extruded 3D lines of text (Arial Black, like HAPPY DAY), coloured by a left-to-right gradient."""
-    font_path = next((f for f in ('C:/Windows/Fonts/ariblk.ttf', '/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf') if pathlib.Path(f).exists()), None)
+    """Thin 3D lines of text (Segoe UI Semibold: open letters that stay readable in drones), coloured by a left-to-right gradient."""
+    font_path = next((f for f in ('C:/Windows/Fonts/seguisb.ttf', 'C:/Windows/Fonts/arialbd.ttf', '/usr/share/fonts/truetype/msttcorefonts/Arial_Bold.ttf') if pathlib.Path(f).exists()), None)
     colour = lambda p: ramp(stops, p.x)
     for text, y_centre, width in lines:
         curve = bpy.data.curves.new(text, 'FONT'); curve.body = text; curve.align_x = 'CENTER'; curve.align_y = 'CENTER'
         if font_path:
             curve.font = bpy.data.fonts.load(font_path, check_existing=True)
-        curve.extrude = .3; curve.bevel_depth = .05; curve.bevel_resolution = 2; curve.resolution_u = 6
+        curve.extrude = .12; curve.bevel_depth = .02; curve.bevel_resolution = 2; curve.resolution_u = 6
         obj = bpy.data.objects.new(text, curve); bpy.context.scene.collection.objects.link(obj)
         bpy.context.view_layer.update()
         me = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
@@ -635,7 +636,7 @@ def phrase(lines, stops):
         k = width / (max(xs) - min(xs)); cx = (max(xs) + min(xs)) / 2; cy = (max(ys) + min(ys)) / 2
         bm = bmesh.new(); bm.from_mesh(me); bpy.data.meshes.remove(me)
         for v in bm.verts:
-            v.co = Vector(((v.co.x - cx) * k, (v.co.y - cy) * k + y_centre, v.co.z * 1.75))
+            v.co = Vector(((v.co.x - cx) * k, (v.co.y - cy) * k + y_centre, v.co.z * 1.2))  # shallow: the faces, not the sides, carry the lights
         bmesh.ops.triangulate(bm, faces=bm.faces)
         part = Part(colour); part.merge(bm); part.finish(text, 'gold', smooth=False)
 

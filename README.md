@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 22: a whale that swims and blows, a spinning 3D star, readable words
+
+![The whale surfacing and blowing, then diving under its sea; TODAY IS A GIFT in thinner letters; the 3D star mid-turn](docs/media/studio22-whale-star.jpg)
+
+The **whale swims** through a rolling sea: it rises and dives with each stroke, glows deep blue under water, and **blows its split spout whenever its blowhole breaks the surface**. The **five-point star is a faceted 3D star** that makes one smooth full turn as it grows and spins. The sentence before HAPPY DAY now uses **thinner, brighter letters** that read clearly, and each phrase gets **three fireworks**. Show editor fixes: converting Happy day keeps its own 16 s display, and a Happy day too short for its sentence plays HAPPY DAY alone. [Details and checks](docs/STUDIO22.md).
+
 ## Studio 21: a sentence for Happy day, a 3D heart, showpiece fireworks
 
 ![TODAY IS A GIFT, the sentence morphing into HAPPY DAY, and the 3D heart beating with the family in its window](docs/media/studio21-sentence-heart.jpg)
