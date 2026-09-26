@@ -30,9 +30,9 @@ export function musicPlan(show){
   const q=t=>Math.round(t/BEAT)*BEAT,sections=[],grand=show.pyro!==false&&show.stages.some(s=>s.kind==='landing'&&s.reverse);
   show.stages.forEach((s,i)=>{
     const next=show.stages[i+1],start=q(s.start),end=q(s.end),last=sections.at(-1);
-    const mood=s.kind==='takeoff'?'lift':s.kind==='landing'?(grand?'finale':'outro'):s.kind==='move'&&next?.kind==='landing'?(grand?'homebound':'outro'):s.kind==='move'?'build':s.kind==='grow'||s.kind==='burst'?'peak':s.kind==='fall'?'spark':s.kind==='rise'||s.reveal?'drop':i?'end':'intro';
+    const mood=s.kind==='takeoff'?'lift':s.kind==='landing'?(grand?'finale':'outro'):s.kind==='move'&&next?.kind==='landing'?(grand?'homebound':'outro'):s.within||s.phrase&&!s.reveal?'drop':s.kind==='move'?'build':s.kind==='grow'||s.kind==='burst'||s.kind==='beat'?'peak':s.kind==='fall'?'spark':s.kind==='rise'||s.reveal||s.climax?'drop':i?'end':'intro';
     if(end<=start)return;
-    if(last?.mood===mood&&(mood==='outro'||mood==='end'))last.end=end;else sections.push({mood,start,end,name:s.name});
+    if(last?.mood===mood&&(mood==='outro'||mood==='end'||s.kind==='beat'||s.within||s.phrase&&!s.reveal))last.end=end;/* the heartbeat continues the heart's peak */else sections.push({mood,start,end,name:s.name});
   });
   const drops=sections.filter(s=>s.mood==='drop').length,lifted=drops>=4?Math.ceil(drops/2):Infinity;let d=0,p=0;
   for(const s of sections){if(s.mood==='drop')s.index=d++;if(s.mood==='peak')s.index=p++;s.shift=(s.mood==='drop'?s.index>=lifted:['peak','spark','finale'].includes(s.mood)&&d>=lifted)?2:0;}
@@ -40,7 +40,7 @@ export function musicPlan(show){
   // Only timing matters here, and shell timing does not depend on where the launchers are.
   const booms=[];for(const sh of pyroSchedule(show,[[0,0,0]])){
     booms.push({t:sh.t0,voice:'launch',g:.09,dur:.1});
-    booms.push({t:sh.t0+sh.delay,voice:'boom',g:.42*Math.min(1.3,sh.radius/75),dur:.1,crackle:['crossette','strobe','willow'].includes(sh.pattern),seed:sh.seed%100000});
+    booms.push({t:sh.t0+sh.delay,voice:'boom',g:.42*Math.min(1.3,sh.radius/75),dur:.1,crackle:['crossette','strobe','willow','crown'].includes(sh.pattern),seed:sh.seed%100000});
   }
   // Shells fired together (the finale's wall) share one fuller hit instead of stacking a dozen.
   const merged=[];for(const b of booms.sort((a,b)=>a.t-b.t)){const same=merged.findLast(m=>m.voice===b.voice&&b.t-m.t<.06);if(same){same.g=Math.min(b.voice==='boom'?.8:.16,same.g+b.g*.3);same.crackle||=b.crackle;}else merged.push({...b});}

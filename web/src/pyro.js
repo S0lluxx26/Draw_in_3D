@@ -6,9 +6,13 @@
 export const GRAVITY=9.81;
 export const PATTERNS=['peony','ring','willow','crossette','palm','strobe'];
 export const SHAPES=['heart','star','saturn'];// shaped shells for the landing finale, opening toward the audience
+// Showpiece shells for the growing heart and Happy day: a colour-changing chrysanthemum with a bright pistil core,
+// a glittering gold brocade crown and crossed double rings.
+export const FINE=['chrysanthemum','crown','rings'];
+const CHANGE=[[1,.25,.5],[.75,.3,1],[.3,.85,1],[1,.4,.2],[.45,1,.5]];// colours a chrysanthemum turns to
 const SHAPE_COLORS={heart:[[1,.16,.3],[1,.45,.62]],star:[[1,.82,.28]],saturn:[[.35,.62,1],[1,.74,.25]]};
 const PALETTES=[[[1,.72,.25]],[[1,.22,.12],[1,.95,.85]],[[.25,.5,1],[.8,.9,1]],[[.3,1,.45],[1,.78,.2]],[[.75,.3,1],[1,.35,.75]],[[1,.3,.2],[1,.8,.2],[.3,.8,1],[.5,1,.4],[.9,.4,1]]];
-export const PARTICLE_FLOATS=21;// shell(2) origin(3) launch(3) star(3) info(4: type lag life drag) look(4: rgb fade) extra(2: gravity strobe)
+export const PARTICLE_FLOATS=25;// shell(2) origin(3) launch(3) star(3) info(4: type lag life drag) look(4: rgb fade) extra(2: gravity strobe) shift(4: rgb at)
 const rng=seed=>()=>{seed=(Math.imul(seed^seed>>>15,2246822507)+0x9e3779b9)>>>0;seed=(seed^seed>>>13)>>>0;return seed/4294967296;};// [0,1)
 
 // When shells fire: during stages flagged pyro, drone-firework stages and the landing finale.
@@ -24,8 +28,14 @@ export function pyroSchedule(show,origins,{scale=1}={}){
     const length=s.end-s.start;
     if(s.pyro){// celebration salvo, then a crescendo
       const n=Math.max(4,Math.floor(length*1.1));
-      for(let i=0;i<n-3;i++)fire(s.start+.3+i*(length-3.5)/Math.max(1,n-3),k++,PATTERNS[i%PATTERNS.length]);
-      for(let i=0;i<3;i++)fire(s.end-3.2+i*.12,k++,['peony','willow','ring'][i],1.15);
+      const salvo=[...PATTERNS,...FINE,'heart'];for(let i=0;i<n-3;i++)fire(s.start+.3+i*(length-3.5)/Math.max(1,n-3),k++,salvo[i%salvo.length]);
+      for(let i=0;i<3;i++)fire(s.end-3.2+i*.12,k++,['chrysanthemum','crown','heart'][i],1.15);
+    }else if(s.kind==='grow'&&s.heart){// the heart blooms among heart shells and chrysanthemums
+      ['heart','chrysanthemum','heart','chrysanthemum'].forEach((p,i)=>fire(s.start+.2+i*1.15,k++,p,1,2));
+    }else if(s.kind==='beat'){// while it beats: crowns, rings and hearts all around it
+      ['crown','rings','heart','crown','rings'].forEach((p,i)=>fire(s.start+i*.9,k++,p,1.05,2.4));
+    }else if(s.phrase){// every phrase of the sentence gets two showpiece shells
+      fire(s.start-.8,k++,FINE[k%FINE.length],.95,2);
     }else if(s.kind==='grow'||s.kind==='burst'){
       for(let i=0;i<3;i++)fire(s.start+.4+i*length/3.4,k++,PATTERNS[(i*2+k)%PATTERNS.length],.95);
     }
@@ -57,6 +67,9 @@ function shapeDirections(n,pattern,random){
 function unitDirections(n,pattern,random){
   if(SHAPES.includes(pattern))return shapeDirections(n,pattern,random);
   const dirs=[];
+  if(pattern==='rings'){// two rings crossing at right angles, tipped toward the audience
+    const tilt=.35+random()*.4,half=n/2;for(let i=0;i<n;i++){const a=(i%half)*2*Math.PI/half;dirs.push(i<half?[Math.cos(a),Math.sin(a)*Math.cos(tilt),Math.sin(a)*Math.sin(tilt)]:[Math.sin(a)*Math.sin(tilt),Math.cos(a),Math.sin(a)*Math.cos(tilt)]);}
+    return dirs;}
   if(pattern==='ring'){const tilt=random()*Math.PI;for(let i=0;i<n;i++){const a=i*2*Math.PI/n;dirs.push([Math.cos(a),Math.sin(a)*Math.cos(tilt),Math.sin(a)*Math.sin(tilt)]);}}// tilted ring
   else if(pattern==='palm'){for(let i=0;i<n;i++){const arm=i%7,a=arm*2*Math.PI/7+.2,y=.35+.5*random();const r=Math.sqrt(1-y*y);dirs.push([Math.cos(a)*r,y,Math.sin(a)*r]);}}
   else for(let i=0;i<n;i++){const y=1-2*(i+.5)/n,r=Math.sqrt(1-y*y),a=i*2.399963229728653+random()*.3;dirs.push([Math.cos(a)*r,y,Math.sin(a)*r]);}
@@ -65,12 +78,13 @@ function unitDirections(n,pattern,random){
 // Particle buffer: comet trail while rising, launch and burst flashes, stars with trail samples.
 export function pyroParticles(shells){
   const out=[];
-  const push=(sh,type,lag,life,drag,star,color,fade,gravity,strobe)=>out.push(sh.t0,sh.delay,...sh.origin,...sh.launch,...star,type,lag,life,drag,...color,fade,gravity,strobe);
+  const push=(sh,type,lag,life,drag,star,color,fade,gravity,strobe,shift=[0,0,0,0])=>out.push(sh.t0,sh.delay,...sh.origin,...sh.launch,...star,type,lag,life,drag,...color,fade,gravity,strobe,...shift);
   for(const sh of shells){
     const random=rng(sh.seed),palette=PALETTES[sh.palette];
     push(sh,2,0,.35,0,[0,0,0],[6,4.2,2.4],1,0,0);// muzzle flash on the ship
     for(let j=0;j<7;j++)push(sh,0,j*.035,0,0,[0,0,0],[1.6,1.05,.5],1-j/7,0,0);// rising comet
     push(sh,3,0,.16,0,[0,0,0],[4,3.6,3],1,0,0);// burst flash
+    if(FINE.includes(sh.pattern)){fineShell(sh,random,push);continue;}
     const n={peony:150,ring:90,willow:110,crossette:120,palm:84,strobe:130,heart:140,star:130,saturn:150}[sh.pattern],dirs=unitDirections(n,sh.pattern,random),shaped=SHAPES.includes(sh.pattern);
     const drag={peony:1.5,ring:1.6,willow:1.1,crossette:1.4,palm:1.0,strobe:1.5,heart:1.4,star:1.4,saturn:1.5}[sh.pattern],life={peony:2.3,ring:2.1,willow:4.2,crossette:2.4,palm:3,strobe:2.8,heart:2.7,star:2.6,saturn:2.6}[sh.pattern];
     const trail=sh.pattern==='willow'||sh.pattern==='palm'?5:3,gravity=sh.pattern==='willow'?1:.55,speed=sh.radius*drag;
@@ -83,6 +97,26 @@ export function pyroParticles(shells){
     }
   }
   return new Float32Array(out);
+}
+// The showpiece shells. Stars of a chrysanthemum trail long tails and turn colour half-way through their life
+// around a white pistil; the crown is heavy gold brocade that droops and glitters; the rings cross in two colours.
+function fineShell(sh,random,push){
+  const trailOf=(n,lag,fades)=>fades.slice(0,n).map((f,t)=>[t*lag,f]);
+  if(sh.pattern==='chrysanthemum'){
+    const dirs=unitDirections(150,'peony',random),to=CHANGE[sh.seed%CHANGE.length],speed=sh.radius*1.3;
+    for(const d of dirs){const v=d.map(c=>c*speed*(.94+.12*random())),l=3.1*(.9+.2*random());
+      for(const [lag,fade] of trailOf(4,.07,[1,.55,.3,.14]))push(sh,1,lag,l,1.3,v,[4.4,3.4,1.5],fade,.5,0,[to[0]*4.4,to[1]*4.4,to[2]*4.4,.5]);}
+    for(const d of unitDirections(50,'peony',random)){const v=d.map(c=>c*speed*.42),l=2.1;// pistil core
+      for(const [lag,fade] of trailOf(2,.05,[1,.45]))push(sh,1,lag,l,1.4,v,[4.2,4.4,4.6],fade,.45,0);}
+  }else if(sh.pattern==='crown'){
+    const dirs=unitDirections(110,'peony',random).map(d=>[d[0],Math.abs(d[1])*.8+.2*d[1],d[2]]),speed=sh.radius*1.05;// a crown: more stars upward
+    for(const d of dirs){const v=d.map(c=>c*speed*(.9+.2*random())),l=4.6*(.9+.2*random());
+      for(const [lag,fade] of trailOf(5,.11,[1,.6,.36,.2,.1]))push(sh,1,lag,l,1.05,v,[4.4,3,1.2],fade,1,-2);}
+  }else{
+    const dirs=unitDirections(120,'rings',random),speed=sh.radius*1.55,colours=[[.3,.85,1],[1,.3,.75]];
+    dirs.forEach((d,i)=>{const v=d.map(c=>c*speed),l=2.4,c=colours[i<60?0:1].map(x=>x*4.4);
+      for(const [lag,fade] of trailOf(3,.05,[1,.5,.28]))push(sh,1,lag,l,1.55,v,c,fade,.55,0);});
+  }
 }
 // CPU reference of the shader (tests and bounds): world position and brightness of particle i at time.
 export function evaluateParticle(data,i,time,scale=1){
@@ -97,24 +131,26 @@ export function evaluateParticle(data,i,time,scale=1){
   const spread=(1-Math.exp(-drag*ts))/drag;
   return {position:burst.map((v,k)=>v+f(8+k)*spread-(k===1?.5*g*f(19)*ts*ts:0)),brightness:f(18)*(1-(ts/life)**2)};
 }
-export const PYRO_VERTEX=`attribute vec2 shell;attribute vec3 origin,launch,star;attribute vec4 info,look;attribute vec2 extra;
+export const PYRO_VERTEX=`attribute vec2 shell;attribute vec3 origin,launch,star;attribute vec4 info,look,shift;attribute vec2 extra;
 uniform float time,gravity,sizeWorld,viewport,minSize;varying vec3 vColor;varying float vGlow;
 float hash(float n){return fract(sin(n)*43758.5453);}
 void main(){
-  float type=info.x,lag=info.y,life=info.z,drag=info.w,t=time-shell.x-lag,tb=shell.y;vec3 p=origin;float b=0.,size=sizeWorld;
+  float type=info.x,lag=info.y,life=info.z,drag=info.w,t=time-shell.x-lag,tb=shell.y;vec3 p=origin,col=look.rgb;float b=0.,size=sizeWorld;
   vec3 burst=origin+launch*tb-vec3(0.,.5*gravity*tb*tb,0.);
   if(type<.5){if(t>0.&&t<tb){p=origin+launch*t-vec3(0.,.5*gravity*t*t,0.);b=look.w*(.4+.6*t/tb)*(.75+.25*sin(t*60.+lag*90.));size*=.6;}}
   else if(type<1.5){float ts=t-tb;if(ts>0.&&ts<life){float spread=(1.-exp(-drag*ts))/drag,f=ts/life;p=burst+star*spread-vec3(0.,.5*gravity*extra.x*ts*ts,0.);
     b=look.w*(1.-f*f)*(.8+.2*sin(ts*23.+star.x));
     if(extra.y>0.)b*=step(.45,fract(ts*extra.y+hash(star.y)));// strobe
-    if(extra.y<0.&&f>.45)b*=1.6*step(.5,hash(floor(ts*14.)+star.z));// crossette crackle
+    if(extra.y<0.&&extra.y>-1.5&&f>.45)b*=1.6*step(.5,hash(floor(ts*14.)+star.z));// crossette crackle
+    if(extra.y<-1.5&&f>.3)b*=.3+1.5*step(.55,hash(floor(ts*24.)+star.x*7.+star.z*3.));// brocade glitter
+    if(shift.w>0.)col=mix(look.rgb,shift.rgb,smoothstep(shift.w-.08,shift.w+.08,f));// colour-changing stars
     size*=mix(1.,.55,f);}}
   else if(type<2.5){if(t>0.&&t<life){p=origin+vec3(0.,sizeWorld*1.5,0.);b=1.-t/life;size*=3.;}}
   else{float ts=t-tb;if(ts>0.&&ts<life){p=burst;b=1.-ts/life;size*=3.5;}}
   if(b<=.001){gl_Position=vec4(2.,2.,2.,1.);gl_PointSize=0.;vColor=vec3(0.);vGlow=0.;return;}
   vec4 mv=modelViewMatrix*vec4(p,1.);gl_Position=projectionMatrix*mv;
   float px=size*projectionMatrix[1][1]*viewport*.5/max(-mv.z,.001),s=clamp(px,minSize,160.);
-  vColor=look.rgb*b*(px<minSize?px*px/(minSize*minSize):1.);vGlow=type>1.5?1.:0.;gl_PointSize=s;}`;
+  vColor=col*b*(px<minSize?px*px/(minSize*minSize):1.);vGlow=type>1.5?1.:0.;gl_PointSize=s;}`;
 export const PYRO_FRAGMENT=`varying vec3 vColor;varying float vGlow;void main(){vec2 p=(gl_PointCoord-.5)*2.;float r=dot(p,p);if(r>1.)discard;
   float core=exp(-r*(vGlow>.5?3.:9.));gl_FragColor=vec4(vColor*core,1.);
   #include <tonemapping_fragment>

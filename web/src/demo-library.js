@@ -1,6 +1,6 @@
 // The Demo's formation library: Blender-built 3D formations with their built-in motion (spout, waves, flapping,
 // drifting balloons), shared by the Demo and by shows edited from it in the Show editor. Pure: no DOM.
-import {buildShow,demoPaths,spoutDrop,spoutPoint,waveDrop,wavePoint,MOTIONS} from './drone-show.js';
+import {buildShow,demoPaths,demoHold,spoutDrop,spoutPoint,waveDrop,wavePoint,MOTIONS} from './drone-show.js';
 
 export const FLEET_SIZES=[256,512,1024,2048,4096];
 export const DEMO_TRANSFER=7;// seconds between Demo formations
@@ -29,7 +29,9 @@ export function libraryFormation(assets,name,count,scale,fire=false){
   const formation={positions:[...[...asset.body.positions.slice(0,bodyCount),...asset.fire.positions.slice(0,fireCount)].map(world),...drops.map(d=>d.kind==='spout'?spoutPoint(spout,d):wavePoint(waves,d))],
     colors:[...asset.body.colors.slice(0,bodyCount),...asset.fire.colors.slice(0,fireCount),...drops.map(d=>d.kind==='spout'?[.46+.16*d.radius,.68,.9]:[.1,.5+.18*(d.line%2),1])],
     fire:Array.from({length:count},(_,i)=>i>=bodyCount&&i<bodyCount+fireCount),...extraCount?{extra:Array.from({length:count},(_,i)=>drops[i-bodyCount-fireCount]??0)}:{}};
-  return {formation,fireEnabled:fireCount>0,pyro:cue.pyro,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none',motion:MOTIONS.includes(cue.effect)?cue.effect:undefined,spout,waves};
+  // Its sentence, if it has one: every phrase uses the whole fleet (no fire, no water).
+  const phrases=(cue.prelude||[]).filter(label=>assets[label]).map(label=>{const b=assets[label].body;return {label,formation:{positions:b.positions.slice(0,count).map(world),colors:b.colors.slice(0,count).map(c=>[...c])}};});
+  return {formation,fireEnabled:fireCount>0,pyro:cue.pyro,effect:cue.effect==='starship'?'starship':fireCount?'fire':cue.effect==='sparkle'?'sparkle':'none',motion:MOTIONS.includes(cue.effect)?cue.effect:undefined,spout,waves,...(phrases.length?{phrases}:{})};
 }
 // Drawings with the whale or fish swim get the same water as the Demo formations: a spout from the top of the
 // drawing's front (the whale's head faces +x) or rolling waves above it. `positions` are world points of the
@@ -50,7 +52,7 @@ export function drawingExtras(motion,positions,extraCount,unit){
 }
 export function compileDemo(assets,value){
   const settings=demoSettings(value),{count}=settings,scale=settings.scale*2;
-  const sequence=demoPaths().map(cue=>({...cue,transfer:DEMO_TRANSFER,...libraryFormation(assets,cue.name,count,scale,settings.fire[cue.name])}));
+  const sequence=demoPaths().map(cue=>({...cue,hold:demoHold(cue),transfer:DEMO_TRANSFER,...libraryFormation(assets,cue.name,count,scale,settings.fire[cue.name])}));
   const show=buildShow(null,{count,sequence,transitionLights:true,motionScale:scale,reverseLanding:true,fireworks:{trilogy:true}});
   show.lightShape=settings.shape;show.demo=true;show.pyro=settings.pyro;show.lasers=settings.lasers;return show;
 }

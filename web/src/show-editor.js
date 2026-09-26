@@ -204,7 +204,7 @@ export class ShowEditor{
         const played=cueSequence(this.doc,c,this.assets),f=played.formation,water=f.extra?.filter(Boolean).length||0,fire=f.fire?.filter(Boolean).length||0;
         const parts=[`${(this.doc.count-water-fire).toLocaleString()} lights`,water&&`${water.toLocaleString()} ${played.spout?'in the spout':'in the waves'}`,fire&&`${fire.toLocaleString()} falling fire`].filter(Boolean).join(' · ');
         const formation={positions:f.positions.map(p=>p.map(v=>v/unit)),colors:f.colors};
-        return {formation,note:c.library?`${c.name} · Demo formation · Blender 3D · ${parts}`:`${c.name} · ${parts}${this.spacing(c,unit)}`};
+        return {formation,note:c.library?`${c.name} · Demo formation · Blender 3D · ${parts}${played.phrases?` · after a ${played.phrases.length}-phrase sentence`:''}`:`${c.name} · ${parts}${this.spacing(c,unit)}`};
       }
       return {formation:cueFormation(c,this.doc.count),note:`${c.name} · ${this.doc.count.toLocaleString()} sampled lights${this.spacing(c,unit)}`};
     }catch(error){return {formation:null,note:error.message};}

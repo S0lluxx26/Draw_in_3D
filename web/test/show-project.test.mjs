@@ -7,7 +7,7 @@ import {byPad} from './pads.mjs';
 
 test('editable demo reproduces source paths, timing, fleet, and exact landing after a show round trip',()=>{
   const doc=decodeShow(encodeShow(editableDemo())),compiled=compileShow(doc),original=buildShow();
-  assert.equal(compiled.duration,317);// the Demo's formations hold 3 s longerassert.equal(compiled.duration,showDuration(doc));assert.deepEqual(compiled.cues,original.cues);
+  assert.equal(compiled.duration,314);/* the line-art Demo: formations hold 15 s, HAPPY DAY 16 s */assert.equal(compiled.duration,showDuration(doc));assert.deepEqual(compiled.cues,original.cues);
   const raw=demoPaths();for(const [i,c]of doc.cues.entries()){
     const actual=cueFormation(c),expected=samplePaths(raw[i].paths);
     assert.ok(actual.positions.every((p,j)=>p.every((v,k)=>Math.abs(v-expected.positions[j][k])<1e-5)));

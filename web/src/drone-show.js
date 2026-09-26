@@ -124,7 +124,13 @@ export function waveGlow(waves,d,t){return .3+.7*Math.max(0,Math.sin(swell(waves
 // burners, and the whale swims and blows (see sampleShow).
 export const MOTIONS=['flap','swim','fish','balloons','candles'];
 // Displays last about 12 s so each formation has time to be admired; the finale lingers longer.
-export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15,effect:'candles'},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:19,effect:'sparkle',pyro:true}];
+export const demoPaths=()=>[{name:'Robot',paths:robot(),hold:15},{name:'Fish',paths:fish(),hold:15,effect:'fish',waves:FISH_WAVES},{name:'Butterfly',paths:butterfly(),hold:15,effect:'flap'},{name:'Hot air balloon',paths:balloon(),hold:15,effect:'balloons'},{name:'Eiffel Tower',paths:tower(),hold:15},{name:'Big ship',paths:ship(),hold:15},{name:'Whale',paths:whale(),hold:18,effect:'swim',spout:WHALE_SPOUT},{name:'Firework star',paths:star(),hold:15,effect:'sparkle'},{name:'Row of fire',paths:fireRow(),hold:15,effect:'fire'},{name:'Birthday cake',paths:cake(),hold:15,effect:'candles'},{name:'Starship launch',paths:starship(),hold:20,effect:'starship'},{name:'Happy day',paths:happyDay(),hold:16,effect:'sparkle',pyro:true,prelude:HAPPY_PHRASES}];
+// Happy day grows out of a sentence, one 3D phrase at a time (Blender assets of these names), each morphing into the next:
+// 'Yesterday is history, tomorrow is a mystery, today is a gift - that's why it's called the present.'
+export const HAPPY_PHRASES=Object.freeze(['Yesterday is history','Tomorrow is a mystery','Today is a gift',"That's why it's called",'the present']);
+export const PHRASE_TIMING=Object.freeze({hold:3.5,morph:2.5});
+// A Demo formation's whole display: its sentence first (if any), then the formation itself.
+export const demoHold=cue=>cue.hold+(cue.prelude?.length||0)*(PHRASE_TIMING.hold+PHRASE_TIMING.morph);
 // One spout droplet: position along the jet u, jet side, and a spray offset (angle, radius), all from its index.
 export function spoutDrop(j){const f=x=>x-Math.floor(x);return {kind:'spout',u:f(j*.6180339887+.13),side:j%2?1:-1,angle:f(j*.7548776662)*Math.PI*2,radius:Math.sqrt(f(j*.5698402910+.37))};}
 // The spout rises from the blowhole and splits into two jets that fan out and droop (formation units).
@@ -187,7 +193,15 @@ function uncross(previous,targets,permutation){
       else{const G=g?G1:G0;for(let m=G.head[h],end=G.head[h+1];m<end;m++){const j=g?inv[G.items[m]]:G.items[m];if(j!==i&&!(same&&j<i)&&check(i,j))return;}}
     }}}}};
   for(let i=0;i<n;i++)if(!queued[i])scan(i,true);
-  for(let work=0;waiting&&work<64*n;work++){const i=queue[head];head=(head+1)%n;waiting--;queued[i]=0;scan(i,false);}
+  const settle=()=>{for(let work=0;waiting&&work<64*n;work++){const i=queue[head];head=(head+1)%n;waiting--;queued[i]=0;scan(i,false);}};settle();
+  // Pairs can also come closest a quarter or three quarters of the way, far apart at the start, end and mid-flight:
+  // look for neighbours at those moments too, then settle again (a few rounds at most).
+  for(let round=0;round<3;round++){let swaps=0;
+    for(const u of [.25,.75]){const P=new Float64Array(n*3);for(let i=0;i<n*3;i++)P[i]=a[i]+(b[i]-a[i])*u;const G=grid(P);
+      for(let i=0;i<n;i++){const o=i*3;for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){
+        const h=(Math.imul(G.cells[o]+dx,73856093)^Math.imul(G.cells[o+1]+dy,19349663)^Math.imul(G.cells[o+2]+dz,83492791))&mask;
+        for(let m=G.head[h],end=G.head[h+1];m<end;m++){const j=G.items[m];if(j>i&&check(i,j))swaps++;}}}}
+    settle();if(!swaps)break;}
 }
 // Small fleets use exact Hungarian matching (minimum squared travel, hence uncrossed). Large fleets use a deterministic
 // median-split partition (O(n log n), O(n) live storage), then pairwise uncrossing of spatial neighbours.
@@ -294,12 +308,43 @@ function familyFigures(count){
   const chosen=rim.length>=count?pick(rim,count):[...rim,...pick(inner,count-rim.length)];
   return {positions:chosen.map(q=>[q.x,q.y,0]),colors:chosen.map(q=>q.part.color.map(v=>Math.min(1,q.rim?v*1.05+.08:v*.8)))};
 }
+// The growing heart as a 3D shell (Taubin's heart surface, facing the audience) with an oval locket window in front
+// where the family stands. Rays from the centre find the surface; farthest-point sampling spreads `n` lights evenly.
+// Shaded like a sculpture: deep red below to pink above, lit from the upper left, a warm rim, a gold window edge.
+// Heart-local units: the same size and centre as the earlier flat heart.
+export const HEART_WINDOW={cx:0,cy:.25,rx:6.7,ry:4.7},HEART_BEAT=5;// seconds the grown heart beats before it falls
+function heartShell(n){
+  const F=(x,y,z)=>{const a=x*x+2.25*y*y+z*z-1;return a*a*a-x*x*z*z*z-.1125*y*y*z*z*z;};// z up, y depth
+  const S=10.2,lift=-1.9,m=Math.max(600,n*3),W=HEART_WINDOW,candidates=[];
+  for(let i=0;i<m;i++){
+    const dz=1-2*(i+.5)/m,rr=Math.sqrt(1-dz*dz),a=i*2.399963229728653,d=[rr*Math.cos(a),rr*Math.sin(a),dz];
+    let lo=0,hi=0;for(let r=.02;r<=2;r+=.02)if(F(d[0]*r,d[1]*r,d[2]*r)>0){lo=r-.02;hi=r;break;}
+    if(!hi)continue;for(let k=0;k<28;k++){const mid=(lo+hi)/2;if(F(d[0]*mid,d[1]*mid,d[2]*mid)>0)hi=mid;else lo=mid;}
+    const r=(lo+hi)/2,[x,y,z]=d.map(v=>v*r),e=1e-4,g=[F(x+e,y,z)-F(x-e,y,z),F(x,y+e,z)-F(x,y-e,z),F(x,y,z+e)-F(x,y,z-e)],gl=Math.hypot(...g);
+    const nrm=gl>1e-12?[g[0]/gl,g[2]/gl,g[1]/gl]:[d[0],d[2],d[1]],p=[x*S,z*S+lift,y*S];// to x right, y up, z toward the audience
+    const w=((p[0]-W.cx)/W.rx)**2+((p[1]-W.cy)/W.ry)**2;if(p[2]>0&&w<1)continue;// the locket window
+    candidates.push({p,n:nrm,w});
+  }
+  // Farthest-point sampling: every light as far as possible from those already placed.
+  const N=candidates.length,dist=new Float64Array(N).fill(Infinity),chosen=[];let next=0;
+  for(let c=0;c<n&&c<N;c++){chosen.push(next);const q=candidates[next].p;let best=-1,far=-1;
+    for(let j=0;j<N;j++){const o=candidates[j].p,d=(o[0]-q[0])**2+(o[1]-q[1])**2+(o[2]-q[2])**2;if(d<dist[j])dist[j]=d;if(dist[j]>far){far=dist[j];best=j;}}next=best;}
+  const ys=candidates.map(c=>c.p[1]),y0=Math.min(...ys),y1=Math.max(...ys),L=[-.45,.55,.7].map(v=>v/Math.hypot(-.45,.55,.7));
+  const ramp=t=>t<.5?[.9,.05+.3*t,.18+.44*t]:[1,.2+.6*(t-.5),.4+.7*(t-.5)];
+  const positions=[],colors=[];
+  for(let c=0;c<n;c++){const {p,n:q,w}=candidates[chosen[c%chosen.length]];positions.push(p);
+    const base=ramp((p[1]-y0)/(y1-y0)),light=.35+.65*Math.max(0,q[0]*L[0]+q[1]*L[1]+q[2]*L[2]),rim=(1-Math.abs(q[2]))**2*.55,edge=p[2]>0&&w<1.35?1:0;
+    colors.push(edge?[1,.82,.4]:base.map((v,k)=>Math.min(1,v*light+[1,.72,.42][k]*rim)).map(v=>p[2]<0&&w<1?v*.45:v));}// dim behind the family
+  return {positions,colors};
+}
 function shapedFirework(kind,count,scale){
   const positions=[],colors=[],centres=[];
   // The heart keeps ~72% of the fleet for its contours; the rest draw the family inside it.
-  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?familyFigures(count-outline):null;
+  const outline=kind==='heart'?count-Math.floor(count*.28):count,family=outline<count?familyFigures(count-outline):null,shell=kind==='heart'?heartShell(outline):null,turn=[];
   for(let i=0;i<count;i++){
+    turn.push(kind==='heart'&&i<outline);// the shell turns and beats; the family stands still in its window
     if(i>=outline){const p=family.positions[i-outline],centre=[0,24,0];colors.push([...family.colors[i-outline]]);centres.push(centre.map(v=>v*scale));positions.push(p.map((v,k)=>(centre[k]+v)*scale));continue;}
+    if(shell){const centre=[0,24,0];colors.push(shell.colors[i]);centres.push(centre.map(v=>v*scale));positions.push(shell.positions[i].map((v,k)=>(centre[k]+v)*scale));continue;}
     let p,centre=[0,24,0];
     if(kind==='balls'){
       const cluster=i%3,j=Math.floor(i/3),n=Math.floor((count+2-cluster)/3),y=1-2*(j+.5)/n,a=j*2.399963229728653,r=Math.sqrt(Math.max(0,1-y*y));
@@ -314,7 +359,7 @@ function shapedFirework(kind,count,scale){
     }
     centres.push(centre.map(v=>v*scale));positions.push(p.map((v,k)=>(centre[k]+v)*scale));
   }
-  return {positions,colors,centres};
+  return {positions,colors,centres,...(kind==='heart'?{turn}:{})};
 }
 // Return, descent and rest on the pads for the Demo and shows edited from it (seconds).
 export const CINEMATIC_LANDING=Object.freeze([9,20,8]);
@@ -335,7 +380,17 @@ export function buildShow(custom,options={}){
   const add=(name,kind,duration,target,details={})=>{if(kind==='move'&&details.transitionLights&&stages.length)stages.at(-1).fadeBeforeMove=true;const stage={name,kind,start:cursor,end:cursor+duration,from:previous,to:target,...details};stages.push(stage);cursor+=duration;previous=target;return stage;};
   add('Launch grid','hold',2,ground);cues.push({label:'Takeoff',time:2});add('Takeoff','takeoff',6,hover);
   const sequence=options.sequence??(custom?[{name:'Your drawing',formation:custom,hold:12}]:demoPaths().map(f=>({...f,formation:samplePaths(f.paths,count)})));
-  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled,pyro,motion=MOTIONS.includes(effect)?effect:undefined,spout,waves} of sequence){
+  for(const {name,formation,hold,transfer=7,light='fade',effect='none',fireEnabled,pyro,motion=MOTIONS.includes(effect)?effect:undefined,spout,waves,phrases} of sequence){
+    if(phrases?.length){// a sentence first: each phrase holds, then morphs (lights on) into the next, and the last into the formation
+      const natural=phrases.length*(PHRASE_TIMING.hold+PHRASE_TIMING.morph),k=Math.min(1,Math.max(0,hold-6)/natural),final=hold-natural*k;
+      phrases.forEach((p,j)=>{const target=matchFormation(previous.positions,p.formation);
+        if(j)add(p.label+' · forming','move',PHRASE_TIMING.morph*k,target,{morph:true,within:true});else add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});
+        cues.push({label:p.label,time:cursor+.2});add(p.label,'hold',PHRASE_TIMING.hold*k,target,{reveal:!j,light,phrase:true,motionScale:options.motionScale});});
+      const target=matchFormation(previous.positions,formation);add(name+' · forming','move',PHRASE_TIMING.morph*k,target,{morph:true});
+      cues.push({label:name,time:cursor+Math.min(final/2,2)});
+      add(name,'hold',final,target,{climax:true,light,effect,fireEnabled,motionScale:options.motionScale,...(pyro?{pyro:true}:{}),...(motion?{motion}:{})});
+      continue;
+    }
     // `pyro` marks a formation that ship-launched fireworks accompany; motion, spout and waves animate the display.
     const target=matchFormation(previous.positions,formation),details={...(pyro?{pyro:true}:{}),...(motion?{motion}:{}),...(spout&&target.extra?{spout}:{}),...(waves&&target.extra?{waves}:{})};
     add('Forming '+name,'move',transfer,target,{transitionLights:options.transitionLights});cues.push({label:name,time:cursor+Math.min(hold/2,2)});
@@ -349,8 +404,11 @@ export function buildShow(custom,options={}){
       const rawSeeds={positions:shape.positions.map((p,i)=>p.map((v,k)=>shape.centres[i][k]+(v-shape.centres[i][k])*.12)),colors:dark()};
       const seeds=matchFormation(previous.positions,rawSeeds),indices=seeds.order.map(rank=>Math.round(rank*(count-1)));
       add('Launching '+name.toLowerCase(),'move',9,seeds,{transitionLights:options.transitionLights});
-      const expanded={positions:indices.map(i=>shape.positions[i]),colors:indices.map(i=>shape.colors[i])};
-      cues.push({label:name,time:cursor+4.5});add(name,'grow',6,expanded);
+      const expanded={positions:indices.map(i=>shape.positions[i]),colors:indices.map(i=>shape.colors[i]),...(shape.turn?{turn:indices.map(i=>shape.turn[i])}:{})};
+      // The 3D heart turns gently while it grows and beats, then falls; star and balls fall straight away.
+      const beat=kind==='heart'?HEART_BEAT:0,turn=beat?{start:cursor,period:6+beat,angle:.3,pivot:[0,24*(options.motionScale??1),0]}:null;
+      cues.push({label:name,time:cursor+4.5});add(name,'grow',6,expanded,turn?{heart:true,turn}:{});
+      if(beat)add('Beating heart','beat',beat,expanded,{turn});
       const fallen={positions:expanded.positions.map((p,i)=>[p[0]+Math.sin(i*2.4)*.7*(options.motionScale??1),p[1]-7*(options.motionScale??1),p[2]]),colors:dark()};
       add(name+' · falling sparks','fall',7,fallen);
     }
@@ -444,14 +502,20 @@ export function sampleShow(show,time,out=createFrame(show)){
   out.time=t;out.phase=s.name;
   const window=Math.sin(Math.PI*elapsed/duration)**2,animated=['sparkle','fire','starship'].includes(s.effect),travel=ease((elapsed-.65)/(duration-1.3)),progress=ease(elapsed/duration),fadeOut=1-ease(elapsed/.6),fadeIn=ease(elapsed/.65),navigation=ease(elapsed/.35)*ease((duration-elapsed)/.35);
   const side=Math.ceil(Math.sqrt(show.count)),motion=(s.kind==='hold'||s.kind==='rise')&&s.motion?motionFrame(s):null,envelope=motion?ease(elapsed/1.2)*ease((duration-elapsed)/1.2):0;
+  // The heart's lub-dub (twice a second, zero at both ends of the stage) and its gentle turn (zero where it starts and ends).
+  const u=elapsed%1.05,beat=s.kind==='beat'?(Math.exp(-(((u-.12)/.05)**2))+.6*Math.exp(-(((u-.36)/.06)**2)))*ease(elapsed/.4)*ease((duration-elapsed)/.4):0;
+  const turnAngle=s.turn?s.turn.angle*Math.sin(2*Math.PI*(t-s.turn.start)/s.turn.period):0,tc=Math.cos(turnAngle),ts=Math.sin(turnAngle),swell=1+.05*beat,blend=[0,0,0];
   for(let i=0;i<show.count;i++){
     let q=0,light=0,navLight=0,color=s.to.colors[i];
     if(s.kind==='hold'){q=1;const reveal=Math.min(2,duration/2),rank=s.light==='draw-on'?(s.to.order?.[i]??0):s.light==='bottom-up'?clamp((s.to.positions[i][1]/(s.motionScale??1)-2)/42):0;light=s.reveal?ease((elapsed-rank*reveal*.75)/(s.light==='fade'||!s.light?Math.min(1.1,reveal):reveal*.25)):1;}
+    // A sentence morphs with its lights on, the colours blending from one phrase to the next.
+    else if(s.kind==='move'&&s.morph){q=progress;const a=s.from.colors[i],b=s.to.colors[i];for(let k=0;k<3;k++)blend[k]=a[k]+(b[k]-a[k])*progress;color=blend;light=1;}
     // Lit transitions: the shape's lights are off in flight and every drone blinks red or blue at TRAVEL_BLINK.
     else if(s.kind==='move'){q=travel;light=s.transitionLights?0:fadeOut;color=s.from.colors[i];if(s.transitionLights)navLight=TRAVEL_LEVEL*navigation*(.35+.65*Math.sin(elapsed*8+i*.12)**2);}
     else if(s.kind==='takeoff'||s.kind==='landing'){// Row and LED phase follow the pad, so each pad reverses its own takeoff.
       const pad=s.to.pad?.[i]??i,row=Math.floor(pad/side)/Math.max(1,side-1),navTime=s.reverse?6*(1-elapsed/duration):elapsed,navDuration=s.reverse?6:duration;q=s.reverse?1-ease((navTime-row*.65)/(6-.65)):ease((elapsed-row*.65)/(duration-.65));light=ease(navTime/.35)*ease((navDuration-navTime)/.35)*(.35+.65*Math.sin(navTime*8+pad*.12)**2);color=(Math.floor(navTime*3)+pad)%2?navigationRed:navigationBlue;}
     else if(s.kind==='grow'){q=progress;light=fadeIn;}
+    else if(s.kind==='beat'){q=1;light=1-.14*(1-beat)*ease(elapsed/.4)*ease((duration-elapsed)/.4);}// brightest on each beat
     // Sparks accelerate uniformly for 80% of the fall, then brake to rest, matching the next transfer's zero start speed.
     else if(s.kind==='fall'){const u=elapsed/duration;q=u<.8?u*u/.8:.8+2*(u-.8)-(u-.8)**2/.2;light=(1-ease(elapsed/duration))*(1-.92*Math.sin(Math.PI*elapsed/duration)**2*(.5+.5*Math.sin(elapsed*12+i*2.4)));color=s.from.colors[i];}
     else if(s.kind==='burst'||s.kind==='rise'){q=progress;light=fadeIn;}
@@ -466,6 +530,7 @@ export function sampleShow(show,time,out=createFrame(show)){
       if(k===1)out.positions[i*3+k]=Math.max(.12,out.positions[i*3+k]);
       out.colors[i*3+k]=color[k]*light*pulse+navLight*((Math.floor(elapsed*3)+i)%2?navigationRed[k]:navigationBlue[k]);
     }
+    if(s.turn&&s.to.turn?.[i]){const P=out.positions,o=i*3,[px,py,pz]=s.turn.pivot,x=(P[o]-px)*swell,y=(P[o+1]-py)*swell,z=(P[o+2]-pz)*swell;P[o]=px+x*tc+z*ts;P[o+1]=py+y;P[o+2]=pz-x*ts+z*tc;}
     if(envelope>0)moveDrone(s,motion,i,elapsed,envelope,out);
   }
   return out;

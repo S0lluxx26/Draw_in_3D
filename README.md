@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 21: a sentence for Happy day, a 3D heart, showpiece fireworks
+
+![TODAY IS A GIFT, the sentence morphing into HAPPY DAY, and the 3D heart beating with the family in its window](docs/media/studio21-sentence-heart.jpg)
+
+Before **HAPPY DAY**, the drones now spell out *"Yesterday is history, tomorrow is a mystery, today is a gift — that's why it's called the present"* in 3D letters, one phrase at a time, gliding from each phrase into the next with their colours blending. The **growing heart is a 3D heart**: shaded, with a locket window where the family stands. It turns as it grows and **beats** before falling into sparks. New **showpiece fireworks** burst around the heart and through the sentence: colour-changing chrysanthemums, glittering gold crowns, crossed double rings and heart shells. The Demo runs 6:59. [Details and checks](docs/STUDIO21.md).
+
 ## Studio 20: candles that burn, a family you can recognise
 
 ![The birthday cake with flickering candle flames, and the growing heart with the family holding hands](docs/media/studio20-cake-family.jpg)

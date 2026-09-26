@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import assets from '../src/formation-assets.js';
 import {compileDemo} from '../src/demo-settings.js';
-import {sampleShow,spoutPoint,blowGlow,wavePoint,waveGlow,WHALE_SPOUT} from '../src/drone-show.js';
+import {sampleShow,spoutPoint,blowGlow,wavePoint,waveGlow,WHALE_SPOUT,HEART_WINDOW,HEART_BEAT} from '../src/drone-show.js';
 import {withWebmDuration} from '../src/show-recorder.js';
 import {editableDemo,compileShow,encodeShow,decodeShow} from '../src/show-project.js';
 import {laserBeam,LASER_COUNT} from '../src/lasers.js';
@@ -92,15 +92,22 @@ test('three balloons drift up during their display, swaying on their own, with f
   assert.ok(a.some((v,k)=>Math.abs(v-b[k])>.08*Math.max(v,b[k])),'the flames flicker');
 });
 
-test('the growing heart holds a family: man, boy, woman and waving girl, all inside the heart',()=>{
-  // Heart-local coordinates (demo scale 6, heart centre 24 units up); the innermost contour is the r=.76 ring.
-  const s=stage('Growing heart'),n=demo.count,family=Math.floor(n*.28),local=s.to.positions.map(p=>[p[0]/6,p[1]/6-24]);
-  const ring=Array.from({length:720},(_,i)=>{const a=i*Math.PI/360;return [16*Math.sin(a)**3*.76*.7,(13*Math.cos(a)-5*Math.cos(2*a)-2*Math.cos(3*a)-Math.cos(4*a))*.76*.7];});
-  const inside=([x,y])=>{let c=false;for(let i=0,j=ring.length-1;i<ring.length;j=i++){const [xi,yi]=ring[i],[xj,yj]=ring[j];if((yi>y)!==(yj>y)&&x<(xj-xi)*(y-yi)/(yj-yi)+xi)c=!c;}return c;};
-  const clear=p=>inside(p)&&Math.min(...ring.map(([x,y])=>Math.hypot(x-p[0],y-p[1])))>.25,people=local.map((p,i)=>clear(p)?i:-1).filter(i=>i>=0);
-  assert.equal(people.length,family,'every family light sits clearly inside the heart, and nothing else does');
+test('the growing heart is a 3D locket: a shell with a window where the family stands, turning and beating',()=>{
+  // Heart-local coordinates (demo scale 6, heart centre 24 units up).
+  const s=stage('Growing heart'),n=demo.count,local=s.to.positions.map(p=>[p[0]/6,p[1]/6-24,p[2]/6]);
+  const people=local.map((p,i)=>s.to.turn[i]?-1:i).filter(i=>i>=0),shell=local.map((p,i)=>s.to.turn[i]?i:-1).filter(i=>i>=0);
+  assert.equal(people.length,Math.floor(n*.28),'28% of the fleet is the family');
+  const w=([x,y])=>((x-HEART_WINDOW.cx)/HEART_WINDOW.rx)**2+((y-HEART_WINDOW.cy)/HEART_WINDOW.ry)**2;
+  assert.ok(people.every(i=>w(local[i])<1&&Math.abs(local[i][2])<.01),'the family stands in the window, in the middle of the heart');
+  assert.ok(shell.every(i=>!(local[i][2]>0&&w(local[i])<1)),'nothing hides them from the audience');
+  const zs=shell.map(i=>local[i][2]),xs=shell.map(i=>local[i][0]);assert.ok(Math.max(...zs)-Math.min(...zs)>10&&Math.max(...xs)-Math.min(...xs)>20,'a real 3D heart');
   const colours=new Set(people.map(i=>s.to.colors[i].map(v=>v.toFixed(2)).join()));assert.ok(colours.size>=4,'four people, four colours');
-  const ys=people.map(i=>local[i][1]),xs=people.map(i=>local[i][0]);assert.ok(Math.max(...xs)-Math.min(...xs)>7&&Math.max(...ys)-Math.min(...ys)>5,'a row of standing figures');
+  const fy=people.map(i=>local[i][1]),fx=people.map(i=>local[i][0]);assert.ok(Math.max(...fx)-Math.min(...fx)>7&&Math.max(...fy)-Math.min(...fy)>5,'a row of standing figures');
+  // It turns while it grows, then beats for HEART_BEAT seconds; the family stays put and the shell comes back to rest.
+  const beat=demo.stages[demo.stages.indexOf(s)+1];assert.equal(beat.kind,'beat');assert.equal(beat.end-beat.start,HEART_BEAT);
+  const mid=sampleShow(demo,beat.start+2.62),moved=shell.filter(i=>Math.hypot(mid.positions[i*3]-s.to.positions[i][0],mid.positions[i*3+2]-s.to.positions[i][2])>1).length;
+  assert.ok(moved>shell.length*.5,'the shell turns');assert.ok(people.every(i=>Math.abs(mid.positions[i*3]-s.to.positions[i][0])<1e-3),'the family does not');
+  const end=sampleShow(demo,beat.end-1e-6);assert.ok(shell.every(i=>Math.abs(end.positions[i*3]-s.to.positions[i][0])<.05));
 });
 
 test('recorded WebM videos get their length, so players can show it and seek',async()=>{

@@ -1,6 +1,6 @@
 // Editable source is separate from compiled drone positions and drawing-only files.
 import {entity,clone,validate,documentOf,decode} from './model.js';
-import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT,MOTIONS,CINEMATIC_LANDING} from './drone-show.js';
+import {demoPaths,drawingPaths,fitPaths,placePaths,samplePaths,buildShow,DRONE_COUNT,MOTIONS,CINEMATIC_LANDING,HEART_BEAT,demoHold} from './drone-show.js';
 import {FORMATIONS,FLEET_SIZES,LIGHT_SHAPES,DEMO_TRANSFER,demoSettings,libraryCue,libraryFormation,extrasFor,drawingExtras} from './demo-library.js';
 import {designPaper,designPlacement,toSheet,argb} from './formation-design.js';
 
@@ -42,7 +42,7 @@ export function editableDemo(){
 // The Demo itself as an editable show (version 3): the Blender-built formations with their built-in motion, the
 // Demo's look and its finale. Edit, reorder, remove or add formations, save the file, and it plays like the Demo.
 const DEFAULT_PLACEMENT={origin:[0,1.4,0],scale:10,position:[0,18,0],yaw:0};
-export const demoCue=(name,fire=false)=>({id:crypto.randomUUID(),name,library:name,artwork:[],hold:libraryCue(name).hold,transfer:DEMO_TRANSFER,light:'fade',effect:libraryCue(name).effect??'none',fire,brightness:1,placement:structuredClone(DEFAULT_PLACEMENT)});
+export const demoCue=(name,fire=false)=>({id:crypto.randomUUID(),name,library:name,artwork:[],hold:demoHold(libraryCue(name)),transfer:DEMO_TRANSFER,light:'fade',effect:libraryCue(name).effect??'none',fire,brightness:1,placement:structuredClone(DEFAULT_PLACEMENT)});
 export function demoShowDoc(settings){
   const s=demoSettings(settings);
   return validateShow({format:'draw-in-3d-show',version:3,name:'Sky stories',count:s.count,look:{shape:s.shape,scale:s.scale,pyro:s.pyro,lasers:s.lasers},
@@ -94,7 +94,7 @@ export function cueFormation(c,count=DRONE_COUNT){
 // and the Show editor previews the selected one with it, so the preview never drifts from the performance.
 export function cueSequence(doc,c,assets){
   const scale=doc.look.scale*2;
-  if(c.library){const lib=libraryFormation(assets,c.library,doc.count,scale,c.fire);lib.formation.colors=lib.formation.colors.map(v=>v.map(x=>x*c.brightness));return {...c,...lib,name:c.name};}
+  if(c.library){const lib=libraryFormation(assets,c.library,doc.count,scale,c.fire),dim=f=>{f.colors=f.colors.map(v=>v.map(x=>x*c.brightness));};dim(lib.formation);lib.phrases?.forEach(p=>dim(p.formation));return {...c,...lib,name:c.name};}
   // Drawings swim like the Demo formations: the whale swim adds a spout, the fish swim adds waves.
   const motion=MOTIONS.includes(c.effect)?c.effect:undefined,extra=extrasFor(motion,doc.count),f=cueFormation(c,doc.count-extra);f.positions=f.positions.map(p=>p.map(v=>v*scale));
   const water=drawingExtras(motion,f.positions,extra,scale);if(!water)return {...c,formation:f};
@@ -124,7 +124,7 @@ export function compileShow(doc,assets){
   const show=buildShow(null,{sequence,count:doc.count,transitionLights:true,motionScale:scale,reverseLanding:true,fireworks:finale,title:doc.name});
   return Object.assign(show,{lightShape:doc.look.shape,pyro:doc.look.pyro,lasers:doc.look.lasers,cinematic:true});
 }
-export const DEMO_FINALE=66;// heart, star and firework balls: three 9 s launches, 6 s growth and 7 s falling sparks
+export const DEMO_FINALE=66+HEART_BEAT;// heart, star and firework balls: three 9 s launches, 6 s growth, 7 s falling sparks; the heart beats
 export const DEMO_LANDING=CINEMATIC_LANDING.reduce((a,b)=>a+b);// return, descent under the firework finale, rest
 export const showDuration=doc=>doc.version===3
   ?8+doc.cues.reduce((n,c)=>n+c.hold+c.transfer,0)+(doc.fireworks.enabled?(doc.fireworks.style==='demo'?DEMO_FINALE:7+doc.fireworks.duration):0)+DEMO_LANDING

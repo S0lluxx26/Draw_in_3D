@@ -15,7 +15,7 @@ try{
   const download=async name=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const d=await waiting,file=path.join(out,name);await d.saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   await page.locator('#width').fill('130');await page.locator('#width').dispatchEvent('change');
   await drag([.33,.41],[.64,.44]);await count(2);await page.locator('[data-color="#f47e97"]').click();await drag([.35,.48],[.62,.57]);await count(3);
-  const initial=await download('paper-initial.json');assert.ok(initial.version>=3);// paper files export v4+ since Studio 05assert.equal(initial.entities[1].paperId,initial.entities[0].id);
+  const initial=await download('paper-initial.json');assert.ok(initial.version>=3);/* paper files export v4+ since Studio 05 */assert.equal(initial.entities[1].paperId,initial.entities[0].id);
   // Change the finish under existing paint; its pigment geometry must rebuild.
   await page.locator('#paper-kind').selectOption('rough');await count(3);assert.equal((await download('paper-rough.json')).entities[0].paperKind,'rough');
   await page.locator('#undo').click();await page.waitForFunction(()=>document.querySelector('#paper-kind').value==='watercolor');

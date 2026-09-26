@@ -25,6 +25,9 @@ export function showKeyframes(show){
   // where the shells burst, with the launch field at the bottom of the picture.
   const unit=stageUnit(show),finale=show.pyro!==false&&stages.some(s=>s.kind==='landing'&&s.reverse);
   const harbour={center:[0,128*unit,-160*unit],half:[250*unit,148*unit,40*unit],ground:.1,wide:true};
+  // A sentence (Happy day's phrases) shares one steady frame around all its phrases, with headroom, so the words change in place.
+  const sentence=new Map();stages.forEach((s,c)=>{if(!s.climax)return;const points=[];for(let j=c-1;j>=0&&(stages[j].phrase||stages[j].morph);j--)if(stages[j].phrase)points.push(...stages[j].to.positions);
+    if(points.length){const b=box(points);sentence.set(s,{center:[b.center[0],b.center[1]-b.half[1]*.32,b.center[2]],half:[b.half[0]*1.04,b.half[1]*1.4,b.half[2]],ground:0});}});// room below: the words sit clear of the skyline
   const keyframes=[grounded(stages[0])?{...close}:frame(box(stages[0].from.positions),1)];
   stages.forEach((s,i)=>{
     const next=stages[i+1];let b;
@@ -33,6 +36,8 @@ export function showKeyframes(show){
     else b=box(s.to.positions);
     if(grounded(s)&&(i===0||i===stages.length-1)){keyframes.push({...close});return;}
     if(finale&&(s.kind==='landing'||next?.kind==='landing')){keyframes.push({...harbour});return;}
+    // A sentence holds one steady frame, the one its closing formation needs, so the words change in place.
+    if(s.phrase||s.morph&&!next?.climax||s.kind==='move'&&next?.phrase){const f=sentence.get(stages.slice(i).find(x=>x.climax));if(f){keyframes.push({...f});return;}}
     keyframes.push(frame(b,b.top<=hoverTop*1.05+1e-6?1:0));
   });
   // Never zoom in on tiny intermediate shapes more than the show's typical formation allows.

@@ -211,7 +211,7 @@ export class SkyStage{
     if(this.pyro){this.pyro.geometry.dispose();this.pyro.material.dispose();this.pyro.removeFromParent();this.pyro=null;}
     const data=pyroParticles(pyroSchedule(this.show,origins,{scale:this.scale}));if(!data.length)return;
     const buffer=new THREE.InterleavedBuffer(data,PARTICLE_FLOATS),geometry=new THREE.BufferGeometry(),n=data.length/PARTICLE_FLOATS;
-    for(const [name,size,offset] of [['shell',2,0],['origin',3,2],['launch',3,5],['star',3,8],['info',4,11],['look',4,15],['extra',2,19]])geometry.setAttribute(name,new THREE.InterleavedBufferAttribute(buffer,size,offset));
+    for(const [name,size,offset] of [['shell',2,0],['origin',3,2],['launch',3,5],['star',3,8],['info',4,11],['look',4,15],['extra',2,19],['shift',4,21]])geometry.setAttribute(name,new THREE.InterleavedBufferAttribute(buffer,size,offset));
     geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,2));geometry.setDrawRange(0,n);
     const material=new THREE.ShaderMaterial({vertexShader:PYRO_VERTEX,fragmentShader:PYRO_FRAGMENT,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,
       uniforms:{time:{value:0},gravity:{value:GRAVITY*this.scale},sizeWorld:{value:3.4*this.scale},viewport:{value:720},minSize:{value:1.5}}});

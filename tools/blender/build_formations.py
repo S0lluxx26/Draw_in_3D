@@ -610,6 +610,35 @@ def happy_day():
     sparkles.finish('Sparkles', 'white', smooth=False)
     exhaust([-8, -3, 3, 8], -9.4, 0, 2.6, .4)
 
+# The sentence Happy day grows from, one 3D phrase at a time (the web app morphs the drones between them):
+# 'Yesterday is history, tomorrow is a mystery, today is a gift - that's why it's called the present.'
+PHRASES = [('Yesterday is history', [('YESTERDAY', 5.2, 24.0), ('IS HISTORY', -2.8, 21.0)], [(-12, (.3, .55, 1)), (12, (.72, .45, 1))]),
+           ('Tomorrow is a mystery', [('TOMORROW', 5.2, 22.0), ('IS A MYSTERY', -2.8, 24.0)], [(-12, (.7, .35, 1)), (12, (1, .3, .72))]),
+           ('Today is a gift', [('TODAY', 5.2, 17.0), ('IS A GIFT', -2.8, 20.0)], [(-12, (1, .78, .2)), (12, (1, .42, .22))]),
+           ("That's why it's called", [("THAT'S WHY", 5.2, 22.0), ("IT'S CALLED", -2.8, 23.0)], [(-12, (.3, .88, 1)), (12, (.85, .95, 1))]),
+           ('the present', [('THE', 6.8, 9.0), ('PRESENT', -1.2, 26.0)], [(-13, (1, .3, .55)), (-4, (1, .62, .15)), (4, (1, .88, .25)), (13, (.4, 1, .6))])]
+
+def phrase(lines, stops):
+    """Extruded 3D lines of text (Arial Black, like HAPPY DAY), coloured by a left-to-right gradient."""
+    font_path = next((f for f in ('C:/Windows/Fonts/ariblk.ttf', '/usr/share/fonts/truetype/msttcorefonts/Arial_Black.ttf') if pathlib.Path(f).exists()), None)
+    colour = lambda p: ramp(stops, p.x)
+    for text, y_centre, width in lines:
+        curve = bpy.data.curves.new(text, 'FONT'); curve.body = text; curve.align_x = 'CENTER'; curve.align_y = 'CENTER'
+        if font_path:
+            curve.font = bpy.data.fonts.load(font_path, check_existing=True)
+        curve.extrude = .3; curve.bevel_depth = .05; curve.bevel_resolution = 2; curve.resolution_u = 6
+        obj = bpy.data.objects.new(text, curve); bpy.context.scene.collection.objects.link(obj)
+        bpy.context.view_layer.update()
+        me = bpy.data.meshes.new_from_object(obj.evaluated_get(bpy.context.evaluated_depsgraph_get()))
+        bpy.data.objects.remove(obj); bpy.data.curves.remove(curve)
+        xs = [v.co.x for v in me.vertices]; ys = [v.co.y for v in me.vertices]
+        k = width / (max(xs) - min(xs)); cx = (max(xs) + min(xs)) / 2; cy = (max(ys) + min(ys)) / 2
+        bm = bmesh.new(); bm.from_mesh(me); bpy.data.meshes.remove(me)
+        for v in bm.verts:
+            v.co = Vector(((v.co.x - cx) * k, (v.co.y - cy) * k + y_centre, v.co.z * 1.75))
+        bmesh.ops.triangulate(bm, faces=bm.faces)
+        part = Part(colour); part.merge(bm); part.finish(text, 'gold', smooth=False)
+
 BUILDERS = {'Robot': robot, 'Fish': fish, 'Butterfly': butterfly, 'Hot air balloon': balloon, 'Eiffel Tower': tower, 'Big ship': ship, 'Whale': whale,
             'Firework star': star, 'Row of fire': fire_row, 'Birthday cake': cake, 'Starship launch': starship, 'Happy day': happy_day}
 
@@ -721,7 +750,7 @@ DECODER = '''const bytes=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
 function decode(g){const view=new DataView(bytes(g.p).buffer),c=bytes(g.c),positions=[],colors=[];
   for(let i=0;i<g.n;i++){positions.push([0,1,2].map(k=>Math.round((g.min[k]+(view.getInt16((i*3+k)*2,true)+32768)/65535*(g.max[k]-g.min[k]))*1e4)/1e4));colors.push([0,1,2].map(k=>Math.round(c[i*3+k]/255*1e3)/1e3));}
   return {positions,colors};}
-export default Object.fromEntries(Object.entries(data).map(([name,f])=>[name,{body:decode(f.body),fire:decode(f.fire)}]));
+export default Object.fromEntries(Object.entries(data).map(([name,f])=>[name,{body:decode(f.body),fire:f.fire?decode(f.fire):{positions:[],colors:[]}}]));
 '''
 
 # ---------------------------------------------------------------- main
@@ -748,6 +777,16 @@ for i, name in enumerate(NAMES):
     fire = sample([o for o in objects if o.get('fire')], FIRE, 200 + SEEDS[name])
     encoded[name] = {'body': encode(*body), 'fire': encode(*fire)}
     print('Exported', name, flush=True)
+for i, (label, lines, stops) in enumerate(PHRASES):  # body only: the phrases carry no fire
+    if EXPORT_ONLY:
+        collection = bpy.data.collections[label]
+    else:
+        collection = bpy.data.collections.new(label)
+        bpy.context.scene.collection.children.link(collection)
+        phrase(lines, stops)
+    bpy.context.view_layer.update()
+    encoded[label] = {'body': encode(*sample(list(collection.all_objects), BODY, 300 + i))}
+    print('Exported', label, flush=True)
 if not EXPORT_ONLY:
     (ROOT / 'assets').mkdir(exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=str(ROOT / 'assets/drone-formations.blend'), compress=True)
