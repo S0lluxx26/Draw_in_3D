@@ -1,3 +1,4 @@
+import {translate as t} from './i18n.js';
 import {clone} from './model.js';
 import {drawingPaths,placePaths} from './drone-show.js';
 import {newShow,newCue,demoShowDoc,demoCue,drawingCue,withDemoLook,captureArtwork,fitArtwork,ShowHistory,SHOW_LIMITS,encodeShow,decodeShow,cueFormation,showDuration,DEMO_FINALE,DEMO_TIMING,DEMO_LANDING,cueSequence,cueProblem,cueTimes} from './show-project.js';
@@ -134,7 +135,7 @@ export class ShowEditor{
     $('recovery').hidden=false;$('drafts').textContent='Loading…';
     try{await this.writer.flush();let stored=[];try{stored=await this.store.list();}catch(error){this.report(error.message+' Memory-only drafts are listed below; download them before closing.',true);}const rows=new Map(stored.map(r=>[r.id,r]));for(const [id,job]of this.writer.failed)rows.set(id,{...job.create(),unsaved:true});$('drafts').replaceChildren();
       for(const row of [...rows.values()].sort((a,b)=>b.updatedAt-a.updatedAt)){
-        const item=document.createElement('div');item.className='author-draft';const label=document.createElement('span');label.textContent=`${row.name} · ${new Date(row.updatedAt).toLocaleString()}${row.unsaved?' · only in memory':''}`;
+        const item=document.createElement('div');item.className='author-draft';const label=document.createElement('span');label.translate=false;label.textContent=`${row.name} · ${new Date(row.updatedAt).toLocaleString()}${row.unsaved?' · only in memory':''}`;
         const load=download=>this.loadDraft(row.id,download);
         item.append(label,button('Restore',()=>load()),button('Download',()=>load(true)));$('drafts').append(item);
       }if(!rows.size)$('drafts').textContent='No show drafts yet. Editing a show creates one.';
@@ -162,7 +163,7 @@ export class ShowEditor{
         const id=cue.id;card=button('',()=>{this.active=id;this.render();});card.className='author-card';card.dataset.cueId=id;card.draggable=true;
         card.ondragstart=e=>{e.dataTransfer.setData('text/plain',id);e.dataTransfer.effectAllowed='move';};card.ondragover=e=>e.preventDefault();
         card.ondrop=e=>{e.preventDefault();e.stopPropagation();const source=this.doc.cues.find(c=>c.id===e.dataTransfer.getData('text/plain'));if(!source||source.id===id)return;const cues=this.doc.cues.filter(c=>c!==source);cues.splice(cues.findIndex(c=>c.id===id),0,source);this.change({...this.doc,cues},source.id);};
-        card.thumb=document.createElement('canvas');card.thumb.width=140;card.thumb.height=90;const text=document.createElement('span');card.heading=document.createElement('strong');card.detail=document.createElement('small');
+        card.thumb=document.createElement('canvas');card.thumb.width=140;card.thumb.height=90;const text=document.createElement('span');card.heading=document.createElement('strong');card.heading.translate=false;card.detail=document.createElement('small');
         text.append(card.heading,card.detail);card.append(card.thumb,text);this.cardNodes.set(id,card);
       }
       card.classList.toggle('active',cue.id===this.active);card.setAttribute('aria-pressed',String(cue.id===this.active));
@@ -185,7 +186,7 @@ export class ShowEditor{
     $('look').hidden=!v3;$('classic').hidden=v3;$('library').disabled=this.doc.cues.length>=SHOW_LIMITS.cues;
     if(v3){$('look-shape').value=this.doc.look.shape;$('look-scale').value=this.doc.look.scale;$('look-pyro').checked=this.doc.look.pyro;$('look-lasers').checked=this.doc.look.lasers;}
     this.stage(c);
-    $('timeline').replaceChildren();for(const [label,duration]of [['Takeoff',8],...this.doc.cues.flatMap(c=>[['Transfer',c.transfer],[c.name,c.hold]]),...(this.doc.fireworks.enabled?v3&&this.doc.fireworks.style==='demo'?[['Demo finale',DEMO_FINALE]]:[['Firework launch',7],['Fireworks',this.doc.fireworks.duration]]:[]),['Return / land',v3?DEMO_LANDING:17]]){const part=document.createElement('span');part.textContent=label+' · '+duration+'s';part.style.flexGrow=duration;part.title=part.textContent;$('timeline').append(part);}
+    $('timeline').replaceChildren();for(const [label,duration]of [['Takeoff',8],...this.doc.cues.flatMap(c=>[['Transfer',c.transfer],[c.name,c.hold]]),...(this.doc.fireworks.enabled?v3&&this.doc.fireworks.style==='demo'?[['Demo finale',DEMO_FINALE]]:[['Firework launch',7],['Fireworks',this.doc.fireworks.duration]]:[]),['Return / land',v3?DEMO_LANDING:17]]){const part=document.createElement('span');part.translate=false;part.textContent=label+' · '+duration+'s';part.style.flexGrow=duration;part.title=part.textContent;$('timeline').append(part);}
   }
   // The designer shows the formation exactly as Run plays it; drawings on the stage sheet are edited in place.
   stage(c){
@@ -223,6 +224,6 @@ export class ShowEditor{
       const minX=Math.min(...p.map(v=>v[0]))-1,maxX=Math.max(...p.map(v=>v[0]))+1,minY=Math.min(...p.map(v=>v[1]))-1,maxY=Math.max(...p.map(v=>v[1]))+1;
       const s=Math.min((w-12)/(maxX-minX),(h-12)/(maxY-minY)),ox=(w-(maxX-minX)*s)/2,oy=(h-(maxY-minY)*s)/2;
       for(let i=0;i<p.length;i++){ctx.fillStyle=`rgb(${f.colors[i].map(v=>Math.round(v*255)).join(' ')})`;ctx.beginPath();ctx.arc(ox+(p[i][0]-minX)*s,h-oy-(p[i][1]-minY)*s,1,0,Math.PI*2);ctx.fill();}
-    }catch{ctx.fillStyle='#5f8aa3';ctx.font='11px sans-serif';ctx.fillText('Draw it',12,h/2+4);}
+    }catch{ctx.fillStyle='#5f8aa3';ctx.font='11px sans-serif';ctx.fillText(t('Draw it'),12,h/2+4);}
   }
 }

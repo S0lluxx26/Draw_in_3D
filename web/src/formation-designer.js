@@ -1,3 +1,4 @@
+import {translate as t} from './i18n.js';
 // The 2D formation designer in the Show editor: draw a formation straight onto the sky stage, adjust it, and watch
 // the drones it makes. It edits the formation's sheet ink (formation-design.js), so every change is one Show-editor
 // edit (undo, drafts, save) and Run plays exactly what is drawn.
@@ -15,7 +16,7 @@ const SKYLINE=Array.from({length:36},(_,i)=>{const h=1.2+((i*7919)%13)/13*3.4+(i
 
 export class FormationDesigner{
   constructor(root,hooks){
-    this.hooks=hooks;this.tool='pen';this.color=PALETTE[0];this.fill=false;this.mirror=false;this.snap=false;this.view='both';
+    document.addEventListener('languagechange',()=>this.draw());this.hooks=hooks;this.tool='pen';this.color=PALETTE[0];this.fill=false;this.mirror=false;this.snap=false;this.view='both';
     this.selection=new Set();this.strokes=[];this.editable=false;this.gesture=null;this.hover=-1;
     // Lines made in one action (a filled shape, a word, a mirrored pair) select together; ids survive every edit.
     this.groups=new Map();
@@ -203,7 +204,7 @@ export class FormationDesigner{
       g.globalAlpha=.32;g.drawImage(b,x,y,w*s,h*s);g.globalAlpha=1;}
     g.setLineDash([6*dpr,5*dpr]);g.strokeStyle='#2f6680';g.strokeRect(...px([STAGE.minX,STAGE.maxY]),(STAGE.maxX-STAGE.minX)*s,(STAGE.maxY-STAGE.minY)*s);
     if(this.mirror){g.strokeStyle='#7ee8c5';g.beginPath();g.moveTo(...px([0,STAGE.minY]));g.lineTo(...px([0,STAGE.maxY]));g.stroke();}
-    g.setLineDash([]);g.fillStyle='#5f8aa3';g.font=`${11*dpr}px Inter,sans-serif`;g.fillText('SKY STAGE',...px([STAGE.minX+.6,STAGE.maxY-1.6]));
+    g.setLineDash([]);g.fillStyle='#5f8aa3';g.font=`${11*dpr}px Inter,sans-serif`;g.fillText(t('SKY STAGE'),...px([STAGE.minX+.6,STAGE.maxY-1.6]));
     if(this.unit){const label=`${Math.round((STAGE.maxX-STAGE.minX)*this.unit)} × ${Math.round((STAGE.maxY-STAGE.minY)*this.unit)} m`;g.textAlign='right';g.fillText(label,...px([STAGE.maxX-.6,STAGE.maxY-1.6]));g.textAlign='left';}
     const gesture=this.gesture,moving=gesture?.preview?new Set(gesture.base.map(s=>s.id)):null;
     const lines=[...this.strokes.filter(s=>!moving?.has(s.id)&&!gesture?.removed?.has(s.id)),...(gesture?.preview||[])];
@@ -224,7 +225,7 @@ export class FormationDesigner{
     if(h&&this.editable){const [x0,y0]=px([h.box.minX,h.box.maxY]),[x1,y1]=px([h.box.maxX,h.box.minY]);g.setLineDash([5*dpr,4*dpr]);g.strokeStyle='#7ee8c5';g.lineWidth=1*dpr;g.strokeRect(x0,y0,x1-x0,y1-y0);g.setLineDash([]);
       g.fillStyle='#7ee8c5';for(const q of h.corners){const [x,y]=px(q);g.fillRect(x-4*dpr,y-4*dpr,8*dpr,8*dpr);}
       const [rx,ry]=px(h.rotate);g.beginPath();g.moveTo((x0+x1)/2,y0);g.lineTo(rx,ry);g.stroke();g.beginPath();g.arc(rx,ry,5*dpr,0,Math.PI*2);g.fill();}
-    if(this.editable&&!this.strokes.length&&!gesture){g.fillStyle='#8fb5c7';g.font=`${15*dpr}px Inter,sans-serif`;g.textAlign='center';g.fillText('Draw your formation here: pen, shapes or text',...px([0,26]));g.font=`${12*dpr}px Inter,sans-serif`;g.fillStyle='#5f8aa3';g.fillText('The dots are the drones. Run from here to watch them fly into it.',...px([0,22.5]));g.textAlign='left';}
+    if(this.editable&&!this.strokes.length&&!gesture){g.fillStyle='#8fb5c7';g.font=`${15*dpr}px Inter,sans-serif`;g.textAlign='center';g.fillText(t('Draw your formation here: pen, shapes or text'),...px([0,26]));g.font=`${12*dpr}px Inter,sans-serif`;g.fillStyle='#5f8aa3';g.fillText(t('The dots are the drones. Run from here to watch them fly into it.'),...px([0,22.5]));g.textAlign='left';}
   }
   path(g,points){g.beginPath();points.forEach((p,i)=>g[i?'lineTo':'moveTo'](...this.px(p)));}
 }
