@@ -3,6 +3,8 @@ import {mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
+// Phones fold New / Drafts / Open / Export into the header's Files menu; open it first when it is showing.
+const files=async page=>{if(await page.locator('#files-menu').isVisible()&&await page.locator('#editor-files').isHidden())await page.locator('#files-menu').click();};
 
 const root=fileURLToPath(new URL('../',import.meta.url)),out=path.join(root,'test-output');await mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
@@ -10,11 +12,11 @@ try{
   const page=await browser.newPage({viewport:{width:1440,height:1040},acceptDownloads:true}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('dialog',d=>d.accept());
   await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();
-  assert.equal(await page.locator('.edition').textContent(),'STUDIO 16');
+  assert.equal(await page.locator('.edition').textContent(),'SKY STUDIO');
   let box=await page.locator('#canvas').boundingBox();const xy=(x,y)=>[box.x+box.width*x,box.y+box.height*y];
   const drag=async(a,b)=>{await page.mouse.move(...xy(...a));await page.mouse.down();await page.mouse.move(...xy(...b),{steps:24});await page.mouse.up();};
   const count=async n=>page.waitForFunction(n=>document.querySelector('#object-count').textContent===`${n} / 80`,n);
-  const save=async name=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const d=await waiting,file=path.join(out,name);await d.saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
+  const save=async name=>{const waiting=page.waitForEvent('download');await files(page);await page.locator('#export').click();const d=await waiting,file=path.join(out,name);await d.saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   const history=async id=>{await page.locator('#'+id).click();await page.waitForFunction(()=>!document.body.classList.contains('busy'));};
   await page.locator('#add-paper').click();await drag([.43,.45],[.57,.45]);await count(2);const first=await save('paper-first.json');
   // Regression: orbit behind an existing sheet, leave the legacy plane at Wall,

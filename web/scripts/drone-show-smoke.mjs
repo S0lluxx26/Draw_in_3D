@@ -3,6 +3,8 @@ import {mkdir,readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
+// Phones fold New / Drafts / Open / Export into the header's Files menu; open it first when it is showing.
+const files=async page=>{if(await page.locator('#files-menu').isVisible()&&await page.locator('#editor-files').isHidden())await page.locator('#files-menu').click();};
 const out=fileURLToPath(new URL('../test-output/',import.meta.url));await mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
@@ -11,7 +13,7 @@ try{
   await page.locator('#welcome-demo').click();await page.locator('#drone-show').waitFor({state:'visible'});await page.locator('#show-exit').click();await page.locator('#drone-show').waitFor({state:'hidden'});
   await page.locator('#drone-drawing').click();await page.locator('#toast').waitFor();assert.ok((await page.locator('#toast').textContent()).includes('Draw'));assert.equal(await page.locator('#drone-show').isVisible(),false);
   await page.locator('#add-paper').click();await page.locator('[data-paper-bend="90"]').click();await page.locator('[data-tool="line"]').click();const canvas=await page.locator('#canvas').boundingBox();await page.mouse.move(canvas.x+canvas.width*.44,canvas.y+canvas.height*.44);await page.mouse.down();await page.mouse.move(canvas.x+canvas.width*.58,canvas.y+canvas.height*.55,{steps:10});await page.mouse.up();
-  const save=async name=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const file=path.join(out,name);await(await waiting).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
+  const save=async name=>{const waiting=page.waitForEvent('download');await files(page);await page.locator('#export').click();const file=path.join(out,name);await(await waiting).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   const before=await save('drone-editor-before.json'),history=await page.locator('#history-status').textContent();
   await page.locator('#drone-demo').click();await page.locator('#drone-show').waitFor({state:'visible'});await page.waitForFunction(()=>document.querySelector('#show-scrub').valueAsNumber>.4);
   await page.locator('#show-pause').click();await page.waitForFunction(()=>document.querySelector('#show-play-state').textContent==='PAUSED');const paused=await page.locator('#show-scrub').inputValue();await page.waitForTimeout(150);assert.equal(await page.locator('#show-scrub').inputValue(),paused);

@@ -20,7 +20,7 @@ try{
   await card('Robot').click();await page.locator('#author-delete').click();
   await card('Whale').click();await change('#author-hold',20);
   await card('Fish').click();await page.locator('#author-cue-fire').check();
-  await page.locator('#author-library').selectOption('Butterfly');assert.equal(await page.locator('.author-card').count(),12);
+  await page.locator('#author-library-open').click();await page.locator('#author-library [data-library="Butterfly"]').click();assert.equal(await page.locator('.author-card').count(),12);
   await page.locator('#author-look-shape').selectOption('star');await change('#author-name','My Demo remix');
   await page.screenshot({path:path.join(out,'demo-editing-editor.png')});
   const saving=page.waitForEvent('download');await page.locator('#author-save').click();const file=path.join(out,'my-demo-remix.show.json');await(await saving).saveAs(file);

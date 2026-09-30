@@ -24,6 +24,6 @@ try{
   await page.locator('#show-demo-settings').click();await page.locator('#demo-shape').selectOption('diamond');await page.getByRole('button',{name:'Apply & play Demo',exact:true}).click();
   await page.locator('#show-cues').getByRole('button',{name:'Starship launch',exact:true}).click();await page.waitForFunction(()=>document.querySelector('#show-phase').textContent==='Starship launch');await page.screenshot({path:out+'demo-starship-detailed.png'});
   await page.setViewportSize({width:412,height:915});await page.locator('#show-demo-settings').click();assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:out+'demo-settings-mobile.png'});await page.locator('#demo-cancel').click();
-  await page.locator('#show-exit').click();await page.reload();await page.locator('#drone-demo-settings').click();assert.equal(await page.locator('#demo-count').inputValue(),'1024');assert.equal(await page.locator('#demo-shape').inputValue(),'diamond');
+  await page.locator('#show-exit').click();await page.reload();await page.locator('#welcome-settings').click();/* phone size: the title screen's Settings */assert.equal(await page.locator('#demo-count').inputValue(),'1024');assert.equal(await page.locator('#demo-shape').inputValue(),'diamond');
   assert.deepEqual(errors,[]);console.log('PASS: Demo settings apply/restart, fire toggles, light shaders, cancel/resume, mobile layout, reload persistence and no browser errors.');
 }finally{await browser.close();}

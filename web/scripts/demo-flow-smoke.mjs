@@ -29,7 +29,7 @@ try{
   assert.ok(await page.locator('#demo-quality').isVisible()&&await page.locator('#demo-camera').isVisible());
   assert.ok(await page.locator('#demo-sky').isVisible(),'the background is a player option');
   await page.locator('#demo-quality').selectOption('balanced');await page.locator('#demo-sky').selectOption('afternoon');await page.locator('#demo-apply').click();await ready();
-  assert.equal(await page.locator('#show-quality').textContent(),'BALANCED');assert.equal(await page.locator('#drone-show').getAttribute('data-sky'),'afternoon','Late afternoon applies live');assert.equal(await page.locator('#show-exit').textContent(),'← Back to show','still your show');
+  assert.equal(await page.locator('#show-quality').textContent(),'BALANCED');assert.equal(await page.locator('#drone-show').getAttribute('data-sky'),'afternoon','Late afternoon applies live');assert.equal(await page.locator('#show-exit').textContent(),'Back to show','still your show');
   await page.locator('#show-exit').click();await page.locator('#author-dialog').waitFor({state:'visible'});await page.locator('#author-close').click();
   // 4. From the Demo straight into the Show editor, on the formation that was playing.
   await page.locator('#drone-demo').click();await ready();await page.locator('#show-cues').getByRole('button',{name:'Whale',exact:true}).click();

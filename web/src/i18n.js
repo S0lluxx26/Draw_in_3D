@@ -18,6 +18,14 @@ export function translate(text,locale=language){
     const plane=source.match(/^(WALL · Z|FLOOR · Y|SIDE · X|VIEW OFFSET)(.*)$/);if(plane)result=({'WALL · Z':'TƯỜNG · Z','FLOOR · Y':'SÀN · Y','SIDE · X':'BÊN · X','VIEW OFFSET':'ĐỘ LỆCH GÓC NHÌN'}[plane[1]])+plane[2];
     const lights=source.match(/^([\d,.]+) lights\. One canvas\. An open sky\.$/);
     if(lights)result=lights[1]+' ánh đèn. Một vùng vẽ. Bầu trời rộng mở.';
+    const drafts=source.match(/^Drafts · (\d+)$/);if(drafts)result='Bản nháp · '+drafts[1];
+    // A known prefix and its detail: an error message after it is translated too; a file name is kept as it is.
+    for(const [en,local,inner] of [['Could not load Demo: ','Không tải được Demo: ',true],['Could not load the Demo formations: ','Không tải được các đội hình Demo: ',true],['Video downloaded · ','Đã tải video · ',false]])
+      if(result===undefined&&source.startsWith(en)&&source.length>en.length){const rest=source.slice(en.length);result=local+(inner?translate(rest,locale):rest);}
+    // The Demo's show phases are built from its formation names: "Forming Fish", "Whale · forming", "Launching growing heart".
+    const forming=result===undefined&&source.match(/^Forming (.+)$/);if(forming){const name=translate(forming[1],locale);if(name!==forming[1])result='Đang tạo hình '+name;}
+    const launching=result===undefined&&source.match(/^Launching (.+)$/);if(launching){const base=launching[1][0].toUpperCase()+launching[1].slice(1),name=translate(base,locale);if(name!==base)result='Phóng '+name[0].toLowerCase()+name.slice(1);}
+    const stage=result===undefined&&source.match(/^(.+) · (forming|falling sparks)$/);if(stage){const name=translate(stage[1],locale);if(name!==stage[1])result=name+(stage[2]==='forming'?' · đang tạo hình':' · tia lửa rơi');}
   }
   return result===undefined?text:text.replace(source,result);
 }

@@ -3,34 +3,38 @@ import {QUALITY_LEVELS,SKY_MODES,SKY_KEY} from './quality.js';
 export {FLEET_SIZES,LIGHT_SHAPES,FORMATIONS,demoSettings,compileDemo} from './demo-library.js';
 
 export function installDemoSettings({play,player,notify,edit}){
-  const key='draw3d-demo-settings-v1';let settings=demoSettings(),assets,cached,wasPlaying=false,opener,generation=0;
+  const key='draw3d-demo-settings-v1';let settings=demoSettings(),assets,cached,wasPlaying=false,opener,generation=0,launching=false;
   try{settings=demoSettings(JSON.parse(localStorage.getItem(key)));}catch{}
   const dialog=document.createElement('dialog');dialog.id='demo-settings';dialog.setAttribute('aria-labelledby','demo-settings-title');
-  dialog.innerHTML=`<form><h2 id="demo-settings-title">Demo settings</h2><p class="demo-only">Blender-built 3D formations. Settings apply to this Demo; saved shows stay independent.</p>
-    <p class="player-only">These player options apply to every show. This show's formations and look are set in the Show editor.</p>
-    <label class="demo-only">Number of drones<select id="demo-count">${FLEET_SIZES.map(n=>`<option value="${n}">${n.toLocaleString()}</option>`).join('')}</select></label>
-    <label class="demo-only">Drone light shape<select id="demo-shape"><option value="round">Round glow</option><option value="diamond">Diamond</option><option value="star">Star</option></select></label>
-    <label>Graphics quality<select id="demo-quality"><option value="auto">Auto (recommended)</option><option value="high">Cinematic · bloom, reflections, drone bodies</option><option value="balanced">Balanced · bloom, lighter reflections</option><option value="battery">Battery saver · no post effects</option></select></label>
-    <label>Background<select id="demo-sky"><option value="night">Dark night</option><option value="afternoon">Late afternoon</option></select></label>
-    <label class="demo-only">Formation size / spacing<select id="demo-scale"><option value="2">4× original size</option><option value="3">6× original size (default)</option><option value="4">8× original size</option></select></label>
-    <label class="switch-row demo-only"><span>Ship fireworks<small>Barges and the yacht launch real fireworks during Happy day, the drone fireworks and the finale</small></span><input type="checkbox" id="demo-pyro"></label>
-    <label class="switch-row demo-only"><span>Stage lasers<small>Beams from the launch deck light up the takeoff and the landing</small></span><input type="checkbox" id="demo-lasers"></label>
-    <label>Camera when you drag<select id="demo-camera"><option value="follow">Stay around the show (recommended)</option><option value="free">Free orbit</option></select></label>
-    <fieldset class="demo-only"><legend>Add falling yellow fire to</legend>${FORMATIONS.map((name,i)=>`<label><input type="checkbox" id="demo-fire-${i}">${name}</label>`).join('')}</fieldset>
-    <p class="demo-only">Lower drone counts leave more space between lights and reduce phone workload. Drag to orbit and see the depth. Scale increases world-space spacing; it is not a flight-separation guarantee.</p>
-    <p id="demo-settings-status" role="status"></p><div class="demo-actions"><button type="button" id="demo-edit" class="demo-only" title="Open this Demo in the Show editor to rearrange, retime or add formations and save it">✎ Edit in Show editor</button><button type="button" id="demo-cancel">Cancel</button><button class="primary" type="submit" id="demo-apply">Apply &amp; play Demo</button></div></form>`;
+  dialog.innerHTML=`<form><header class="sheet-head"><div><span class="eyebrow" translate="no">SKY STUDIO</span><h2 id="demo-settings-title">Demo settings</h2></div><button type="button" class="sheet-close" id="demo-close" title="Close" aria-label="Close" data-icon="close"></button></header>
+    <p class="sheet-lead demo-only">Blender-built 3D formations. Settings apply to this Demo; saved shows stay independent.</p>
+    <p class="sheet-lead player-only">These player options apply to every show. This show's formations and look are set in the Show editor.</p>
+    <section class="settings-group demo-only"><h3>Show</h3>
+    <label class="field">Number of drones<select id="demo-count">${FLEET_SIZES.map(n=>`<option value="${n}">${n.toLocaleString()}</option>`).join('')}</select></label>
+    <label class="field">Formation size / spacing<select id="demo-scale"><option value="2">4× original size</option><option value="3">6× original size (default)</option><option value="4">8× original size</option></select></label>
+    <label class="field">Drone light shape<select id="demo-shape"><option value="round">Round glow</option><option value="diamond">Diamond</option><option value="star">Star</option></select></label></section>
+    <section class="settings-group"><h3>Look</h3>
+    <label class="field">Background<select id="demo-sky"><option value="night">Dark night</option><option value="afternoon">Late afternoon</option></select></label>
+    <label class="field">Graphics quality<select id="demo-quality"><option value="auto">Auto (recommended)</option><option value="high">Cinematic · bloom, reflections, drone bodies</option><option value="balanced">Balanced · bloom, lighter reflections</option><option value="battery">Battery saver · no post effects</option></select></label>
+    <label class="field">Camera when you drag<select id="demo-camera"><option value="follow">Stay around the show (recommended)</option><option value="free">Free orbit</option></select></label></section>
+    <section class="settings-group demo-only"><h3>Effects</h3>
+    <label class="switch-row"><span>Ship fireworks<small>Barges and the yacht launch real fireworks all through the show</small></span><input type="checkbox" id="demo-pyro" role="switch"></label>
+    <label class="switch-row"><span>Stage lasers<small>Beams from the launch deck light up the takeoff and the landing</small></span><input type="checkbox" id="demo-lasers" role="switch"></label>
+    <fieldset><legend>Add falling yellow fire to</legend><div class="fire-picks">${FORMATIONS.map((name,i)=>`<label><input type="checkbox" id="demo-fire-${i}">${name}</label>`).join('')}</div></fieldset></section>
+    <p class="settings-note demo-only">Lower drone counts leave more space between lights and reduce phone workload. Drag to orbit and see the depth. Scale increases world-space spacing; it is not a flight-separation guarantee.</p>
+    <p id="demo-settings-status" role="status"></p><div class="demo-actions"><button type="button" id="demo-edit" class="demo-only" data-icon="film" title="Open this Demo in the Show editor to rearrange, retime or add formations and save it">Edit in Show editor</button><button type="button" id="demo-cancel">Cancel</button><button class="primary" type="submit" id="demo-apply">Apply &amp; play Demo</button></div></form>`;
   document.body.append(dialog);
   const $=id=>document.getElementById(id);
   // Yield a frame first so the "Preparing" state paints before the synchronous compile.
   async function load(value){assets??=(await import('./formation-assets.js')).default;await new Promise(r=>requestAnimationFrame(()=>setTimeout(r)));return compileDemo(assets,value);}
-  async function launch(){const request=++generation,button=$('drone-demo');button.setAttribute('aria-busy','true');button.classList.add('busy');try{const show=cached??await load(settings);if(request!==generation||document.querySelector('dialog[open]'))return;cached=show;play(show);}catch(error){notify('Could not load Demo: '+error.message,true);}finally{button.removeAttribute('aria-busy');button.classList.remove('busy');}}
+  async function launch(){if(launching)return;launching=true;const request=++generation,buttons=[$('drone-demo'),$('welcome-demo')].filter(Boolean);for(const b of buttons){b.setAttribute('aria-busy','true');b.classList.add('busy');}try{const show=cached??await load(settings);if(request!==generation||document.querySelector('dialog[open]'))return;cached=show;play(show);}catch(error){notify('Could not load Demo: '+error.message,true);}finally{launching=false;for(const b of buttons){b.removeAttribute('aria-busy');b.classList.remove('busy');}}}
   // For the Demo (or before any show) the dialog sets up the Demo; while another show plays it offers the player options only.
   const demoMode=()=>!player()?.active||!!player().show?.demo;
   function open(){if(player()?.recorder.active)return;generation++;opener=document.activeElement;wasPlaying=!!player()?.active&&player().clock.playing;if(wasPlaying)player().toggle();
     const demo=demoMode();dialog.classList.toggle('player-settings',!demo);$('demo-settings-title').textContent=demo?'Demo settings':'Player settings';$('demo-apply').textContent=demo?'Apply & play Demo':'Apply';
     $('demo-count').value=settings.count;$('demo-quality').value=player()?.quality||'auto';$('demo-shape').value=settings.shape;$('demo-pyro').checked=settings.pyro;$('demo-lasers').checked=settings.lasers;$('demo-camera').value=player()?.cameraMode||'follow';$('demo-sky').value=player()?.sky||'night';$('demo-scale').value=settings.scale;FORMATIONS.forEach((name,i)=>$('demo-fire-'+i).checked=settings.fire[name]);$('demo-settings-status').textContent='';dialog.showModal();}
   function cancel(){generation++;dialog.close();if(wasPlaying&&player()?.active&&!player().clock.playing)player().toggle();opener?.focus();}
-  $('demo-cancel').onclick=cancel;dialog.addEventListener('cancel',e=>{e.preventDefault();cancel();});dialog.addEventListener('keydown',e=>e.stopPropagation());
+  $('demo-cancel').onclick=cancel;$('demo-close').onclick=cancel;dialog.addEventListener('cancel',e=>{e.preventDefault();cancel();});dialog.addEventListener('keydown',e=>e.stopPropagation());
   const chosen=()=>demoSettings({count:Number($('demo-count').value),shape:$('demo-shape').value,scale:Number($('demo-scale').value),pyro:$('demo-pyro').checked,lasers:$('demo-lasers').checked,fire:Object.fromEntries(FORMATIONS.map((name,i)=>[name,$('demo-fire-'+i).checked]))});
   // Straight from the Demo to the Show editor, with these settings and the formation now on screen selected.
   $('demo-edit').onclick=()=>{generation++;const p=player(),time=p?.active?p.clock.time:0,focus=p?.active?[...p.show.cues].reverse().find(c=>c.time<=time+1)?.label:undefined;dialog.close();wasPlaying=false;if(p?.active)p.stop();edit?.(chosen(),focus);};

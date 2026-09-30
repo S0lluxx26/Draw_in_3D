@@ -17,7 +17,7 @@ page.on('dialog',dialog=>dialog.accept());
 const setInput=async(id,value)=>{await page.locator('#'+id).fill(String(value));await page.locator('#'+id).dispatchEvent('change');};
 const exportFile=async(name)=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const download=await waiting;const filename=path.join(output,name);await download.saveAs(filename);return JSON.parse(await readFile(filename,'utf8'));};
 try{
-  await page.goto('http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();
+  await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();
   await page.screenshot({path:path.join(output,'web-empty.png')});
   assert.deepEqual(errors,[]);
   const box=await page.locator('#canvas').boundingBox();

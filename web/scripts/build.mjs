@@ -5,15 +5,15 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = path.join(root, 'dist');
 await mkdir(path.join(dist, 'vendor'), { recursive: true });
-const files=['i18n.js', 'vi.js', 'index.html', 'style.css', 'editor-tools.css', 'editor.js', 'editor-look.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'show-camera.js', 'quality.js', 'pyro.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'sky-stage.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'formation-design.js', 'formation-designer.js', 'show-editor.css', 'show-worker.js', 'show-recorder.js', 'show-music.js', 'lasers.js', 'demo-library.js'];
-const binaries=['assets/sky-stage.glb'];
+const files=['i18n.js', 'vi.js', 'index.html', 'style.css', 'editor-tools.css', 'editor.js', 'editor-look.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'show-camera.js', 'quality.js', 'pyro.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'sky-stage.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'formation-design.js', 'formation-designer.js', 'show-editor.css', 'ui.css', 'show-worker.js', 'show-recorder.js', 'show-music.js', 'lasers.js', 'demo-library.js'];
+const binaries=['assets/sky-stage.glb', 'assets/keyart-wide.webp', 'assets/keyart-tall.webp'];
 const sources=await Promise.all(files.map(file=>readFile(path.join(root,'src',file),'utf8')));
 const binaryData=await Promise.all(binaries.map(file=>readFile(path.join(root,'src',file))));
 const revision=createHash('sha256').update(sources.join('\n')).update(Buffer.concat(binaryData)).digest('hex').slice(0,12);
 const localAssets=new Set([...files.filter(file=>/\.(js|css)$/.test(file)),...binaries].map(file=>'./'+file));
 for (const [i,file] of files.entries()) {
-  // Match HTML and module references so a new page cannot reuse stale app code or assets.
-  const source=sources[i].replace(/(['"])(\.\/[^'"\s]+\.(?:js|css|glb))\1/g,(match,quote,url)=>localAssets.has(url)?quote+url+'?v='+revision+quote:match);
+  // Match HTML, CSS and module references so a new page cannot reuse stale app code or assets.
+  const source=sources[i].replace(/(['"])(\.\/[^'"\s]+\.(?:js|css|glb|webp))\1/g,(match,quote,url)=>localAssets.has(url)?quote+url+'?v='+revision+quote:match);
   await writeFile(path.join(dist,file),source);
 }
 for (const [i,file] of binaries.entries()) { await mkdir(path.dirname(path.join(dist,file)),{recursive:true}); await writeFile(path.join(dist,file),binaryData[i]); }

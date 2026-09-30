@@ -4,17 +4,19 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import assert from 'node:assert/strict';
 import {strokeUV} from '../src/paper.js';
+// Phones fold New / Drafts / Open / Export into the header's Files menu; open it first when it is showing.
+const files=async page=>{if(await page.locator('#files-menu').isVisible()&&await page.locator('#editor-files').isHidden())await page.locator('#files-menu').click();};
 const root=fileURLToPath(new URL('../',import.meta.url)),out=path.join(root,'test-output');await mkdir(out,{recursive:true});
 const near=(a,b)=>a.forEach((v,i)=>assert.ok(Math.abs(v-b[i])<.00001,`${a} != ${b}`));
 const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
   const page=await browser.newPage({viewport:{width:1440,height:1040},acceptDownloads:true}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('dialog',d=>d.accept());
-  await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();assert.equal(await page.locator('.edition').textContent(),'STUDIO 16');
+  await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173');await page.locator('#undo:disabled').waitFor();assert.equal(await page.locator('.edition').textContent(),'SKY STUDIO');
   let box=await page.locator('#canvas').boundingBox();const xy=(x,y)=>[box.x+box.width*x,box.y+box.height*y];
   const drag=async(a,b)=>{await page.mouse.move(...xy(...a));await page.mouse.down();await page.mouse.move(...xy(...b),{steps:20});await page.mouse.up();};
   const count=async n=>page.waitForFunction(n=>document.querySelector('#object-count').textContent===`${n} / 80`,n);
-  const save=async name=>{const waiting=page.waitForEvent('download');await page.locator('#export').click();const file=path.join(out,name);await (await waiting).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
+  const save=async name=>{const waiting=page.waitForEvent('download');await files(page);await page.locator('#export').click();const file=path.join(out,name);await (await waiting).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   const history=async id=>{await page.locator('#'+id).click();await page.waitForFunction(()=>!document.body.classList.contains('busy'));};
   const uv=(e,p,index)=>strokeUV(e,e.points.at(index),p);
   const mirror=(a,b,p,k)=>{assert.equal(a.points.length,b.points.length);a.points.forEach((point,i)=>{const v=strokeUV(a,point,p);v[k]*=-1;near(strokeUV(b,b.points[i],p),v);assert.equal(point[3],b.points[i][3]);});};
@@ -36,10 +38,10 @@ try{
   await page.locator('#parallel-sheet').click();await count(10);const layered=await save('assists-layer.json');assert.equal(await page.locator('#painting-target').inputValue(),layered.entities[9].id);near(layered.entities[9].position,[0,1.4,.1]);assert.equal(layered.entities[9].points.length,0);assert.deepEqual(layered.entities.slice(0,9),freehand.entities);assert.equal(layered.entities.filter(e=>e.paperId===layered.entities[9].id).length,0);
   await page.setViewportSize({width:412,height:915});box=await page.locator('#canvas').boundingBox();await page.locator('#mirror-strokes').selectOption('u');await drag([.54,.43],[.58,.52]);await count(12);await page.locator('#toast').evaluate(e=>e.hidden=true);await page.locator('.drawing-assists').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'studio07-mobile-helpers.png')});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.locator('#view-ink').click();const result=await save('drawing-assists.json');assert.equal(result.version,5);assert.equal(result.entities[10].paperId,result.entities[9].id);mirror(result.entities[10],result.entities[11],result.entities[9],0);
-  await page.locator('#new').click();await page.locator('#project-file').setInputFiles(path.join(out,'drawing-assists.json'));await count(12);assert.deepEqual((await save('assists-reopened.json')).entities,result.entities);assert.deepEqual(errors,[]);
+  await files(page);await page.locator('#new').click();await page.locator('#project-file').setInputFiles(path.join(out,'drawing-assists.json'));await count(12);assert.deepEqual((await save('assists-reopened.json')).entities,result.entities);assert.deepEqual(errors,[]);
   await page.setViewportSize({width:1440,height:1040});await page.locator('#painting-target').selectOption(result.entities[0].id);await page.locator('#show-papers').click();await page.locator('#face-and-draw').click();await page.locator('#toast').evaluate(e=>e.hidden=true);await page.locator('.drawing-assists').scrollIntoViewIfNeeded();await page.screenshot({path:path.join(out,'studio07-drawing-helpers.png')});
   // The shared gesture changes must preserve ordinary free-space tools and grid snapping.
-  await page.locator('#new').click();await count(0);box=await page.locator('#canvas').boundingBox();await page.locator('#snap').check();await page.locator('[data-tool="block"]').click();await drag([.463,.48],[.574,.57]);await count(1);
+  await files(page);await page.locator('#new').click();await count(0);box=await page.locator('#canvas').boundingBox();await page.locator('#snap').check();await page.locator('[data-tool="block"]').click();await drag([.463,.48],[.574,.57]);await count(1);
   await page.locator('[data-tool="ellipse"]').click();await drag([.44,.41],[.54,.49]);await count(2);await page.locator('[data-tool="draw"]').click();await drag([.44,.55],[.54,.58]);await count(3);
   const plain=await save('assists-free-space.json'),block=plain.entities[0];for(const axis of [0,1])for(const sign of [-1,1]){const corner=(block.position[axis]+sign*block.size[axis]/2)*10;assert.ok(Math.abs(corner-Math.round(corner))<.00001);}assert.ok(plain.entities.every(e=>!e.paperId));await history('undo');await count(2);assert.deepEqual(errors,[]);
   console.log('PASS: live mirrored strokes/cancel/undo; curved and smoothed mirrors; endpoint snapping; translucent view preserves file; sheet depth/undo; blank parallel layers; mobile drawing; export/reopen; free-space/grid tools; no browser errors.');

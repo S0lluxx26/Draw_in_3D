@@ -5,4 +5,5 @@
 *.glb binary
 *.blend binary
 *.jpg binary
+*.webp binary
 *.wasm binary

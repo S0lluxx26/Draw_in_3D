@@ -32,7 +32,7 @@ export class ShowRecorder{
   constructor(player){this.player=player;$('show-record').onclick=()=>this.active?this.finish(true,'Recording cancelled.'):this.start();}
   available(){return typeof MediaRecorder!=='undefined'&&typeof this.player.canvas.captureStream==='function';}
   // Recording waits for the scenery too, so every video starts on the same opening shot.
-  reset(){const supported=this.available();$('show-record').disabled=!supported||!!this.player.waiting;$('show-record').textContent='Record video';note(supported).textContent=supported?(this.player.music?.enabled?'Video with music':'Silent video')+' · real time · keep this tab visible':'Canvas recording is unavailable in this browser.';}
+  reset(){const supported=this.available();$('show-record').disabled=!supported||!!this.player.waiting;$('show-record').textContent='Record video';$('show-record').classList.toggle('recording',false);note(supported).textContent=supported?(this.player.music?.enabled?'Video with music':'Silent video')+' · real time · keep this tab visible':'Canvas recording is unavailable in this browser.';}
   start(){
     if(!this.available()||!this.player.active||this.player.waiting||this.active||this.recorder)return;
     const bits=recordingBitrate(this.player.show?.duration);
@@ -56,7 +56,7 @@ export class ShowRecorder{
           (webm?withWebmDuration(raw,this.elapsed):Promise.resolve(raw)).then(blob=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=((this.player.show?.title||'Sky stories').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'')||'drone-show')+'.'+(webm?'webm':'mp4');a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);note().textContent='Video downloaded · '+Math.round(blob.size/1024/1024)+' MiB';});}
         else if(!cancelled)note().textContent='No video frames were recorded. Try another browser.';
       };
-      this.lock(true);recorder.start(1000);this.started=performance.now();p.clock.play(performance.now());$('show-record').textContent='Cancel recording';note().textContent=`Recording from takeoff${audio?' with music':''}… keep this tab visible.`;p.refresh();
+      this.lock(true);recorder.start(1000);this.started=performance.now();p.clock.play(performance.now());$('show-record').textContent='Cancel recording';$('show-record').classList.toggle('recording',true);note().textContent=`Recording from takeoff${audio?' with music':''}… keep this tab visible.`;p.refresh();
     }catch(error){this.finish(true,error.message);if(this.recorder?.state==='inactive')this.recorder=null;note().textContent=error.message;}
   }
   lock(locked){
@@ -71,6 +71,6 @@ export class ShowRecorder{
     if(this.recorder&&this.recorder.state!=='inactive')this.recorder.stop();
     this.stream?.getTracks().forEach(t=>t.stop());this.stream=null;p.music?.release?.();
     if(this.saved){p.camera.copy(this.saved.camera);p.orbit.target.copy(this.saved.target);p.frontMode=this.saved.frontMode;p.renderer.setPixelRatio(this.saved.ratio);p.renderer.setSize(p.canvas.clientWidth,p.canvas.clientHeight,false);p.clock.speed(this.saved.rate,performance.now());p.resize(p.canvas.clientWidth/p.canvas.clientHeight);this.saved=null;}
-    p.canvas.style.objectFit='';p.orbit.enabled=true;$('show-record').textContent='Record video';note().textContent=cancel?message:'Finishing video…';p.refresh();
+    p.canvas.style.objectFit='';p.orbit.enabled=true;$('show-record').textContent='Record video';$('show-record').classList.toggle('recording',false);note().textContent=cancel?message:'Finishing video…';p.refresh();
   }
 }

@@ -12,6 +12,7 @@ import {TIERS,QUALITY_LEVELS,resolveTier,browserEnvironment,FrameGovernor} from 
 import {ShowRecorder} from './show-recorder.js';
 import {ShowMusic} from './show-music.js';
 import {hardenOrbit} from './editor-look.js';
+import {translate as t} from './i18n.js';
 // The show waits at 00:00 for its scenery, but never longer than this on a stalled connection.
 const STAGE_WAIT_MS=15000;
 const $=id=>document.getElementById(id),stamp=t=>`${Math.floor(t/60).toString().padStart(2,'0')}:${Math.floor(t%60).toString().padStart(2,'0')}`;
@@ -36,7 +37,7 @@ const TRAIL_FRAGMENT='varying vec3 vColor;void main(){gl_FragColor=vec4(vColor,1
 export class DronePlayer{
   active=false;
   constructor(renderer,canvas,requestFrame,onExit){
-    Object.assign(this,{renderer,canvas,requestFrame,onExit});
+    Object.assign(this,{renderer,canvas,requestFrame,onExit});document.addEventListener('languagechange',()=>{if(this.active){this.localize();this.refresh();}});
     this.recorder=new ShowRecorder(this);this.music=new ShowMusic(()=>this.active?this.clock:null);this.music.onchange=()=>{if(this.active)this.syncMusic();};this.size=new THREE.Vector2();this.reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
     try{this.quality=QUALITY_LEVELS.includes(localStorage.getItem(QUALITY_KEY))?localStorage.getItem(QUALITY_KEY):'auto';}catch{this.quality='auto';}
     try{this.cameraMode=CAMERA_MODES.includes(localStorage.getItem(CAMERA_KEY))?localStorage.getItem(CAMERA_KEY):'follow';}catch{this.cameraMode='follow';}
@@ -71,6 +72,8 @@ export class DronePlayer{
     const [x,y,z]=pose.position.map((v,k)=>v-pose.target[k]),dist=Math.hypot(x,y,z),az=Math.atan2(x,z),polar=Math.acos(Math.max(-1,Math.min(1,y/dist)));
     Object.assign(this.orbit,{minAzimuthAngle:az-.95,maxAzimuthAngle:az+.95,minPolarAngle:Math.max(.2,polar-.8),maxPolarAngle:Math.min(Math.PI*.56,polar+.28),minDistance:dist*.4,maxDistance:dist*1.8});
   }
+  // The Demo's built-in names (its title, formations and phases) follow the app language; a show's own names stay as typed.
+  localize(){if(!this.show)return;const show=this.show,name=v=>show.demo?t(v):v;$('show-title').textContent=show.title||t(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');for(const b of $('show-cues').children)b.textContent=name(b.dataset.label);this.phaseShown=null;}
   syncMusic(){const b=$('show-music'),state=this.music.state,label={on:'Music on',off:'Music off',locked:'Tap for sound',unavailable:'No audio'}[state];if(b.dataset.state!==state){b.dataset.state=state;b.querySelector('.music-label').textContent=' '+label;b.setAttribute('aria-label',label);b.setAttribute('aria-pressed',String(state==='on'));b.disabled=state==='unavailable';b.classList.toggle('locked',state==='locked');}}
   start(show){
     if(this.active)this.teardown();
@@ -99,9 +102,9 @@ export class DronePlayer{
     // Compile every stage shader off the main path before hiding the loader, so the first close-up
     // of detailed drones does not stall (D3D shader compiles can take seconds).
     loadStageAsset().then(async gltf=>{if(!current())return;this.stage.attach(gltf);try{await this.renderer.compileAsync?.(this.scene,this.camera);}catch{}if(!current())return;loading.hidden=true;if(!gltf)$('show-quality').textContent+=' · scenery unavailable';ready();this.refresh();});
-    $('show-fleet').textContent=show.count.toLocaleString();$('show-tagline').textContent=show.count.toLocaleString()+' lights. One canvas. An open sky.';$('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';$('show-title').textContent=show.title||(show.custom?'YOUR INK, IN THE SKY':'SKY STORIES');this.recorder.reset();
+    $('show-fleet').textContent=show.count.toLocaleString();$('show-tagline').textContent=show.count.toLocaleString()+' lights. One canvas. An open sky.';$('drone-show').hidden=false;$('show-scrub').max=show.duration;$('show-speed').value='1';this.recorder.reset();
     $('show-quality').textContent={high:'CINEMATIC',balanced:'BALANCED',battery:'BATTERY SAVER'}[this.tierName];
-    $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.textContent=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});
+    $('show-cues').replaceChildren();show.cues.forEach(cue=>{const b=document.createElement('button');b.translate=false;b.dataset.label=cue.label;b.onclick=()=>this.seek(cue.time);b.dataset.time=cue.time;$('show-cues').append(b);});this.localize();
     this.music.start(show);this.syncMusic();
     this.resize(this.canvas.clientWidth/this.canvas.clientHeight);$('show-pause').focus({preventScroll:true});this.refresh();
   }
@@ -181,10 +184,10 @@ export class DronePlayer{
     this.stage.update(time,frame,this.camera,now,this.stage.wantsVelocity?sampleShow(this.show,time-.15,this.velocityFrame):null);
     if(this.composer)this.composer.render();else this.renderer.render(this.scene,this.camera);
     this.recorder.frame();
-    if(now-this.lastUI>100||!this.clock.playing||$('show-phase').textContent!==frame.phase){
-      this.lastUI=now;$('show-phase').textContent=frame.phase;$('show-time').textContent=stamp(time)+' / '+stamp(this.show.duration);$('show-scrub').value=time;
+    if(now-this.lastUI>100||!this.clock.playing||this.phaseShown!==frame.phase){
+      this.lastUI=now;if(this.phaseShown!==frame.phase){this.phaseShown=frame.phase;$('show-phase').textContent=this.show.demo?t(frame.phase):frame.phase;}$('show-time').textContent=stamp(time)+' / '+stamp(this.show.duration);$('show-scrub').value=time;
       const running=this.clock.playing||this.waiting&&this.autoplay;
-      const [icon,word]=running?['Ⅱ','Pause']:time>=this.show.duration?['↻','Replay']:['▶','Play'],pause=$('show-pause');if(pause.dataset.word!==word){pause.dataset.word=word;pause.firstElementChild.textContent=icon;pause.lastElementChild.textContent=' '+word;}$('show-pause').setAttribute('aria-label',running?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
+      const word=running?'Pause':time>=this.show.duration?'Replay':'Play',pause=$('show-pause');if(pause.dataset.word!==word){pause.dataset.word=word;pause.lastElementChild.textContent=' '+word;}$('show-pause').setAttribute('aria-label',running?'Pause drone show':time>=this.show.duration?'Replay drone show':'Play drone show');
       $('show-progress').style.width=(100*time/this.show.duration)+'%';
       const cue=[...this.show.cues].reverse().find(c=>time>=c.time-1);for(const button of $('show-cues').children){const active=Number(button.dataset.time)===cue?.time;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active));}
       let lit=0,sum=[0,0,0];const colors=frame.colors;for(let i=0;i<colors.length;i+=3){const r=colors[i],g=colors[i+1],b=colors[i+2];if(Math.max(r,g,b)>.05){lit++;sum[0]+=r;sum[1]+=g;sum[2]+=b;}}

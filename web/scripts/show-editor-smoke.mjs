@@ -3,13 +3,15 @@ import {mkdir,readFile,stat} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+// Phones fold New / Drafts / Open / Export into the header's Files menu; open it first when it is showing.
+const files=async page=>{if(await page.locator('#files-menu').isVisible()&&await page.locator('#editor-files').isHidden())await page.locator('#files-menu').click();};
 const out=fileURLToPath(new URL('../test-output/',import.meta.url));await mkdir(out,{recursive:true});
 const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,headless:true,args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
 try{
   const context=await browser.newContext({viewport:{width:1440,height:1040},acceptDownloads:true}),page=await context.newPage(),errors=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});page.on('dialog',d=>d.accept());
   await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173/');await page.locator('#undo:disabled').waitFor();
-  const download=async(id,name)=>{const pending=page.waitForEvent('download');await page.locator(id).click();const file=path.join(out,name);await(await pending).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
+  const download=async(id,name)=>{const pending=page.waitForEvent('download');if(id==='#export')await files(page);await page.locator(id).click();const file=path.join(out,name);await(await pending).saveAs(file);return JSON.parse(await readFile(file,'utf8'));};
   const change=async(id,value)=>{await page.locator(id).fill(String(value));await page.locator(id).dispatchEvent('change');};
   await page.locator('#add-paper').click();await page.locator('[data-tool=line]').click();let box=await page.locator('#canvas').boundingBox();
   await page.mouse.move(box.x+box.width*.44,box.y+box.height*.44);await page.mouse.down();await page.mouse.move(box.x+box.width*.58,box.y+box.height*.55,{steps:8});await page.mouse.up();

@@ -5,7 +5,7 @@ const browser=await chromium.launch({executablePath:process.env.DRAW3D_CHROME,he
 try{
   const page=await browser.newPage({acceptDownloads:true}),errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.addInitScript(()=>{const put=IDBObjectStore.prototype.put;window.failDraftWrites=true;IDBObjectStore.prototype.put=function(...args){if(window.failDraftWrites&&this.name==='scenes')throw new DOMException('Storage full','QuotaExceededError');return put.apply(this,args);};});
-  await page.goto('http://127.0.0.1:5173');await page.locator('#add-paper').click();await page.locator('#paper-name').fill('Unsaved first sheet');await page.locator('#paper-name').press('Tab');
+  await page.goto(process.env.DRAW3D_URL||'http://127.0.0.1:5173');await page.locator('#add-paper').click();await page.locator('#paper-name').fill('Unsaved first sheet');await page.locator('#paper-name').press('Tab');
   await page.locator('#retry-draft').waitFor({state:'visible'});await page.locator('#new').click();await page.locator('#retry-draft').waitFor({state:'visible'});
   await page.locator('#add-paper').click();await page.locator('#paper-name').fill('Unsaved second sheet');await page.locator('#paper-name').press('Tab');
   await page.waitForFunction(()=>document.querySelector('#draft-status').textContent.startsWith('2 drafts could not save'));

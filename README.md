@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 24: a title screen, a settings sheet, touch-sized controls
+
+![The title screen on a phone, the settings sheet, the player on a phone and the title screen on a PC](docs/media/studio24-ui.jpg)
+
+The app now opens on a **title screen**. Its key art is a Blender render of the Demo's butterfly and ship fireworks over the harbour, with three clear actions: **Watch the drone show**, **Design a show** and **Start drawing**. On phones it fills the screen in portrait and landscape; Back from the show returns to it, and the brand is a **Home** button. **Settings** open as a grouped sheet (a bottom sheet on phones) with real switches. Every screen uses **one set of SVG icons and touch-sized controls**, and phones get an icon tool rail and a **Files** menu. The Show editor's **＋ Demo formation…** is now a **picture library** of the twelve formations. In Vietnamese, the italic headline is fixed and the Demo's own names are translated. [Details and checks](docs/STUDIO24.md).
+
 ## Studio 23: fireworks all through the show, a growing Eiffel Tower, five balloons, a flying princess
 
 ![Five hot air balloons; the Eiffel Tower growing; the liner with its two escorts; the princess flying over the waving row of fire](docs/media/studio23-scenes.jpg)
