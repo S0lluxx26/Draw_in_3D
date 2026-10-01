@@ -87,7 +87,7 @@ export class DronePlayer{
     this.orbit=hardenOrbit(new OrbitControls(this.camera,this.canvas));this.orbit.target.set(0,15,0);this.freeLimits();this.orbit.enablePan=false;this.orbit.enableDamping=true;this.orbit.dampingFactor=.09;
     this.orbit.addEventListener('change',()=>{if(!this.updatingCamera)this.refresh();});this.orbit.addEventListener('start',()=>{this.frontMode=false;this.blend=null;});
     this.active=true;this.lastFrame=-Infinity;this.lastUI=-Infinity;this.frontMode=true;this.blend=null;this.waiting=true;this.autoplay=true;
-    this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r,sky:this.sky});$('drone-show').dataset.sky=this.sky;this.createDrones();this.precrowd(show);
+    this.stage=new SkyStage(this.scene,show,{tier:this.tier,renderer:r,sky:this.sky,quiet:this.reducedMotion});$('drone-show').dataset.sky=this.sky;this.createDrones();this.precrowd(show);
     if(this.tier.bloom){
       this.composer=new EffectComposer(r,new THREE.WebGLRenderTarget(1,1,{type:THREE.HalfFloatType,samples:this.tierName==='high'?4:0}));
       this.composer.addPass(new RenderPass(this.scene,this.camera));this.bloom=new UnrealBloomPass(new THREE.Vector2(256,256),.78,.55,1.05);this.composer.addPass(this.bloom);this.composer.addPass(new OutputPass());

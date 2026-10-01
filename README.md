@@ -4,6 +4,17 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 25: a living harbour
+
+![Floating lanterns round the launch area and sky lanterns over the city; bridge traffic; a spectator boat with its lights and wake; the late afternoon](docs/media/studio25-harbour-life.jpg)
+
+The harbour around the show is now alive:
+- **On the water:** a ring of **floating lanterns** drifts round the launch area, and **spectator boats** cruise with their navigation lights and glowing wakes. The water **glints** in the formation's colours, with a moonlight (or sunlight) path.
+- **Ashore:** **traffic** streams over the bridge and along the shore, and **cameras flash** in the crowd during the fireworks.
+- **In the sky:** **sky lanterns** rise over the city, with **shooting stars**, a **distant plane** and, in the late afternoon, **gulls** and drifting clouds.
+
+Each kind is one draw call, moved entirely on the graphics card and sized per device; it costs about nothing on phones. [Details and checks](docs/STUDIO25.md).
+
 ## Studio 24: a title screen, a settings sheet, touch-sized controls
 
 ![The title screen on a phone, the settings sheet, the player on a phone and the title screen on a PC](docs/media/studio24-ui.jpg)

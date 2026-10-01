@@ -11,6 +11,7 @@ import {mergeGeometries} from './vendor/addons/utils/BufferGeometryUtils.js';
 import {pyroSchedule,pyroParticles,PARTICLE_FLOATS,PYRO_VERTEX,PYRO_FRAGMENT,GRAVITY} from './pyro.js';
 import {LaserRig} from './lasers.js';
 import {stageUnit} from './drone-show.js';
+import {HarbourLife,excitement} from './harbour-life.js';
 
 const DEMO_SCALE=6;// demo motionScale that the Blender scenery is modelled for (metres)
 const MOON=new THREE.Vector3(.5,.3,-.81).normalize();
@@ -106,7 +107,7 @@ const skyShader={
       float sd=max(dot(d,sun),0.);// low sun: disc, corona and a wide warm haze
       c+=sunColor*(smoothstep(.99965-fwidth(sd),.99965+fwidth(sd),sd)*1.4+pow(sd,700.)*.3+pow(sd,30.)*.05+pow(sd,5.)*.02);
       if(clouds>0.){// thin evening clouds on a layer above the harbour, lit from the sun side
-        vec2 uv=d.xz/(max(h,0.)+.12);float n=noise(vec3(uv*1.3,1.7))*.62+noise(vec3(uv*4.1,5.3))*.28+noise(vec3(uv*11.,9.1))*.1;
+        vec2 uv=d.xz/(max(h,0.)+.12)+vec2(time*.004,time*.0015);float n=noise(vec3(uv*1.3,1.7))*.62+noise(vec3(uv*4.1,5.3))*.28+noise(vec3(uv*11.,9.1))*.1;
         float cl=smoothstep(.52,.78,n)*smoothstep(.015,.1,h)*(1.-smoothstep(.3,.65,h))*clouds;
         c=mix(c,vec3(.5,.26,.18)*(.3+1.2*pow(sd,2.))+vec3(.03,.035,.06),cl*.7);}
       if(h<0.)c=mix(c,horizon*.35,clamp(-h*6.,0.,1.));
@@ -150,7 +151,7 @@ const waterShader={
 };
 
 export class SkyStage{
-  constructor(scene,show,{tier,renderer,sky='night'}){
+  constructor(scene,show,{tier,renderer,sky='night',quiet=false}){
     Object.assign(this,{scene,show,tier,renderer});
     this.scale=stageScale(show);this.group=new THREE.Group();scene.add(this.group);
     const s=this.scale;
@@ -186,6 +187,8 @@ export class SkyStage{
     this.createPads();
     this.buildPyro(LAUNCHERS.map(p=>p.map(v=>v*s)));
     if(show.lasers!==false){this.lasers=new LaserRig(show,s,{bloom:tier.bloom});this.group.add(this.lasers.mesh);}
+    // The living harbour (boats, lanterns, traffic, birds…), sized by the tier; ?life=0 leaves it out for comparisons.
+    if(!/[?&]life=0(&|$)/.test(globalThis.location?.search||'')){this.life=new HarbourLife({scale:s,budget:tier.life??1,quiet});this.group.add(this.life.group);}
     this.setSky(sky);
   }
   // Switch background live: sky, fog, water, lights, reflections and the scenery's lit windows.
@@ -197,7 +200,7 @@ export class SkyStage{
     this.hemi.color.set(b.hemi[0]);this.hemi.groundColor.set(b.hemi[1]);this.hemi.intensity=b.hemi[2];
     this.moon.color.set(b.key[0]);this.moon.intensity=b.key[1];this.moon.position.copy(b.key[2]).multiplyScalar(100);
     this.scene.environment=environment(this.renderer,this.sky.userData.mode);this.scene.environmentIntensity=b.environment;
-    this.background=b;this.applyScenery();
+    this.background=b;this.applyScenery();this.life?.setSky(b.night);this.life?.setFog(this.scene.fog.density);
   }
   get skyMode(){return this.sky.userData.mode;}
   // Shared Blender materials follow the background: windows glow at night, hills catch the afternoon light.
@@ -209,7 +212,7 @@ export class SkyStage{
   // Ship fireworks: one static buffer; the vertex shader evaluates every particle from show time.
   buildPyro(origins){
     if(this.pyro){this.pyro.geometry.dispose();this.pyro.material.dispose();this.pyro.removeFromParent();this.pyro=null;}
-    const data=pyroParticles(pyroSchedule(this.show,origins,{scale:this.scale}));if(!data.length)return;
+    const shells=pyroSchedule(this.show,origins,{scale:this.scale}),data=pyroParticles(shells);this.bursts=shells.map(sh=>sh.t0+sh.delay).sort((a,b)=>a-b);if(!data.length)return;
     const buffer=new THREE.InterleavedBuffer(data,PARTICLE_FLOATS),geometry=new THREE.BufferGeometry(),n=data.length/PARTICLE_FLOATS;
     for(const [name,size,offset] of [['shell',2,0],['origin',3,2],['launch',3,5],['star',3,8],['info',4,11],['look',4,15],['extra',2,19],['shift',4,21]])geometry.setAttribute(name,new THREE.InterleavedBufferAttribute(buffer,size,offset));
     geometry.setAttribute('position',new THREE.InterleavedBufferAttribute(buffer,3,2));geometry.setDrawRange(0,n);
@@ -265,6 +268,7 @@ export class SkyStage{
     const t=now/1000,s=this.scale;this.sky.material.uniforms.time.value=t;this.stars.material.uniforms.time.value=t;this.water.material.uniforms.time.value=t;
     const beacons=this.materials?.get('Beacons');if(beacons){const on=(t%1.7)<.22;beacons.color.setRGB(on?9:.25,on?.45:.01,on?.27:.01);}
     if(this.pyro)this.pyro.material.uniforms.time.value=time;
+    this.life?.update(t,excitement(this.bursts,time));
     this.lasers?.update(time,camera,this.viewHeight);
     this.key.position.copy(camera.position).addScaledVector(camera.up,2*s);
     for(const ship of this.ships||[]){// gentle swell
@@ -289,7 +293,7 @@ export class SkyStage{
     this.spin.value=(Math.min(Math.max(time,this.flight[0]),this.flight[1])-this.flight[0])*42;// props turn only while flying
   }
   // The formation lights the scenery: average LED colour at the framing centre.
-  setGlow(center,color,amount){this.focus=this.focus||new THREE.Vector3();this.focus.fromArray(center);this.glow.position.copy(this.focus);this.glow.color.copy(color);this.glow.intensity=amount;}
+  setGlow(center,color,amount){this.focus=this.focus||new THREE.Vector3();this.focus.fromArray(center);this.glow.position.copy(this.focus);this.glow.color.copy(color);this.glow.intensity=amount;this.life?.setGlow(color,amount);}
   dispose(){
     this.scenery?.removeFromParent();
     this.group.traverse(o=>{if(o.isInstancedMesh)o.dispose();if(o.geometry&&!o.geometry.userData.shared)o.geometry.dispose();for(const m of [o.material].flat())if(m&&!m.userData.shared){m.map?.dispose();m.dispose();}});// the drone frame uses a material array
