@@ -12,6 +12,7 @@ import {pyroSchedule,pyroParticles,PARTICLE_FLOATS,PYRO_VERTEX,PYRO_FRAGMENT,GRA
 import {LaserRig} from './lasers.js';
 import {stageUnit} from './drone-show.js';
 import {HarbourLife,excitement} from './harbour-life.js';
+import {SceneAccents} from './scene-accents.js';
 
 const DEMO_SCALE=6;// demo motionScale that the Blender scenery is modelled for (metres)
 const MOON=new THREE.Vector3(.5,.3,-.81).normalize();
@@ -188,7 +189,8 @@ export class SkyStage{
     this.buildPyro(LAUNCHERS.map(p=>p.map(v=>v*s)));
     if(show.lasers!==false){this.lasers=new LaserRig(show,s,{bloom:tier.bloom});this.group.add(this.lasers.mesh);}
     // The living harbour (boats, lanterns, traffic, birds…), sized by the tier; ?life=0 leaves it out for comparisons.
-    if(!/[?&]life=0(&|$)/.test(globalThis.location?.search||'')){this.life=new HarbourLife({scale:s,budget:tier.life??1,quiet});this.group.add(this.life.group);}
+    // …and the small accent that belongs to each scene (bubbles for the fish, confetti for the cake…).
+    if(!/[?&]life=0(&|$)/.test(globalThis.location?.search||'')){this.life=new HarbourLife({scale:s,budget:tier.life??1,quiet});this.accents=new SceneAccents(show,{waterY:-1.1*s,budget:tier.life??1,quiet});this.group.add(this.life.group,this.accents.group);}
     this.setSky(sky);
   }
   // Switch background live: sky, fog, water, lights, reflections and the scenery's lit windows.
@@ -200,7 +202,7 @@ export class SkyStage{
     this.hemi.color.set(b.hemi[0]);this.hemi.groundColor.set(b.hemi[1]);this.hemi.intensity=b.hemi[2];
     this.moon.color.set(b.key[0]);this.moon.intensity=b.key[1];this.moon.position.copy(b.key[2]).multiplyScalar(100);
     this.scene.environment=environment(this.renderer,this.sky.userData.mode);this.scene.environmentIntensity=b.environment;
-    this.background=b;this.applyScenery();this.life?.setSky(b.night);this.life?.setFog(this.scene.fog.density);
+    this.background=b;this.applyScenery();this.life?.setSky(b.night);this.life?.setFog(this.scene.fog.density);this.accents?.setNight(b.night);
   }
   get skyMode(){return this.sky.userData.mode;}
   // Shared Blender materials follow the background: windows glow at night, hills catch the afternoon light.
@@ -268,7 +270,7 @@ export class SkyStage{
     const t=now/1000,s=this.scale;this.sky.material.uniforms.time.value=t;this.stars.material.uniforms.time.value=t;this.water.material.uniforms.time.value=t;
     const beacons=this.materials?.get('Beacons');if(beacons){const on=(t%1.7)<.22;beacons.color.setRGB(on?9:.25,on?.45:.01,on?.27:.01);}
     if(this.pyro)this.pyro.material.uniforms.time.value=time;
-    this.life?.update(t,excitement(this.bursts,time));
+    this.life?.update(t,excitement(this.bursts,time));this.accents?.update(time,t);
     this.lasers?.update(time,camera,this.viewHeight);
     this.key.position.copy(camera.position).addScaledVector(camera.up,2*s);
     for(const ship of this.ships||[]){// gentle swell

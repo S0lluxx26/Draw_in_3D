@@ -5,7 +5,7 @@ import path from 'node:path';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const dist = path.join(root, 'dist');
 await mkdir(path.join(dist, 'vendor'), { recursive: true });
-const files=['i18n.js', 'vi.js', 'index.html', 'style.css', 'editor-tools.css', 'editor.js', 'editor-look.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'show-camera.js', 'quality.js', 'pyro.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'sky-stage.js', 'harbour-life.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'formation-design.js', 'formation-designer.js', 'show-editor.css', 'ui.css', 'show-worker.js', 'show-recorder.js', 'show-music.js', 'lasers.js', 'demo-library.js'];
+const files=['i18n.js', 'vi.js', 'index.html', 'style.css', 'editor-tools.css', 'editor.js', 'editor-look.js', 'model.js', 'geometry.js', 'images.js', 'editing.js', 'paths.js', 'paper.js', 'stroke-processing.js', 'drawing-assists.js', 'drafts.js', 'drone-show.js', 'show-camera.js', 'quality.js', 'pyro.js', 'demo-settings.js', 'formation-assets.js', 'drone-player.js', 'sky-stage.js', 'harbour-life.js', 'scene-accents.js', 'drone-show.css', 'show-project.js', 'show-editor.js', 'formation-design.js', 'formation-designer.js', 'show-editor.css', 'ui.css', 'show-worker.js', 'show-recorder.js', 'show-music.js', 'lasers.js', 'demo-library.js'];
 const binaries=['assets/sky-stage.glb', 'assets/keyart-wide.webp', 'assets/keyart-tall.webp'];
 const sources=await Promise.all(files.map(file=>readFile(path.join(root,'src',file),'utf8')));
 const binaryData=await Promise.all(binaries.map(file=>readFile(path.join(root,'src',file))));

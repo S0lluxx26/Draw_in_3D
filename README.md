@@ -4,6 +4,12 @@
 
 Android AR drawing and small game-map editor prototype, with a **PC browser editor** sharing the same editable project files. Built for a **Galaxy S9+ baseline**, with a later Galaxy S22 Ultra review.
 
+## Studio 26: every scene has its own little touch
+
+![Bubbles round the fish, the Eiffel Tower's searchlight, fireboats saluting the ship, confetti for the cake, lanterns with the balloons, hearts for the heart](docs/media/studio26-scene-accents.jpg)
+
+Each scene now brings one small, light detail of its own, fading in as the drones fly in. The robot sends out radio rings, the fish blows bubbles and the butterfly gets fireflies. The Eiffel Tower sweeps two searchlights, fireboats salute the big ship with water arches, and ripples spread under the whale. Glitter falls round the firework star, embers rise over the row of fire, confetti falls on the cake and Happy day, sparks burst under the Starship, hearts float up beside the heart, and shooting stars fly from the star. Your own formations get one too, from their motion or effect. Each accent is a single point cloud on the graphics card, and no more than two ever draw at once. [Details and checks](docs/STUDIO26.md).
+
 ## Studio 25: a living harbour
 
 ![Floating lanterns round the launch area and sky lanterns over the city; bridge traffic; a spectator boat with its lights and wake; the late afternoon](docs/media/studio25-harbour-life.jpg)
